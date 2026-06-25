@@ -1,0 +1,124 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "data": {
+          "name": "Name",
+          "host": "Host",
+          "port": "Port",
+          "hostid": "Modbus slave ID",
+          "scan_interval": "Scan interval"
+        }
+      }
+    },
+    "error": {
+      "already_configured": "This host is already configured",
+      "invalid_host": "Invalid host or IP address"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "hostid": "Modbus slave ID",
+          "scan_interval": "Scan interval"
+        }
+      }
+    }
+  },
+  "entity": {
+    "climate": {
+      "hrds_climate": { "name": "Climate" }
+    },
+    "sensor": {
+      "room_temperature": { "name": "Room temperature" },
+      "outdoor_temperature": { "name": "Outdoor temperature" },
+      "water_temperature": { "name": "Water temperature" },
+      "supply_temperature": { "name": "Supply air temperature" },
+      "room_humidity": { "name": "Room humidity" },
+      "air_quality": { "name": "Air quality" },
+      "actual_setpoint": { "name": "Active setpoint" },
+      "supply_fan_output": { "name": "Supply fan output" },
+      "compressor_output": { "name": "Compressor output" },
+      "supply_fan_rpm": { "name": "Supply fan speed" },
+      "unit_status": {
+        "name": "Unit status",
+        "state": {
+          "off_by_display": "Off (display)",
+          "off_by_di": "Off (digital input)",
+          "off_by_bms": "Off (Modbus)",
+          "off_by_scheduler": "Off (scheduler)",
+          "off_by_rtc": "Off (clock)",
+          "on": "On"
+        }
+      },
+      "mode_status": {
+        "name": "Mode status",
+        "state": {
+          "summer_manual": "Summer (manual)",
+          "winter_manual": "Winter (manual)",
+          "summer_auto": "Summer (auto)",
+          "winter_auto": "Winter (auto)",
+          "summer_di": "Summer (digital input)",
+          "winter_di": "Winter (digital input)"
+        }
+      },
+      "supply_fan_status": {
+        "name": "Supply fan status",
+        "state": {
+          "disabled": "Disabled",
+          "off": "Off",
+          "wait_on": "Starting",
+          "on": "On",
+          "wait_off": "Stopping",
+          "alarm": "Alarm"
+        }
+      },
+      "compressor_status": {
+        "name": "Compressor status",
+        "state": {
+          "disabled": "Disabled",
+          "alarm": "Alarm",
+          "manual": "Manual",
+          "wait_on": "Starting",
+          "on": "On",
+          "wait_off": "Stopping",
+          "off": "Off"
+        }
+      },
+      "operating_mode": {
+        "name": "Operating mode (season)",
+        "state": {
+          "summer": "Summer",
+          "winter": "Winter",
+          "auto": "Auto"
+        }
+      }
+    },
+    "binary_sensor": {
+      "dehumidify_request": { "name": "Dehumidify requested" },
+      "alarm_active": { "name": "Alarm active" }
+    },
+    "switch": {
+      "unit_on_off": { "name": "Unit on/off (Modbus)" },
+      "dehumidify": { "name": "Dehumidify (Modbus)" },
+      "active_cooling": { "name": "Active cooling (Modbus)" },
+      "enable_onoff_bms": { "name": "Enable on/off via Modbus" },
+      "enable_dehumidify_bms": { "name": "Enable dehumidify via Modbus" },
+      "enable_integration_bms": { "name": "Enable cooling via Modbus" }
+    },
+    "number": {
+      "humidity_setpoint": { "name": "Humidity setpoint" },
+      "summer_setpoint": { "name": "Summer setpoint" },
+      "winter_setpoint": { "name": "Winter setpoint" },
+      "fan_min_speed_dehumidify": { "name": "Fan min speed (dehumidify)" },
+      "fan_max_speed_dehumidify": { "name": "Fan max speed (dehumidify)" },
+      "fan_min_speed_cooling": { "name": "Fan min speed (cooling)" },
+      "fan_max_speed_cooling": { "name": "Fan max speed (cooling)" },
+      "fan_manual_speed": { "name": "Manual fan speed" }
+    }
+  }
+}

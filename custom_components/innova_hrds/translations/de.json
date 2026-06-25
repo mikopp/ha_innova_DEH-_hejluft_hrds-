@@ -1,0 +1,124 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "data": {
+          "name": "Name",
+          "host": "Host",
+          "port": "Port",
+          "hostid": "Modbus-Slave-ID",
+          "scan_interval": "Abfrageintervall"
+        }
+      }
+    },
+    "error": {
+      "already_configured": "Dieser Host ist bereits konfiguriert",
+      "invalid_host": "Ungültiger Host oder ungültige IP-Adresse"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Optionen",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "hostid": "Modbus-Slave-ID",
+          "scan_interval": "Abfrageintervall"
+        }
+      }
+    }
+  },
+  "entity": {
+    "climate": {
+      "hrds_climate": { "name": "Klima" }
+    },
+    "sensor": {
+      "room_temperature": { "name": "Raumtemperatur" },
+      "outdoor_temperature": { "name": "Außentemperatur" },
+      "water_temperature": { "name": "Wassertemperatur" },
+      "supply_temperature": { "name": "Zulufttemperatur" },
+      "room_humidity": { "name": "Raumluftfeuchtigkeit" },
+      "air_quality": { "name": "Luftqualität" },
+      "actual_setpoint": { "name": "Aktiver Sollwert" },
+      "supply_fan_output": { "name": "Zuluftventilator-Ausgang" },
+      "compressor_output": { "name": "Kompressor-Ausgang" },
+      "supply_fan_rpm": { "name": "Zuluftventilator-Drehzahl" },
+      "unit_status": {
+        "name": "Gerätestatus",
+        "state": {
+          "off_by_display": "Aus (Display)",
+          "off_by_di": "Aus (Digitaleingang)",
+          "off_by_bms": "Aus (Modbus)",
+          "off_by_scheduler": "Aus (Zeitprogramm)",
+          "off_by_rtc": "Aus (Uhr)",
+          "on": "Ein"
+        }
+      },
+      "mode_status": {
+        "name": "Modus-Status",
+        "state": {
+          "summer_manual": "Sommer (manuell)",
+          "winter_manual": "Winter (manuell)",
+          "summer_auto": "Sommer (automatisch)",
+          "winter_auto": "Winter (automatisch)",
+          "summer_di": "Sommer (Digitaleingang)",
+          "winter_di": "Winter (Digitaleingang)"
+        }
+      },
+      "supply_fan_status": {
+        "name": "Zuluftventilator-Status",
+        "state": {
+          "disabled": "Deaktiviert",
+          "off": "Aus",
+          "wait_on": "Startet",
+          "on": "Ein",
+          "wait_off": "Stoppt",
+          "alarm": "Alarm"
+        }
+      },
+      "compressor_status": {
+        "name": "Kompressor-Status",
+        "state": {
+          "disabled": "Deaktiviert",
+          "alarm": "Alarm",
+          "manual": "Manuell",
+          "wait_on": "Startet",
+          "on": "Ein",
+          "wait_off": "Stoppt",
+          "off": "Aus"
+        }
+      },
+      "operating_mode": {
+        "name": "Betriebsmodus (Saison)",
+        "state": {
+          "summer": "Sommer",
+          "winter": "Winter",
+          "auto": "Automatik"
+        }
+      }
+    },
+    "binary_sensor": {
+      "dehumidify_request": { "name": "Entfeuchtung angefordert" },
+      "alarm_active": { "name": "Alarm aktiv" }
+    },
+    "switch": {
+      "unit_on_off": { "name": "Gerät ein/aus (Modbus)" },
+      "dehumidify": { "name": "Entfeuchtung (Modbus)" },
+      "active_cooling": { "name": "Aktive Kühlung (Modbus)" },
+      "enable_onoff_bms": { "name": "Ein/Aus über Modbus freigeben" },
+      "enable_dehumidify_bms": { "name": "Entfeuchtung über Modbus freigeben" },
+      "enable_integration_bms": { "name": "Kühlung über Modbus freigeben" }
+    },
+    "number": {
+      "humidity_setpoint": { "name": "Feuchte-Sollwert" },
+      "summer_setpoint": { "name": "Sommer-Sollwert" },
+      "winter_setpoint": { "name": "Winter-Sollwert" },
+      "fan_min_speed_dehumidify": { "name": "Ventilator min. Drehzahl (Entfeuchtung)" },
+      "fan_max_speed_dehumidify": { "name": "Ventilator max. Drehzahl (Entfeuchtung)" },
+      "fan_min_speed_cooling": { "name": "Ventilator min. Drehzahl (Kühlung)" },
+      "fan_max_speed_cooling": { "name": "Ventilator max. Drehzahl (Kühlung)" },
+      "fan_manual_speed": { "name": "Manuelle Ventilatordrehzahl" }
+    }
+  }
+}

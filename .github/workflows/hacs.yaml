@@ -1,0 +1,24 @@
+# HACS (Home Assistant Community Store) validation.
+#
+# Validates that the repository is a well-formed HACS "integration": correct
+# repository structure, a hacs.json, a README, a valid manifest, etc. This is
+# what lets users install the integration as a HACS custom repository. Runs on
+# every push, on pull requests, and once a day on a schedule so we notice if a
+# change in HACS' rules breaks the repo.
+name: HACS
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hacs/action@main
+        with:
+          category: integration

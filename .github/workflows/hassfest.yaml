@@ -1,0 +1,20 @@
+# hassfest validation.
+#
+# `hassfest` is Home Assistant's own manifest/translation validator. It checks
+# that custom_components/innova_hrds/manifest.json is well-formed (domain,
+# requirements, codeowners, iot_class, version, ...) and that the translation
+# files are consistent. This is the canonical "will Home Assistant accept this
+# integration?" check and runs on every push and pull request.
+name: hassfest
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: home-assistant/actions/hassfest@master
