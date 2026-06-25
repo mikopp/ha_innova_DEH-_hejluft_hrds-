@@ -3,7 +3,7 @@
 # Innova DEH+ / hej.luft HRDS+ — Home Assistant integration
 
 Home Assistant custom integration for the **Innova DEH+** air dehumidification
-module (sold in Austria as the **hej.luft HRDS+**) over **Modbus TCP**.
+module (sold in Austria by https://www.hejluft.at/ as the **HRDS+**) over **Modbus TCP**.
 
 ## Build status
 
