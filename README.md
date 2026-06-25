@@ -1,3 +1,5 @@
+**ATTENTION** This is not done yet, use at your own risk
+
 # Innova DEH+ / hej.luft HRDS+ — Home Assistant integration
 
 Home Assistant custom integration for the **Innova DEH+** air dehumidification
