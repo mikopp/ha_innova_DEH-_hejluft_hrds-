@@ -9,10 +9,10 @@ reference for building the Home Assistant integration in this repository.
 
 | File | What it is |
 |------|------------|
-| `HRDS+_Modbus_RTU_RS485_DE.pdf` | **Modbus RTU/RS-485 connection & register manual** (German). The source of truth for all register addresses. |
-| `HRDS+_Technisches_Handbuch_DE.pdf` | Technical manual — installation, operation, maintenance, technical data (German, 87 pp). |
-| `HRDS+_Benutzerhandbuch_DE.pdf` | End-user manual (German, 12 pp). |
-| `MODBUS_REGISTERS.md` | **Distilled, machine-readable register map** extracted from the Modbus PDF. Start here for implementation. |
+| [HRDS+_Modbus_RTU_RS485_DE.pdf](HRDS+_Modbus_RTU_RS485_DE.pdf) | **Modbus RTU/RS-485 connection & register manual** (German). The source of truth for all register addresses. |
+| [HRDS+_Technisches_Handbuch_DE.pdf](HRDS+_Technisches_Handbuch_DE.pdf) | Technical manual — installation, operation, maintenance, technical data (German, 87 pp). |
+| [HRDS+_Benutzerhandbuch_DE.pdf](HRDS+_Benutzerhandbuch_DE.pdf) | End-user manual (German, 12 pp). |
+| [MODBUS_REGISTERS.md](MODBUS_REGISTERS.md) | **Distilled, machine-readable register map** extracted from the Modbus PDF. Start here for implementation. |
 
 ## What the unit is
 
