@@ -97,7 +97,7 @@ ruff format .
 GitHub Actions (in `.github/workflows/`):
 * `lint.yaml` — Ruff lint + format check (Python).
 * `hassfest.yaml` — Home Assistant manifest/translation validation.
-* `hacs.yaml` / `validate.yaml` — HACS repository validation (also daily).
+* `hacs.yaml` — HACS repository validation (also daily); ignores `brands` (not yet in the HACS brands repo).
 * `release.yaml` — re-runs hassfest + hacs when a release is published.
 
 No unit tests yet.
