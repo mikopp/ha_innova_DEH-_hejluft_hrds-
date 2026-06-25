@@ -98,6 +98,22 @@ COMPRESSOR_STATUS = {
 }
 OPERATING_MODE = {0: "summer", 1: "winter", 2: "auto"}
 
+# HA00 (reg 1803) — source for room temperature and humidity probes.
+# 0 = no display sensors; external probes on AI2/AI3 are used if wired.
+# 5/6 = CNU2 display (the wired remote with built-in T/H sensors).
+# 1-4 = older CNU / Epj display variants (rare).
+# Default from factory: 6 (CNU2 with both T and H sensors).
+PROBE_SOURCE = {
+    0: "none_or_external",
+    1: "cnu_temp",
+    2: "cnu_temp_humidity",
+    3: "epj_temp",
+    4: "epj_temp_humidity",
+    5: "cnu2_temp",
+    6: "cnu2_temp_humidity",
+    "default": 6,
+}
+
 # ------------------------------------------------------------------
 # Entity-key constants (== Home Assistant object_id / translation_key)
 # ------------------------------------------------------------------
@@ -138,6 +154,11 @@ C_ACTIVE_COOLING = "active_cooling"
 C_ENABLE_ONOFF_BMS = "enable_onoff_bms"
 C_ENABLE_DEHUM_BMS = "enable_dehumidify_bms"
 C_ENABLE_INTEG_BMS = "enable_integration_bms"
+# Read-write selects
+C_PROBE_SOURCE = "probe_source"
+# Derived binary sensors (bit-extracted from packed alarm registers)
+C_TEMP_PROBE_OK = "temp_probe_ok"
+C_HUMIDITY_PROBE_OK = "humidity_probe_ok"
 
 # Keys the (composite) climate entity reads/writes.
 CLIMATE_CURRENT_TEMP = C_ROOM_TEMPERATURE
@@ -431,6 +452,39 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "SWITCH": {"off": 0, "on": 1},
         "NAME": "Enable cooling via Modbus",
     },
+    # --- T/H probe source (HA00, holding register R/W) ---
+    # Controls which sensor supplies room temperature and humidity readings.
+    # Set to 0 ("none_or_external") when no display is connected; external
+    # NTC/0-10V probes on AI2/AI3 are then used if wired.
+    C_PROBE_SOURCE: {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": 1803,
+        "DT": C_DT_UINT16,
+        "VALUES": PROBE_SOURCE,
+        "NAME": "T/H probe source (HA00)",
+    },
+    # --- Probe-OK binary sensors derived from packed alarm registers ---
+    # PackedAlarm_2 (reg 769): bit 11 = AL28 (room temperature probe fault).
+    # PackedAlarm_3 (reg 770): bit  1 = AL34 (room humidity probe fault).
+    # BITMASK: which bit to check; BITMASK_INVERT: alarm SET → probe NOT OK.
+    C_TEMP_PROBE_OK: {
+        "RT": C_REG_TYPE_INPUT_REGISTERS,
+        "REG": 769,
+        "DT": C_DT_UINT16,
+        "SWITCH": {"off": 0, "on": 1},
+        "BITMASK": 11,
+        "BITMASK_INVERT": True,
+        "NAME": "Room temperature probe OK",
+    },
+    C_HUMIDITY_PROBE_OK: {
+        "RT": C_REG_TYPE_INPUT_REGISTERS,
+        "REG": 770,
+        "DT": C_DT_UINT16,
+        "SWITCH": {"off": 0, "on": 1},
+        "BITMASK": 1,
+        "BITMASK_INVERT": True,
+        "NAME": "Room humidity probe OK",
+    },
 }
 
 # Registers written (in order) when the integration is set up, to make sure
@@ -565,6 +619,10 @@ def is_entity_switch(props: Dict[str, Any]) -> bool:
 
 def is_entity_select(props: Dict[str, Any]) -> bool:
     return get_entity_select(props) not in (None, {})
+
+
+def get_entity_bitmask(props: Dict[str, Any]) -> int | None:
+    return props.get("BITMASK")
 
 
 def is_entity_climate(props: Dict[str, Any]) -> bool:

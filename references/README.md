@@ -128,6 +128,54 @@ Fan mode is **independent of HVAC mode** — changing Dry ↔ Cool does not rese
 the fan mode; switching to Off also turns off the unit via `Status_OnOff_byBMS`
 (1105) but does not change the fan speed register.
 
+## Probes: built-in, display, and external sensors
+
+Understanding which sensors are physically present and which need to be
+installed is essential for setting up the integration. Full detail is in
+[`MODBUS_REGISTERS.md` §14](./MODBUS_REGISTERS.md#14-probes-built-in-display-and-external-sensors).
+Short summary:
+
+### Always present (factory-wired inside the unit)
+
+| Sensor | Register | What it does |
+|--------|----------|-------------|
+| Evaporator temperature | 511 (`AI_Tevaporation`) | Compressor modulation — always active |
+| Water circuit temperature | 501 (`AI_Twater`) | Over-temperature / antifreeze protection — always active |
+
+### Need a display or external probe (not present by default)
+
+| Sensor | Register | Probe type | Used for |
+|--------|----------|-----------|---------|
+| Room temperature | 499 (`AI_TreturnRoom`) | NTC 10 kΩ B3435, or CNU2 display | Automatic cooling/heating trigger; alarm-gating |
+| Room humidity | 505 (`AI_HretRoom`) | 0–10 V or 4–20 mA humidity transmitter, or CNU2 display | Automatic dehumidify trigger |
+| Outdoor temperature | 500 (`AI_Toutdoor`) | NTC 10 kΩ B3435, IP65 | Only used for Free-Cooling/Heating (PG03); otherwise display-only |
+| Exhaust temperature | 502 (`AI_Texhaust`) | NTC 10 kΩ B3435 | Display / monitoring only |
+| Discharge temperature | 503 (`AI_Tdischarge`) | NTC 10 kΩ B3435 | Display / monitoring only |
+
+### Configuring the probe source — HA00 (register 1803)
+
+The **HA00** parameter (holding register 1803) tells the unit which source to
+use for room T/H. The factory default is `6` (CNU2 display with both sensors).
+
+| Scenario | Set HA00 to |
+|---------|------------|
+| Wired CNU2 display present (T + H) | `6` (default) |
+| Wired CNU2 display present (T only) | `5` |
+| External NTC (T) + humidity transmitter (H) on AI2/AI3 | `0` |
+| No display, no external probes (fully manual BMS mode) | `0` + set PH01 = 0 |
+
+The HA integration exposes HA00 as a `select` entity (`T/H probe source`).
+
+### Probe fault alarms
+
+When the configured probe source is absent, the unit raises:
+* **AL28** — room temperature probe fault (stops automatic cooling/heating)
+* **AL34** — room humidity probe fault (stops automatic dehumidification)
+
+The HA integration decodes these from the packed alarm registers (769/770) and
+exposes them as `temp_probe_ok` / `humidity_probe_ok` binary sensors. When
+either is OFF, the climate entity suppresses the corresponding current value.
+
 ## How this maps onto the Home Assistant integration
 
 The integration models the unit as a **climate entity** plus supporting

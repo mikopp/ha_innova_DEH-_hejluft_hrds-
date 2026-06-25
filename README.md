@@ -28,19 +28,93 @@ The integration talks to the unit's control board via Modbus TCP and exposes:
   * Fan mode is selectable: **off** (passive airflow from central MVHR only) /
     **low** / **medium** / **high** — controls the unit's own supply fan via
     the manual fan speed register. Fan mode persists across HVAC mode changes.
-* **Sensors** — room/outdoor/water/supply temperatures, room humidity, air
-  quality, fan output %, fan RPM, compressor output %, active setpoint, and
-  enum status sensors (unit status, season, fan status, compressor status).
-* **Binary sensors** — dehumidify requested, fan integration active, alarm
-  active.
+* **Sensors** — see entity table below.
+* **Binary sensors** — dehumidify requested, fan integration active, probe
+  health, alarm active.
 * **Switches** — unit on/off, dehumidify, active cooling, plus the three
   "enable control via Modbus" registers.
 * **Numbers** — humidity setpoint, summer/winter temperature setpoints, and the
   per-mode fan speed bands.
+* **Select** — T/H probe source (HA00).
 
 See [`references/README.md`](references/README.md) for the full capability list
 and [`references/MODBUS_REGISTERS.md`](references/MODBUS_REGISTERS.md) for the
 register-level detail.
+
+## Entity reference
+
+Entities marked **¹** are only meaningful when a room temperature probe is
+present (CNU2 display or external NTC). Entities marked **²** require a room
+humidity probe. Entities marked **³** are built into the unit's control board
+and are always available. See [probe requirements](#probe-requirements) below
+and [`references/README.md` — Probes](references/README.md#probes-built-in-display-and-external-sensors)
+for full detail.
+
+### Climate
+
+| Entity | What it shows / does |
+|--------|---------------------|
+| `climate.hrds_climate` | HVAC mode (Off/Dry/Cool), action, fan mode, target T & RH. `current_temperature`¹ and `current_humidity`² are suppressed when the corresponding probe is absent. |
+
+### Sensors
+
+| Entity | Unit | Probe needed | Notes |
+|--------|------|-------------|-------|
+| `sensor.room_temperature` | °C | ¹ Display or external NTC | Read from reg 499; used for automatic cooling trigger |
+| `sensor.room_humidity` | %RH | ² Display or external humidity sensor | Read from reg 505; used for automatic dehumidify trigger |
+| `sensor.outdoor_temperature` | °C | External NTC (IP65) | Reg 500; only drives Free-Cooling/Heating (PG03). Display-only otherwise. |
+| `sensor.water_temperature` | °C | ³ Built-in | Reg 501; over-temperature protection |
+| `sensor.supply_temperature` | °C | External NTC | Reg 503; monitoring only |
+| `sensor.air_quality` | ppm | External IAQ sensor | Reg 506; monitoring only |
+| `sensor.actual_setpoint` | °C | — | Reg 1111; active room setpoint in use |
+| `sensor.supply_fan_output` | % | ³ Built-in | Reg 639 (×0.01 %); actual fan analog output |
+| `sensor.compressor_output` | % | ³ Built-in | Reg 641 (×0.01 %); compressor modulation level |
+| `sensor.supply_fan_rpm` | rpm | ³ Built-in | Reg 1117 |
+| `sensor.unit_status` | enum | ³ Built-in | OFF by display/DI/BMS/scheduler/clock, or ON |
+| `sensor.mode_status` | enum | ³ Built-in | Summer/Winter × manual/auto/DI |
+| `sensor.supply_fan_status` | enum | ³ Built-in | Off/Starting/On/Stopping/Alarm |
+| `sensor.compressor_status` | enum | ³ Built-in | Off/Wait/On/Alarm/Manual |
+| `sensor.operating_mode` | enum | ³ Built-in | Summer/Winter/Auto season |
+
+### Binary sensors
+
+| Entity | Probe needed | What ON means |
+|--------|-------------|--------------|
+| `binary_sensor.dehumidify_request` | ³ | Dehumidification currently requested |
+| `binary_sensor.fan_integration_active` | ³ | Unit's supply fan is running (blending/integration) |
+| `binary_sensor.alarm_active` | ³ | At least one alarm is active |
+| `binary_sensor.temp_probe_ok` | ³ | Room temperature probe healthy (AL28 not active) |
+| `binary_sensor.humidity_probe_ok` | ³ | Room humidity probe healthy (AL34 not active) |
+
+### Switches
+
+| Entity | Register | Notes |
+|--------|----------|-------|
+| `switch.unit_on_off` | 1105 | BMS on/off request (requires PH02 = 1) |
+| `switch.dehumidify` | 1140 | BMS dehumidify request (requires PH28 = 1) |
+| `switch.active_cooling` | 1139 | BMS active-cooling request (requires PH27 = 1, summer season) |
+| `switch.enable_onoff_bms` | 1778 | PH02 — auto-set on startup; expose to inspect/reset |
+| `switch.enable_dehumidify_bms` | 1870 | PH28 — auto-set on startup |
+| `switch.enable_integration_bms` | 1869 | PH27 — auto-set on startup |
+
+### Numbers
+
+| Entity | Register | Range | Notes |
+|--------|----------|-------|-------|
+| `number.humidity_setpoint` | 1586 | 0–100 %RH | PU01; target humidity for dehumidify |
+| `number.summer_setpoint` | 1584 | 15–35 °C | SEtC; target room temp for active cooling |
+| `number.winter_setpoint` | 1585 | 15–35 °C | SEtH; target room temp for heating |
+| `number.fan_min_speed_dehumidify` | 1853 | 0–100 % | PF28; lower fan bound in dehumidify mode |
+| `number.fan_max_speed_dehumidify` | 1647 | 0–100 % | PF10; upper fan bound in dehumidify mode |
+| `number.fan_min_speed_cooling` | 1852 | 0–100 % | PF27; lower fan bound in active cooling |
+| `number.fan_max_speed_cooling` | 1646 | 0–100 % | PF09; upper fan bound in active cooling |
+| `number.fan_manual_speed` | 1614 | 0–100 % | PM20; manual fan speed (climate fan mode writes here) |
+
+### Select
+
+| Entity | Register | Options | Notes |
+|--------|----------|---------|-------|
+| `select.probe_source` | 1803 | None/external, CNU2 T, CNU2 T+H, CNU T, CNU T+H, EPJ T, EPJ T+H | HA00 — which sensor feeds room T/H readings. **Set to "None / external probes" when running without a display.** |
 
 ## Installation
 
@@ -145,12 +219,36 @@ If you prefer the individual switches over the climate entity, the same state is
 Technical details and register addresses are in
 [`references/MODBUS_REGISTERS.md` §13](references/MODBUS_REGISTERS.md#13-airflow-passive-flow-fan-integration-and-active-cooling).
 
+## Probe requirements
+
+The unit's control board exposes temperature and humidity readings, but most
+probes must be **installed by the installer** — they do not come built-in.
+
+| What you need | Hardware | Notes |
+|--------------|----------|-------|
+| Room temperature | NTC 10 kΩ B3435 (wall or duct mount) **or** CNU2 display | Needed for auto cooling/heating and dehumidify gating |
+| Room humidity | 0–10 V or 4–20 mA humidity transmitter **or** CNU2 display | Needed for auto dehumidify |
+| Outdoor temperature | NTC 10 kΩ B3435, IP65-rated | Only needed for Free-Cooling/Heating (PG03); otherwise optional |
+| Exhaust / supply air temperature | NTC 10 kΩ B3435 | Optional; display/monitoring only |
+
+**If you have no display and no external probes**, set the `probe_source` select
+entity to **"None / external probes"** (HA00 = 0) and disable the display input
+(PH01 = 0, via the installer menu once). The unit then responds only to
+explicit Modbus commands — dehumidify, cooling and fan control all work
+normally; only the _automatic_ setpoint-based triggers are inactive. The
+`temp_probe_ok` and `humidity_probe_ok` binary sensors will read **OFF** — this
+is expected, not an error.
+
+See [`references/README.md` — Probes](references/README.md#probes-built-in-display-and-external-sensors)
+and [`references/MODBUS_REGISTERS.md` §14](references/MODBUS_REGISTERS.md#14-probes-built-in-display-and-external-sensors)
+for full probe specifications, wiring, and the HA00/PH01 configuration detail.
+
 ## Prerequisites
 
 * An Innova DEH+ / hej.luft HRDS+ with the Modbus RTU/RS-485 control board and a
   Modbus-RTU-to-TCP gateway reachable on your network.
-* Temperature/humidity readings require the wired display or external probes to
-  be present (per the manufacturer manual).
+* Room temperature/humidity readings require the wired CNU2 display or external
+  probes (see [Probe requirements](#probe-requirements) above).
 
 ## Disclaimer
 
