@@ -32,6 +32,7 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     ENTITIES_DICT,
+    get_entity_bitmask,
     get_entity_factor,
     get_entity_props,
     get_entity_reg,
@@ -261,8 +262,16 @@ class HrdsModbusHub:
                 registers=[source[reg]], data_type=dt
             )
             if is_entity_switch(props):
-                off_v = (get_entity_switch(props) or {}).get("off", 0)
-                self.data[key] = "off" if raw == off_v else "on"
+                bitmask = get_entity_bitmask(props)
+                if bitmask is not None:
+                    # Bit-field register: extract the specific bit.
+                    bit_val = bool((raw >> bitmask) & 1)
+                    if props.get("BITMASK_INVERT", False):
+                        bit_val = not bit_val
+                    self.data[key] = "on" if bit_val else "off"
+                else:
+                    off_v = (get_entity_switch(props) or {}).get("off", 0)
+                    self.data[key] = "off" if raw == off_v else "on"
             elif is_entity_select(props):
                 self.data[key] = (get_entity_select(props) or {}).get(
                     raw, f"unknown_{raw}"

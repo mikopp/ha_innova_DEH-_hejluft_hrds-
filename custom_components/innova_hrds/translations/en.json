@@ -101,7 +101,9 @@
     "binary_sensor": {
       "dehumidify_request": { "name": "Dehumidify requested" },
       "fan_integration_active": { "name": "Fan integration active" },
-      "alarm_active": { "name": "Alarm active" }
+      "alarm_active": { "name": "Alarm active" },
+      "temp_probe_ok": { "name": "Room temperature probe OK" },
+      "humidity_probe_ok": { "name": "Room humidity probe OK" }
     },
     "switch": {
       "unit_on_off": { "name": "Unit on/off (Modbus)" },
@@ -110,6 +112,20 @@
       "enable_onoff_bms": { "name": "Enable on/off via Modbus" },
       "enable_dehumidify_bms": { "name": "Enable dehumidify via Modbus" },
       "enable_integration_bms": { "name": "Enable cooling via Modbus" }
+    },
+    "select": {
+      "probe_source": {
+        "name": "T/H probe source (HA00)",
+        "state": {
+          "none_or_external": "None / external probes",
+          "cnu_temp": "CNU display (temperature only)",
+          "cnu_temp_humidity": "CNU display (temperature + humidity)",
+          "epj_temp": "EPJ display (temperature only)",
+          "epj_temp_humidity": "EPJ display (temperature + humidity)",
+          "cnu2_temp": "CNU2 display (temperature only)",
+          "cnu2_temp_humidity": "CNU2 display (temperature + humidity)"
+        }
+      }
     },
     "number": {
       "humidity_setpoint": { "name": "Humidity setpoint" },

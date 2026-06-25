@@ -25,8 +25,10 @@ from .const import (
     C_DEHUM_REQUEST,
     C_DEHUMIDIFY,
     C_FAN_MANUAL,
+    C_HUMIDITY_PROBE_OK,
     C_SUPPLY_FAN_OUTPUT,
     C_SUPPLY_FAN_STATUS,
+    C_TEMP_PROBE_OK,
     C_UNIT_ON_OFF,
     C_UNIT_STATUS,
     CLIMATE_CURRENT_HUMIDITY,
@@ -104,13 +106,24 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
     def _on_hub_update(self) -> None:
         data = self._hub.data
 
-        temp = data.get(CLIMATE_CURRENT_TEMP)
-        if temp is not None:
-            self._attr_current_temperature = float(temp)
+        # Suppress temperature/humidity readings when the unit reports a probe
+        # fault (AL28 / AL34). probe_ok == "off" means the alarm is active.
+        # probe_ok == None means no alarm data yet — show reading if available.
+        temp_ok = data.get(C_TEMP_PROBE_OK)
+        if temp_ok == "off":
+            self._attr_current_temperature = None
+        else:
+            temp = data.get(CLIMATE_CURRENT_TEMP)
+            if temp is not None:
+                self._attr_current_temperature = float(temp)
 
-        hum = data.get(CLIMATE_CURRENT_HUMIDITY)
-        if hum is not None:
-            self._attr_current_humidity = int(hum)
+        hum_ok = data.get(C_HUMIDITY_PROBE_OK)
+        if hum_ok == "off":
+            self._attr_current_humidity = None
+        else:
+            hum = data.get(CLIMATE_CURRENT_HUMIDITY)
+            if hum is not None:
+                self._attr_current_humidity = int(hum)
 
         target_hum = data.get(CLIMATE_TARGET_HUMIDITY)
         if target_hum is not None:

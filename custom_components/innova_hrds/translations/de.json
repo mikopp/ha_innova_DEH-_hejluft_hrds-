@@ -101,7 +101,9 @@
     "binary_sensor": {
       "dehumidify_request": { "name": "Entfeuchtung angefordert" },
       "fan_integration_active": { "name": "Lüfter-Integration aktiv" },
-      "alarm_active": { "name": "Alarm aktiv" }
+      "alarm_active": { "name": "Alarm aktiv" },
+      "temp_probe_ok": { "name": "Raumtemperaturfühler OK" },
+      "humidity_probe_ok": { "name": "Raumfeuchtesensor OK" }
     },
     "switch": {
       "unit_on_off": { "name": "Gerät ein/aus (Modbus)" },
@@ -110,6 +112,20 @@
       "enable_onoff_bms": { "name": "Ein/Aus über Modbus freigeben" },
       "enable_dehumidify_bms": { "name": "Entfeuchtung über Modbus freigeben" },
       "enable_integration_bms": { "name": "Kühlung über Modbus freigeben" }
+    },
+    "select": {
+      "probe_source": {
+        "name": "T/H-Fühlerquelle (HA00)",
+        "state": {
+          "none_or_external": "Kein / externe Fühler",
+          "cnu_temp": "CNU-Display (nur Temperatur)",
+          "cnu_temp_humidity": "CNU-Display (Temperatur + Feuchte)",
+          "epj_temp": "EPJ-Display (nur Temperatur)",
+          "epj_temp_humidity": "EPJ-Display (Temperatur + Feuchte)",
+          "cnu2_temp": "CNU2-Display (nur Temperatur)",
+          "cnu2_temp_humidity": "CNU2-Display (Temperatur + Feuchte)"
+        }
+      }
     },
     "number": {
       "humidity_setpoint": { "name": "Feuchte-Sollwert" },

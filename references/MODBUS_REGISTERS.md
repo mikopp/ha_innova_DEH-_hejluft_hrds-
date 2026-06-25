@@ -356,3 +356,116 @@ To reproduce over Modbus (assuming PH02/PH28 already = 1):
    (×100 encoding: 50 % → `5000`).
 3. Read back `1121`=1, `1119`=3 (fan ON), `1112`=1 (integration/blend active),
    `1139`-derived `CmpStatus` `1122`=4, while there is no active-cooling request.
+
+---
+
+## 14. Probes: built-in, display, and external sensors
+
+### 14.1 Which probes are always present (factory-wired)
+
+These sensors are hard-wired to fixed analog inputs on the control board and
+are always available regardless of display or external probe configuration:
+
+| Register | Addr DEC | Name | Input | Notes |
+|----------|----------|------|-------|-------|
+| `AI_Twater` | 501 | Water circuit temperature | M5 (AI5) fixed | Used for AL03 / AL04 protection |
+| `AI_Tevaporation` | 511 | Evaporator temperature | M4 (AI4) fixed | Compressor modulation control |
+
+The **high-pressure** and **low-pressure** switches (DI1/DI2) are also
+factory-wired but are digital inputs that do not appear as Modbus analog
+registers; they generate alarms AL11 / AL12 directly.
+
+### 14.2 Which probes are external (must be wired by installer)
+
+All other temperature and humidity measurements come from **configurable analog
+inputs** on the control board. The installer assigns a function code to each
+analog input (via parameters HA02, HA03 …) and wires the appropriate sensor to
+the corresponding terminal. If no sensor is wired to a configured input, the
+unit raises a probe-fault alarm.
+
+| Register | Addr DEC | Name | Probe type | What it drives |
+|----------|----------|------|-----------|---------------|
+| `AI_TreturnRoom` | 499 | Room/return temperature | NTC 10 kΩ B3435 | Automatic dehumidify/cooling requests; alarm gating (PU13). **Raises AL28 if missing.** |
+| `AI_HretRoom` | 505 | Room/return humidity | 0–10 V (0=0 %RH, 10 V=100 %RH) or 4–20 mA | Automatic dehumidify request. **Raises AL34 if missing.** |
+| `AI_Toutdoor` | 500 | Outdoor temperature | NTC 10 kΩ B3435, outdoor-rated IP65+ | Only used by Free-Cooling/Free-Heating (PG03). Display-only if PG03 = 0. |
+| `AI_Texhaust` | 502 | Exhaust air temperature | NTC 10 kΩ B3435 | Display/monitoring only — no control logic. |
+| `AI_Tdischarge` | 503 | Discharge (supply) air temperature | NTC 10 kΩ B3435 | Display/monitoring only — no control logic. |
+| `AI_AirQuality` | 506 | Air quality | 0–10 V or 4–20 mA IAQ sensor | Display/monitoring; can trigger ventilation boost if wired. |
+
+The room temperature and humidity probes can alternatively be provided by the
+**CNU2 wired display unit**, which has built-in T and H sensors. See §14.3.
+
+### 14.3 Probe source — HA00 parameter (register 1803)
+
+Parameter **HA00** (holding register 1803, R/W) tells the controller which
+source to use for room temperature and humidity. The unit ignores readings from
+unconfigured inputs; it raises AL28/AL34 when the configured source is absent.
+
+| HA00 value | Meaning | Room T source | Room H source |
+|-----------|---------|---------------|---------------|
+| `0` | None / external probes | AI2 (M2) if wired with code 45 | AI3 (M3) if wired with code 53/54 |
+| `1` | CNU display, T only | CNU built-in NTC | — |
+| `2` | CNU display, T + H | CNU built-in NTC | CNU built-in humidity |
+| `3` | EPJ display, T only | EPJ built-in NTC | — |
+| `4` | EPJ display, T + H | EPJ built-in NTC | EPJ built-in humidity |
+| `5` | CNU2 display, T only | CNU2 built-in NTC | — |
+| `6` | CNU2 display, T + H **(factory default)** | CNU2 built-in NTC | CNU2 built-in humidity |
+
+> **Headless setup (no display, no external probes):** set HA00 = 0 **and**
+> PH01 (1777) = 0 ("display not present"). Without this, the unit raises AL28
+> and AL34 continuously, which blocks dependent control. The HA integration
+> exposes HA00 as a `select` entity (`probe_source`) and PH01 via the
+> `enable_onoff_bms` family; set both from HA rather than requiring a
+> service-tool visit.
+
+### 14.4 Probe fault detection — packed alarm registers
+
+Probe faults are reported in the packed alarm bitmap registers. Bits are
+**set** when the alarm is active (probe absent or faulty):
+
+| Alarm | Register | Addr DEC | Bit | What it blocks |
+|-------|----------|----------|-----|----------------|
+| AL28 — room temp probe fault | `PackedAlarm_2` | 769 | 11 | Automatic integration (cooling/heating) request; PU13 minimum-temp interlock |
+| AL34 — room humidity probe fault | `PackedAlarm_3` | 770 | 1 | Automatic dehumidify request |
+
+The HA integration decodes these bits into two binary sensors:
+
+* `temp_probe_ok` — **ON** = room temperature probe is healthy (AL28 not active)
+* `humidity_probe_ok` — **ON** = room humidity probe is healthy (AL34 not active)
+
+When either sensor reads OFF, the climate entity suppresses the corresponding
+`current_temperature` / `current_humidity` attribute (reports `None`) so the
+HA UI does not show a stale or garbage value.
+
+### 14.5 What each probe controls (summary)
+
+| Probe | Control purpose | Display only if… |
+|-------|----------------|-----------------|
+| Room temperature (499) | Triggers auto cooling (SEtC/SEtH) and auto dehumidify (PU13 guard) | HA00 = 0 with no probe wired |
+| Room humidity (505) | Triggers auto dehumidify (PU01 setpoint) | HA00 = 0 with no probe wired |
+| Evaporator temp (511) | Compressor modulation (PU11 target 6 °C) | Never — always controls |
+| Water temp (501) | AL03 / AL04 protection; gates cooling/heating | Never — always controls |
+| Outdoor temp (500) | Free-Cooling / Free-Heating damper control | PG03 = 0 (default) |
+| Exhaust temp (502) | — | Always display only |
+| Discharge temp (503) | — | Always display only |
+
+### 14.6 Running without any display or external probes
+
+The unit can be driven **entirely via Modbus** (from Home Assistant) without a
+display or any room sensors. In this mode:
+
+1. Set **HA00 = 0** (`probe_source` select → "None / external probes") and
+   **PH01 = 0** (disable display; the HA integration does not yet expose PH01
+   directly — set it once via the wired remote's installer menu or service
+   software).
+2. The HA integration auto-sets **PH02/PH27/PH28** = 1 on every connection,
+   so on/off, dehumidify and cooling are controllable immediately.
+3. Automatic setpoint-based control (trigger dehumidify when room humidity >
+   PU01) does **not** function — there is no room sensor to compare against.
+   Issue dehumidify / cooling requests **explicitly via Modbus** (the climate
+   entity or individual switches).
+4. `current_temperature` and `current_humidity` on the climate entity read
+   `None`; the `temp_probe_ok` and `humidity_probe_ok` binary sensors read OFF
+   (because AL28/AL34 are active). This is expected and not an error.
+5. The evaporator and water-circuit probes remain active (factory-wired) and
+   continue to protect the unit against AL03/AL04/AL11/AL12.
