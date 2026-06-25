@@ -1,0 +1,32 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "data": {
+          "name": "Name",
+          "host": "Host",
+          "port": "Port",
+          "hostid": "Modbus slave ID",
+          "scan_interval": "Scan interval"
+        }
+      }
+    },
+    "error": {
+      "already_configured": "This host is already configured",
+      "invalid_host": "Invalid host or IP address"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "hostid": "Modbus slave ID",
+          "scan_interval": "Scan interval"
+        }
+      }
+    }
+  }
+}

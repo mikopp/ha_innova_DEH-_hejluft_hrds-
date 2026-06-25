@@ -1,0 +1,28 @@
+# Python linting & formatting check.
+#
+# Runs Ruff (linter + formatter) over the whole repository on every push and
+# pull request. This is the fast "is the Python clean?" gate:
+#   * `ruff check`  -> static lint rules (pyflakes/pycodestyle/isort, see ruff.toml)
+#   * `ruff format --check` -> fails if any file is not formatted
+# It does NOT import Home Assistant, so it is quick and has no HA dependency.
+name: Lint
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  ruff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Ruff
+        run: pip install ruff
+      - name: Ruff lint
+        run: ruff check .
+      - name: Ruff format check
+        run: ruff format --check .

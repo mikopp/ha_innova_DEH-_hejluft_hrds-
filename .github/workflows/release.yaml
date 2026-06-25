@@ -1,0 +1,29 @@
+# Release checks.
+#
+# Triggered when a GitHub Release is published. It re-runs the two validators
+# that matter for a shippable artifact:
+#   1. hassfest  -> manifest/translations are valid
+#   2. hacs      -> repository is installable via HACS (only runs if hassfest passes)
+# The bump of the version inside manifest.json is handled separately by
+# .github/scripts/update_hacs_manifest.py (see that file).
+name: Release checks
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  hassfest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: home-assistant/actions/hassfest@master
+
+  hacs:
+    runs-on: ubuntu-latest
+    needs: hassfest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hacs/action@main
+        with:
+          category: integration
