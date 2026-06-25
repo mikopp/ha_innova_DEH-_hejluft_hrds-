@@ -44,7 +44,7 @@ silently ignores writes.
 * **Set the air-flow / fan speed** — per-mode min/max bands
   (`1853/1647` dehumidify, `1852/1646` cooling) and manual setpoint (1614).
   **Percentages are ×100** (40 % → 4000). Actual output `outAO_SupplyFan` (639),
-  RPM (1117).
+  RPM (1117). Fan-integration active flag `FanIntegration_Request` (1112, R/O).
 * **Set the humidity target** — `PU01_Humidity_Setpoint` (1586), %RH.
 * **Set the temperature target** — summer (1584) / winter (1585) setpoints, °C ×10.
 * **Select season / operating mode** — `Mode_OperatingMode` (1583, R/O feedback),
@@ -60,6 +60,43 @@ silently ignores writes.
 * **Other** — full weekly scheduler, probe calibration, filter running-hours and
   alarm thresholds, and complete hardware I/O configuration are all exposed; see
   the "FULL MODBUS REGISTER LIST" in the PDF (§6).
+
+## Airflow: passive flow, fan integration, and active cooling (technical)
+
+The word *integration* is overloaded in the manufacturer's documentation, which
+makes the airflow behaviour easy to misread. There are **three** distinct
+things, exposed by three different register groups. The full register-level
+treatment — with the exact addresses, the detection logic and the
+reproduce-over-Modbus recipe — lives in
+[`MODBUS_REGISTERS.md` §13](./MODBUS_REGISTERS.md#13-airflow-passive-flow-fan-integration-and-active-cooling).
+A short summary:
+
+* **Passive airflow** — the unit's own supply fan is **off**, but the central
+  MVHR upstream still pushes air through the inflow pipe. There is **no
+  dedicated register** for this; it is inferred from `SupplyFan_Status` (1119) =
+  OFF while `sm_UnitStatus` (1104) = ON. The HRDS+ cannot see the upstream MVHR's
+  flow, so it cannot report a passive flow rate. Source:
+  `HRDS+_Technisches_Handbuch_DE.pdf`, § Lüfterregelung / Funktionsweise.
+* **Fan integration** — the unit's **own fan runs** to blend the central-MVHR
+  inflow air with recirculated room air across the coil. Exposed by the new
+  read-only `FanIntegration_Request` (1112) → `fan_integration_active` binary
+  sensor, plus `SupplyFan_Status` (1119), output `outAO_SupplyFan` (639) and RPM
+  (1117).
+* **Active cooling** — the manufacturer *also* calls this "integration"
+  (`Status_Integ_byBMS`, 1139): the compressor/chilled-water circuit actively
+  cools the supply air in summer (parameter `PG02_EnableIntegration`, 1798). This
+  is the **active-cooling** request, unrelated to the fan's blending function
+  above, and is mapped to the `active_cooling` switch.
+
+**Dehumidify with the fan on but active cooling off** is a normal state:
+`Status_Dehum_byBMS` (1140) = 1 runs the compressor to condense moisture, which
+needs airflow, so the supply fan runs on the **dehumidify fan band**
+(`MinSpeedFan_Dehum` 1853 / `MaxSpeedFan_Dehum` 1647) while
+`Status_Integ_byBMS` (1139) stays 0. `CmpStatus` (1122) reads ON because the
+compressor serves dehumidification — *not* active cooling. The full Modbus
+recipe and the inverse coupling parameters (`PU05_ForceDehumInCooling` 1692,
+`PU02_EnableWinterDehum` 1689) are in
+[`MODBUS_REGISTERS.md` §13.3](./MODBUS_REGISTERS.md#133-dehumidify-with-the-fan-running-but-active-cooling-off).
 
 ## How this maps onto the Home Assistant integration
 

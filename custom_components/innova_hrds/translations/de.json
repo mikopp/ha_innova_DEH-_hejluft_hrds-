@@ -100,6 +100,7 @@
     },
     "binary_sensor": {
       "dehumidify_request": { "name": "Entfeuchtung angefordert" },
+      "fan_integration_active": { "name": "Lüfter-Integration aktiv" },
       "alarm_active": { "name": "Alarm aktiv" }
     },
     "switch": {

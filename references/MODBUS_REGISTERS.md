@@ -135,6 +135,7 @@ for 40 %). Min/Max apply to the modulation band used in each mode.
 |----------|----------|-------------------|--------|
 | `0x0450` | 1104 | `sm_UnitStatus`      | `0=OFF by display`, `1=OFF by DI`, `2=OFF by BMS`, `3=OFF by scheduler`, `4=OFF by RTC`, `5=ON` |
 | `0x0456` | 1110 | `ModeStatus`         | `0=Summer manual`, `1=Winter manual`, `2=Summer auto`, `3=Winter auto`, `4=Summer DI`, `5=Winter DI` |
+| `0x0458` | 1112 | `FanIntegration_Request` | `0=No`, `1=Yes` — the **fan-integration** function is currently active, i.e. the supply fan is running to integrate (mix) the central-MVHR inflow air with room air. Set whenever the fan runs for ventilation/integration, independent of whether active cooling (`Status_Integ_byBMS`, 1139) is requested. |
 | `0x045F` | 1119 | `SupplyFan_Status`   | `0=Disable`, `1=OFF`, `2=Wait ON`, `3=ON`, `4=Wait OFF`, `5=Alarm` |
 | `0x0461` | 1121 | `DehumRequest`       | `0=No`, `1=Yes` — dehumidification currently requested |
 | `0x0462` | 1122 | `CmpStatus`          | `0=Disable`, `1=Alarm`, `2=Manual`, `3=Wait ON`, `4=ON`, `5=Wait OFF`, `6=OFF` — compressor (active cooling/dehum) |
@@ -263,3 +264,75 @@ outdoor temp `500`, water temp `501`, supply/discharge temp `503`.
 * See `references/HRDS+_Modbus_RTU_RS485_DE.pdf` §6 "FULL MODBUS REGISTER LIST"
   for the complete ~250-register table (schedulers, probe calibration, alarm
   tuning, hardware I/O mapping) not reproduced in full here.
+
+---
+
+## 13. Airflow: passive flow, fan integration, and active cooling
+
+The HRDS+ sits on the supply branch of a central MVHR/VMC system (the "inflow
+pipe"). The word *integration* is overloaded in the manufacturer documentation,
+so this section pins down the three distinct concepts and the registers that
+expose each. Sources: `HRDS+_Technisches_Handbuch_DE.pdf` (§ Funktionsweise /
+Integration, Lüfterregelung) and `HRDS+_Benutzerhandbuch_DE.pdf` (operation
+modes); register numbers from the Modbus PDF and §§6–8 above.
+
+### 13.1 Three concepts, three meanings
+
+| Concept | What physically happens | How it is exposed |
+|---------|-------------------------|-------------------|
+| **Passive airflow** | The unit's own supply fan is **off**, but the central MVHR upstream still pushes air through the unit's duct, so air keeps flowing through the inflow pipe. | **No dedicated register.** Infer it: `SupplyFan_Status` (1119) = `1` (OFF) while `sm_UnitStatus` (1104) = `5` (ON). The unit cannot measure the upstream MVHR's flow, so there is no "passive flow rate". |
+| **Fan integration** (the *fan's* job) | The unit's **own supply fan runs** to "integrate" — i.e. blend the central-MVHR inflow air with recirculated room air and drive it across the coil. | `FanIntegration_Request` (1112) = `1` when the fan-integration function is active; `SupplyFan_Status` (1119) = `3` (ON); modulation at `outAO_SupplyFan` (639, ×0.01 %) and `actRPMsupplyFan` (1117). |
+| **Active cooling** (the manufacturer's *"integration" register*) | The compressor / chilled-water circuit engages to **actively cool** the supply air in summer (the "Integration" function PG02). | `Status_Integ_byBMS` (1139, R/W request, requires PH27=1), feedback via `CmpStatus` (1122). **This is a different meaning of "integration" than the fan blending in row 2.** |
+
+> **Trap.** `Status_Integ_byBMS` (1139) and `FanIntegration_Request` (1112) both
+> contain the word *integration* but are unrelated: 1139 is the *active-cooling*
+> command (compressor), 1112 is a read-only status that the *supply fan* is
+> running its integration/blending function. The HA integration maps 1139 to the
+> `active_cooling` switch and 1112 to the `fan_integration_active` binary sensor.
+
+### 13.2 Detecting passive airflow
+
+There is no Modbus point that reports "air is passively flowing through the
+duct". Derive it from the fan being commanded off while the unit is otherwise
+running:
+
+```
+passive_airflow = (sm_UnitStatus[1104] == 5)        # unit is ON
+                  and (SupplyFan_Status[1119] == 1)  # but supply fan is OFF
+                  and (FanIntegration_Request[1112] == 0)
+```
+
+The unit only knows the state of *its own* fan (1119) and its integration
+request (1112). Whether the central MVHR is actually moving air is upstream of
+the HRDS+ and not visible on this bus — treat passive airflow as "fan off, unit
+on" and rely on the central system's own controls/sensors for the real rate.
+
+### 13.3 Dehumidify with the fan running but active cooling off
+
+This is a normal, common state: the unit is **drying** and the **fan is on**,
+but **active cooling is off**.
+
+* `Status_Dehum_byBMS` (1140) = 1 → the compressor condenses moisture out of the
+  air. Dehumidification inherently needs airflow over the coil, so the **supply
+  fan runs** (`SupplyFan_Status` 1119 = ON, `FanIntegration_Request` 1112 = 1)
+  using the **dehumidify fan band** `MinSpeedFan_Dehum` (1853) /
+  `MaxSpeedFan_Dehum` (1647).
+* `Status_Integ_byBMS` (1139) = 0 → the **active-cooling** integration is *not*
+  requested, so the chilled-water/active-cooling band
+  `MinSpeedFan_Integ` (1852) / `MaxSpeedFan_Integ` (1646) is not in play.
+* Feedback: `CmpStatus` (1122) = `4` (ON) because the compressor is running for
+  dehumidification — **not** because active cooling is on. `DehumRequest`
+  (1121) = 1, `outAO_SupplyFan` (639) shows the actual fan %.
+
+In other words, the compressor here serves dehumidification, and the fan runs to
+move/blend air across the coil; active cooling (1139) is an *additional,
+separate* request layered on top in summer. See `PU05_ForceDehumInCooling`
+(1692) for the inverse coupling (force dehum whenever cooling is requested) and
+`PU02_EnableWinterDehum` (1689) for dehumidification in the winter season.
+
+To reproduce over Modbus (assuming PH02/PH28 already = 1):
+1. `1105` ← 1 (unit on), `1140` ← 1 (dehumidify), `1139` ← 0 (active cooling off).
+2. Optionally shape the airflow with the dehumidify band `1853`/`1647`
+   (×100 encoding: 50 % → `5000`).
+3. Read back `1121`=1, `1119`=3 (fan ON), `1112`=1 (integration/blend active),
+   `1139`-derived `CmpStatus` `1122`=4, while there is no active-cooling request.

@@ -120,6 +120,7 @@ C_COMPRESSOR_STATUS = "compressor_status"
 C_OPERATING_MODE = "operating_mode"
 # Read-only binary sensors
 C_DEHUM_REQUEST = "dehumidify_request"
+C_FAN_INTEGRATION_ACTIVE = "fan_integration_active"
 C_ALARM_ACTIVE = "alarm_active"
 # Read-write numbers
 C_HUMIDITY_SETPOINT = "humidity_setpoint"
@@ -282,6 +283,13 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "DT": C_DT_UINT16,
         "SWITCH": {"off": 0, "on": 1},
         "NAME": "Dehumidify requested",
+    },
+    C_FAN_INTEGRATION_ACTIVE: {
+        "RT": C_REG_TYPE_INPUT_REGISTERS,
+        "REG": 1112,
+        "DT": C_DT_UINT16,
+        "SWITCH": {"off": 0, "on": 1},
+        "NAME": "Fan integration active",
     },
     C_ALARM_ACTIVE: {
         "RT": C_REG_TYPE_INPUT_REGISTERS,
