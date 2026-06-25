@@ -58,32 +58,33 @@ verified on hardware.
       Modbus PDF lists Max `158.0`. Confirm the real usable range and adjust
       MIN/MAX/STEP if the device accepts more.
 
-## Fan behaviour — can dry/cool run with the fan OFF?  ← open question
+## Fan mode — implemented, needs hardware verification
 
-- [ ] **Core question:** can the unit dehumidify (DRY) or cool (COOL) while its
-      **own supply fan is off**, relying on the passive airflow the central MVHR
-      pushes through the duct? Believed yes given the ducted architecture, but
-      **unverified**.
-- [ ] Does writing **manual fan speed (1614) = 0** actually stop the fan, or is
-      it overridden by the per-mode min band (`MinSpeedFan_Dehum` 1853 /
-      `MinSpeedFan_Integ` 1852)? I.e. is there a real "fan off" setpoint while a
-      mode is active?
-- [ ] Is there a **dedicated fan enable/disable** independent of mode (e.g. tied
-      to `PG01_MachineType` 1797: 0 = dehumidifier only vs 1 = + VMC)? Check
-      whether machine type changes whether the fan can idle off.
-- [ ] Confirm `SupplyFan_Status` (1119) reports `1` (OFF) in this passive state
-      and that `fan_integration_active` (1112) goes 0 — the basis for the
-      "passive airflow" inference documented in the README.
+The climate entity now exposes **fan_mode** (off / low / medium / high):
 
-## Possible enhancements (pending the fan answer)
+| Mode   | Manual fan speed written to reg 1614 |
+|--------|--------------------------------------|
+| off    | 0 %  |
+| low    | 30 % |
+| medium | 55 % |
+| high   | 85 % |
 
-- [ ] **Climate fan control**: the climate entity currently has **no
-      `fan_mode`** — it only sets off/dry/cool and never touches the fan. If
-      "fan off during dry/cool" is a desired user operation, add
-      `ClimateEntityFeature.FAN_MODE` with fan_modes (e.g. off / low / high /
-      auto) mapped onto the manual fan speed (1614) and/or the per-mode bands.
-      Until then, fan speed is only adjustable via the standalone `number`
-      entities, out of band from the climate card.
+Read-back maps `outAO_SupplyFan` (639) back to the nearest preset via midpoint
+thresholds (42.5 / 70.0 %).
+
+- [ ] **Core assumption: fan off (0 %) while DRY/COOL is active is supported
+      by the unit**, relying on the central MVHR's passive inflow instead of the
+      unit's own fan. User confirms this is believed correct — verify on hardware.
+- [ ] Confirm that writing `1614 = 0` actually stops the fan while a mode is
+      active, and is not clamped up to `MinSpeedFan_Dehum` (1853) /
+      `MinSpeedFan_Integ` (1852) by the unit's internal logic.
+- [ ] Confirm `SupplyFan_Status` (1119) reports `1` (OFF) when fan mode = off
+      and a mode is active, and that `fan_integration_active` (1112) goes 0.
+- [ ] Verify the Low / Medium / High percentages (30 / 55 / 85 %) are
+      reasonable for the real unit; adjust in `climate.py` `_FAN_MODE_PCT` if
+      not. These are nominal choices, not values from the PDF.
+- [ ] Check whether `PG01_MachineType` (1797: 0=dehumidifier only, 1=+VMC)
+      affects whether the fan can be set to off while a mode is active.
 
 ## Entities documented but not yet exposed
 

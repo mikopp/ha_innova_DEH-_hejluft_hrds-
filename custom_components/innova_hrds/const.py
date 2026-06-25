@@ -480,7 +480,9 @@ class MyClimateEntityDescription(ClimateEntityDescription):
 
     temperature_unit: str = UnitOfTemperature.CELSIUS
     supported_features: ClimateEntityFeature = (
-        ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.TARGET_HUMIDITY
+        ClimateEntityFeature.TARGET_TEMPERATURE
+        | ClimateEntityFeature.TARGET_HUMIDITY
+        | ClimateEntityFeature.FAN_MODE
     )
 
 

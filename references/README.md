@@ -96,7 +96,37 @@ needs airflow, so the supply fan runs on the **dehumidify fan band**
 compressor serves dehumidification — *not* active cooling. The full Modbus
 recipe and the inverse coupling parameters (`PU05_ForceDehumInCooling` 1692,
 `PU02_EnableWinterDehum` 1689) are in
-[`MODBUS_REGISTERS.md` §13.3](./MODBUS_REGISTERS.md#133-dehumidify-with-the-fan-running-but-active-cooling-off).
+[`MODBUS_REGISTERS.md` §13.4](./MODBUS_REGISTERS.md#134-dehumidify-with-the-fan-running-but-active-cooling-off).
+
+## Fan mode — how the HA integration controls the supply fan
+
+The HA climate entity exposes four fan modes, all written to
+`PM20_SupplyFan_Manual` (reg 1614, holding, ×0.01 scaling):
+
+| HA fan mode | Raw value written | Actual fan speed | Use when |
+|-------------|-------------------|------------------|----------|
+| `off`       | 0 (0 %)           | Fan stopped       | You want passive airflow from the central MVHR only |
+| `low`       | 3000 (30 %)       | ~30 % output     | Light supplemental airflow |
+| `medium`    | 5500 (55 %)       | ~55 % output     | Normal operation |
+| `high`      | 8500 (85 %)       | ~85 % output     | Maximum airflow / fast drying |
+
+Read-back: the integration reads `outAO_SupplyFan` (639, ×0.01 %) and maps it
+to the nearest preset using midpoint thresholds (42.5 % → low/medium boundary,
+70.0 % → medium/high boundary). If `SupplyFan_Status` (1119) is `1=OFF` or
+`0=Disabled`, fan mode is reported as "off" regardless of the output value.
+
+**Fan mode "off" while HVAC mode is Dry or Cool** relies on the unit honouring
+a 0 % manual setpoint while dehumidification/cooling is requested. The
+expectation is that the unit's compressor still runs, but airflow comes from
+the central MVHR passive inflow rather than the unit's own fan.
+*This has not yet been verified on physical hardware* — see `plans/todo.md`
+for the specific checks needed. In particular, it is unknown whether the unit
+internally clamps the manual speed up to `MinSpeedFan_Dehum` (1853) /
+`MinSpeedFan_Integ` (1852) even when 0 is written to 1614.
+
+Fan mode is **independent of HVAC mode** — changing Dry ↔ Cool does not reset
+the fan mode; switching to Off also turns off the unit via `Status_OnOff_byBMS`
+(1105) but does not change the fan speed register.
 
 ## How this maps onto the Home Assistant integration
 

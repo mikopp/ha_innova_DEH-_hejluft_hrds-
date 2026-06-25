@@ -290,7 +290,27 @@ modes); register numbers from the Modbus PDF and §§6–8 above.
 > running its integration/blending function. The HA integration maps 1139 to the
 > `active_cooling` switch and 1112 to the `fan_integration_active` binary sensor.
 
-### 13.2 Detecting passive airflow
+### 13.2 HA fan mode → register mapping
+
+The climate entity writes `PM20_SupplyFan_Manual` (1614, holding, ×0.01) to
+control the supply fan independently of the HVAC mode:
+
+| Fan mode | Value written to 1614 | Percentage |
+|----------|-----------------------|------------|
+| off      | 0                     | 0 %        |
+| low      | 3000                  | 30 %       |
+| medium   | 5500                  | 55 %       |
+| high     | 8500                  | 85 %       |
+
+Read-back uses `outAO_SupplyFan` (639, ×0.01 %) with nearest-neighbour
+thresholds at 42.5 % (low/medium) and 70.0 % (medium/high). Fan mode "off"
+is also forced when `SupplyFan_Status` (1119) = `1` or `0`.
+
+**Open question (unverified):** does writing `1614 = 0` actually stop the fan
+when a mode is active, or is it clamped up to `MinSpeedFan_Dehum` (1853) /
+`MinSpeedFan_Integ` (1852) internally? See `plans/todo.md`.
+
+### 13.3 Detecting passive airflow
 
 There is no Modbus point that reports "air is passively flowing through the
 duct". Derive it from the fan being commanded off while the unit is otherwise
@@ -307,7 +327,7 @@ request (1112). Whether the central MVHR is actually moving air is upstream of
 the HRDS+ and not visible on this bus — treat passive airflow as "fan off, unit
 on" and rely on the central system's own controls/sensors for the real rate.
 
-### 13.3 Dehumidify with the fan running but active cooling off
+### 13.4 Dehumidify with the fan running but active cooling off
 
 This is a normal, common state: the unit is **drying** and the **fan is on**,
 but **active cooling is off**.

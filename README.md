@@ -22,9 +22,12 @@ The integration talks to the unit's control board via Modbus TCP and exposes:
   HVAC action (off / idle / drying / cooling) and an HVAC mode you can set to
   pick the operating mode:
   * **Off** — turns the unit off
-  * **Dry** — dehumidification
-  * **Cool** — active cooling (the unit's "integration" function)
+  * **Dry** — dehumidification (fan runs, compressor condenses moisture)
+  * **Cool** — active cooling (the unit's "integration" function, summer only)
   * Target humidity and target temperature are settable.
+  * Fan mode is selectable: **off** (passive airflow from central MVHR only) /
+    **low** / **medium** / **high** — controls the unit's own supply fan via
+    the manual fan speed register. Fan mode persists across HVAC mode changes.
 * **Sensors** — room/outdoor/water/supply temperatures, room humidity, air
   quality, fan output %, fan RPM, compressor output %, active setpoint, and
   enum status sensors (unit status, season, fan status, compressor status).
@@ -92,30 +95,34 @@ So in short: set **target humidity** in **Dry** or **Cool**; **target
 temperature** matters in **Cool** (summer). Both require a wired display or
 external probes to be present, otherwise the unit ignores them.
 
-### Passive airflow vs. "integration" (fan) mode
+### Passive airflow vs. fan mode
 
 The HRDS+ sits on the supply branch of your central MVHR ("inflow pipe"), and
 the word *integration* is used by the manufacturer for two different things, so
 it's worth being precise:
 
 * **Passive airflow** — the unit's **own fan is off**, but your central MVHR is
-  still pushing air through the duct, so air keeps flowing. You don't switch
-  this on; it's simply what happens when the unit isn't running its fan. There
-  is **no dedicated sensor** for it — watch **Supply fan status = Off** while
-  **Unit status = On** (and **Fan integration active = off**). The unit can't
-  measure the upstream MVHR's flow, so rely on your central system for the
-  actual rate. Use this when you only want the background ventilation and don't
-  need drying or cooling — keep the climate entity **Off**.
+  still pushing air through the duct, so air keeps flowing. Set the **climate
+  fan mode to "off"** to stop the unit's own fan; the central MVHR continues
+  to push air through passively. There is no dedicated sensor for this state —
+  watch **Supply fan status = Off** while **Unit status = On** (and **Fan
+  integration active = off**). The unit cannot measure the upstream MVHR's
+  flow, so rely on your central system for the actual rate.
 * **Fan integration** — the unit runs **its own fan** to blend (integrate) the
-  central inflow air with room air across its coil. This happens automatically
-  whenever the unit needs airflow (dehumidifying or cooling). The **Fan
-  integration active** binary sensor tells you when it's running; **Supply fan
-  output %** and **Supply fan speed (RPM)** show how hard. Shape it with the
-  per-mode fan-speed `number` entities (dehumidify band vs. cooling band).
+  central inflow air with room air across its coil. Set the climate fan mode to
+  **low / medium / high** to drive the fan at a fixed speed. The **Fan
+  integration active** binary sensor tells you when the fan is running; **Supply
+  fan output %** and **Supply fan speed (RPM)** show the actual speed. Fine-grained
+  modulation bands (per mode) are available via the standalone `number` entities.
 
-There is no separate "turn the fan on" control: the fan follows the operating
-mode. Put the climate entity in **Dry** or **Cool** to make the unit run its fan
-(integration); leave it **Off** to fall back to passive airflow only.
+**Fan mode is independent of HVAC mode.** You can set fan mode to "off" while
+the HVAC mode is Dry or Cool — the unit will still dehumidify or cool using
+the passive airflow from the inflow pipe, without running its own fan. This is
+the expected use case when the central MVHR provides sufficient airflow.
+
+> **Note (unverified):** the "fan off during Dry/Cool" behaviour is based on
+> the unit's ducted architecture and user confirmation, but has not yet been
+> tested on real hardware. See `plans/todo.md`.
 
 ### Drying with the fan on, but active cooling off
 
