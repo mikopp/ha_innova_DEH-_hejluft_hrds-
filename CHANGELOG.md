@@ -4,6 +4,47 @@ All notable changes to this project are documented here, newest first.
 
 ---
 
+## 2026-06-28 (2)
+
+### feat: alarm sensors and min-airflow doc corrections
+
+**New alarm binary sensors** (ON = alarm active) via bitmask extraction from
+`PackedAlarm_1` (reg 768) and `PackedAlarm_2` (reg 769):
+
+- `binary_sensor.alarm_compressor_lowpressure` — AL11, reg 768 bit 10;
+  compressor low-pressure / frost-thermostat. Auto-stops compressor. This is
+  the effective protection against insufficient airflow (evaporator icing →
+  pressure drop → alarm).
+- `binary_sensor.alarm_compressor_highpressure` — AL12, reg 768 bit 11;
+  compressor high-pressure switch. Auto-stops compressor.
+- `binary_sensor.alarm_water_antifreeze` — AL16, reg 768 bit 15;
+  water-circuit antifreeze. Stops fan.
+- `binary_sensor.alarm_dirty_filter` — AL22, reg 769 bit 5; filter service
+  required. Display-only; manual reset (write 0 to reg 1604).
+
+**Documentation corrections** (`references/README.md`):
+- The 130 m³/h (30) / 190 m³/h (50) figures are the **tested spec range**, not
+  a firmware-enforced floor. Removed incorrect "fan never runs below 130 m³/h"
+  claim.
+- Fan minimum speed during DEU/INT is configurable: `PF28` / `PF27` default
+  50 % but allow 0 %. The firmware floor is configurable, not fixed.
+- Fan-off (passive MVHR flow) confirmed valid from multiple sources: non-R
+  variant has no fan and always runs this way; Innova manual Alarm 9 ("does
+  not activate fan, keeps other loads unchanged"); PF28 min = 0 % in firmware.
+- Remaining open question: does firmware clamp a manual 0 % setpoint up to
+  PF28 floor during active DEU on the R variant? Verify by writing 0 to reg
+  1614 and reading `outAO_SupplyFan` (639).
+
+**`CLAUDE.md`:** added reference-folder guide, bitmask pattern documentation
+(including alarm bit-position table), computed-sensor pattern, and device
+variant / fan-minimum notes for future sessions.
+
+**New reference files:** `references/HRDS+_Technisches_Handbuch_DE.txt` and
+`references/Innova_DEH+_H_Installation_Manual_EN.txt` (searchable text
+extracted from the manufacturer PDFs).
+
+---
+
 ## 2026-06-28
 
 ### feat: model parameter, airflow sensors, and variant detection
