@@ -14,7 +14,6 @@ from homeassistant.core import HomeAssistant, callback
 
 from .const import (
     CONF_AIRFLOW_MAX,
-    CONF_AIRFLOW_MIN,
     CONF_FAN_MIN_OUTPUT,
     CONF_HOSTID,
     CONF_MODEL,
@@ -98,7 +97,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         data = self._config_entry.data
         options = self._config_entry.options
         model = options.get(CONF_MODEL, data.get(CONF_MODEL, DEFAULT_MODEL))
-        spec = MODEL_SPECS.get(model, MODEL_SPECS[DEFAULT_MODEL])
+        spec = (
+            MODEL_SPECS[model] if model in MODEL_SPECS else MODEL_SPECS[DEFAULT_MODEL]
+        )
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
@@ -135,13 +136,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                         default=options.get(
                             CONF_AIRFLOW_MAX,
                             data.get(CONF_AIRFLOW_MAX, spec["max"]),
-                        ),
-                    ): vol.Coerce(float),
-                    vol.Optional(
-                        CONF_AIRFLOW_MIN,
-                        default=options.get(
-                            CONF_AIRFLOW_MIN,
-                            data.get(CONF_AIRFLOW_MIN, spec["min"]),
                         ),
                     ): vol.Coerce(float),
                     vol.Optional(

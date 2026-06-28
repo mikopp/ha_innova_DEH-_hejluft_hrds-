@@ -29,10 +29,8 @@ from .const import (
     C_REG_TYPE_INPUT_REGISTERS,
     C_SUPPLY_FAN_AIRFLOW,
     C_SUPPLY_FAN_MAX_AIRFLOW,
-    C_SUPPLY_FAN_MIN_AIRFLOW,
     C_SUPPLY_FAN_OUTPUT,
     CONF_AIRFLOW_MAX,
-    CONF_AIRFLOW_MIN,
     CONF_FAN_MIN_OUTPUT,
     CONF_HOSTID,
     CONF_MODEL,
@@ -99,14 +97,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except (TypeError, ValueError):
         airflow_max = spec["max"]
     try:
-        airflow_min = float(
-            entry.options.get(
-                CONF_AIRFLOW_MIN, entry.data.get(CONF_AIRFLOW_MIN, spec["min"])
-            )
-        )
-    except (TypeError, ValueError):
-        airflow_min = spec["min"]
-    try:
         fan_min_output = float(
             entry.options.get(
                 CONF_FAN_MIN_OUTPUT,
@@ -124,7 +114,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         scan_interval,
         hostid,
         airflow_max,
-        airflow_min,
         fan_min_output,
     )
     hass.data[DOMAIN][name] = {"hub": hub}
@@ -185,7 +174,6 @@ class HrdsModbusHub:
         scan_interval: int,
         hostid: int,
         airflow_max: float,
-        airflow_min: float,
         fan_min_output: float,
     ) -> None:
         self._hass = hass
@@ -198,7 +186,6 @@ class HrdsModbusHub:
         self._sensors: list = []
         self._bms_enabled = False
         self._airflow_max = airflow_max
-        self._airflow_min = airflow_min
         self._fan_min_output = fan_min_output
         self.data: Dict[str, Any] = {}
 
@@ -339,24 +326,16 @@ class HrdsModbusHub:
     def _compute_derived(self) -> None:
         """Write airflow (m³/h) sensor values derived from calibration + live fan output."""
         self.data[C_MAX_TOTAL_AIRFLOW] = self._airflow_max
-        self.data[C_SUPPLY_FAN_MIN_AIRFLOW] = self._airflow_min
         self.data[C_SUPPLY_FAN_MAX_AIRFLOW] = self._airflow_max
         out = self.data.get(C_SUPPLY_FAN_OUTPUT)
         if out is None:
             self.data.setdefault(C_SUPPLY_FAN_AIRFLOW, None)
             return
-        if out <= 0.0:
+        if out <= self._fan_min_output:
             self.data[C_SUPPLY_FAN_AIRFLOW] = 0.0
             return
-        band = 100.0 - self._fan_min_output
-        if band <= 0.0:
-            self.data[C_SUPPLY_FAN_AIRFLOW] = self._airflow_max
-            return
-        flow = self._airflow_min + max(0.0, out - self._fan_min_output) / band * (
-            self._airflow_max - self._airflow_min
-        )
-        self.data[C_SUPPLY_FAN_AIRFLOW] = max(
-            self._airflow_min, min(self._airflow_max, flow)
+        self.data[C_SUPPLY_FAN_AIRFLOW] = min(
+            self._airflow_max, out / 100.0 * self._airflow_max
         )
 
     # ---- writing ----------------------------------------------------------

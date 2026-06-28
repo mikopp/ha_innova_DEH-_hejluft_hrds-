@@ -28,8 +28,7 @@
           "scan_interval": "Abfrageintervall",
           "model": "Modell (30 = HRDS+30, 50 = HRDS+50)",
           "airflow_max_m3h": "Zuluftventilator max. Volumenstrom (m³/h)",
-          "airflow_min_m3h": "Zuluftventilator min. Volumenstrom (m³/h)",
-          "fan_min_output_pct": "Ventilatorausgang (%) ab dem der Mindest-Volumenstrom gilt (%)"
+          "fan_min_output_pct": "Ventilatorausgang (%) unterhalb dessen der Ventilator als aus gilt (%)"
         }
       }
     }
@@ -50,7 +49,6 @@
       "compressor_output": { "name": "Kompressor-Ausgang" },
       "supply_fan_rpm": { "name": "Zuluftventilator-Drehzahl" },
       "max_total_airflow": { "name": "Max. Gesamt-Volumenstrom" },
-      "supply_fan_min_airflow": { "name": "Zuluftventilator min. Volumenstrom" },
       "supply_fan_max_airflow": { "name": "Zuluftventilator max. Volumenstrom" },
       "supply_fan_airflow": { "name": "Zuluftventilator Volumenstrom" },
       "recirculation_damper": {

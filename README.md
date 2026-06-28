@@ -81,8 +81,7 @@ for full detail.
 | `sensor.compressor_status` | enum | ³ Built-in | Off/Wait/On/Alarm/Manual |
 | `sensor.operating_mode` | enum | ³ Built-in | Summer/Winter/Auto season |
 | `sensor.recirculation_damper` | enum | ³ Built-in | Reg 1134; Off/On/Disabled — state of the motorised recirculation damper (R-variant only) |
-| `sensor.supply_fan_airflow` | m³/h | ³ Built-in | Computed from live fan output % and calibration; see [Airflow sensors](#airflow-sensors) |
-| `sensor.supply_fan_min_airflow` | m³/h | — | Computed constant; minimum airflow at which the fan can run (from config) |
+| `sensor.supply_fan_airflow` | m³/h | ³ Built-in | Computed from live fan output %; see [Airflow sensors](#airflow-sensors) |
 | `sensor.supply_fan_max_airflow` | m³/h | — | Computed constant; maximum fan airflow (from config) |
 | `sensor.max_total_airflow` | m³/h | — | Computed constant; same as supply_fan_max_airflow (from config) |
 
@@ -190,13 +189,11 @@ computed `m³/h` sensors:
 |-------|-----------------|-------|
 | Model | `30` | Change here too if you need to switch model |
 | Supply fan max airflow (m³/h) | `300` / `500` | Fan airflow at 100 % output — adjust if your duct or filter raises back-pressure |
-| Supply fan min airflow (m³/h) | `130` / `190` | Fan airflow at its minimum operating point (firmware floor) |
-| Fan output % at which min airflow starts (%) | `50` | Output % below which the fan is off. Matches `PF28`/`PF27` defaults. Raise if you changed those parameters. |
+| Fan output % below which fan is treated as off (%) | `50` | Matches the `PF28`/`PF27` firmware gate (default 50 %). Set to 0 if you set PF28/PF27 to 0. |
 
-These values feed the live `sensor.supply_fan_airflow` calculation (band-linear
-interpolation between min and max). The three static sensors
-(`supply_fan_min_airflow`, `supply_fan_max_airflow`, `max_total_airflow`) are
-updated immediately when you save Options.
+These values feed the live `sensor.supply_fan_airflow` calculation (proportional:
+`output% / 100 × Q_max`). The two static sensors (`supply_fan_max_airflow`,
+`max_total_airflow`) are updated immediately when you save Options.
 
 ## Using the integration
 
@@ -281,24 +278,27 @@ above):
 | Sensor | What it shows |
 |--------|--------------|
 | `sensor.supply_fan_airflow` | Live estimate in m³/h; updates every poll cycle |
-| `sensor.supply_fan_min_airflow` | Configured minimum (floor) airflow in m³/h |
-| `sensor.supply_fan_max_airflow` | Configured maximum airflow in m³/h |
+| `sensor.supply_fan_max_airflow` | Configured maximum airflow in m³/h (from Options) |
 | `sensor.max_total_airflow` | Same as max airflow (provided for convenience) |
 
-The formula is a band-linear interpolation: below the configured "fan min output
-%" the fan is off (0 m³/h); between min-output% and 100 % output the airflow
-scales linearly from `min` to `max`. Default values per model:
+The formula is proportional: `Q = (output% / 100) × Q_max`, using the live
+`supply_fan_output` register. Below the configured "fan min output %" threshold
+the fan is treated as off (0 m³/h) — this threshold matches the `PF28`/`PF27`
+firmware gate (default 50 %, configurable to 0 %). Default Q_max per model:
 
-| Variant | Max | Min | Min output % |
-|---------|----:|----:|-------------:|
-| HRDS+ 30 | 300 m³/h | 130 m³/h | 50 % |
-| HRDS+ 50 | 500 m³/h | 190 m³/h | 50 % |
+| Variant | Q_max | Fan gate default |
+|---------|------:|-----------------:|
+| HRDS+ 30 | 300 m³/h | 50 % (PF28/PF27) |
+| HRDS+ 50 | 500 m³/h | 50 % (PF28/PF27) |
+
+Note: the unit has **no minimum fan speed** — PF28 and PF27 are configurable
+from 0 to 100 %, so the 130/190 m³/h figures from the performance table are the
+tested operating range, not a hardware or firmware floor.
 
 This is an open-loop estimate — it assumes constant duct resistance, so loaded
 filters or restrictive ducts will make the real flow lower than estimated. If
-you can measure actual flow, adjust `airflow_max_m3h` and `airflow_min_m3h` in
-Options to match. The full derivation, the band-aware formula, and a two-point
-calibration recipe are in
+you can measure actual flow, adjust `airflow_max_m3h` in Options to calibrate.
+The full derivation and a two-point calibration recipe are in
 [`references/README.md` — Translating fan speed to airflow](references/README.md#translating-fan-speed--rpm-to-airflow-mh),
 with the underlying spec data in
 [Technical data](references/README.md#technical-data-airflow-capacity-power).

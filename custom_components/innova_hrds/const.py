@@ -46,11 +46,10 @@ CONF_MODEL = "model"
 DEFAULT_MODEL = "30"
 MODELS = ["30", "50"]
 MODEL_SPECS: Dict[str, Dict[str, float]] = {
-    "30": {"max": 300.0, "min": 130.0},
-    "50": {"max": 500.0, "min": 190.0},
+    "30": {"max": 300.0},
+    "50": {"max": 500.0},
 }
 CONF_AIRFLOW_MAX = "airflow_max_m3h"
-CONF_AIRFLOW_MIN = "airflow_min_m3h"
 CONF_FAN_MIN_OUTPUT = "fan_min_output_pct"
 DEFAULT_FAN_MIN_OUTPUT = 50.0
 ATTR_MANUFACTURER = "Innova / hej.luft"
@@ -184,7 +183,6 @@ C_ALARM_ANTIFREEZE = "alarm_water_antifreeze"
 C_ALARM_FILTER = "alarm_dirty_filter"
 # Computed (non-register-backed) airflow sensors
 C_MAX_TOTAL_AIRFLOW = "max_total_airflow"
-C_SUPPLY_FAN_MIN_AIRFLOW = "supply_fan_min_airflow"
 C_SUPPLY_FAN_MAX_AIRFLOW = "supply_fan_max_airflow"
 C_SUPPLY_FAN_AIRFLOW = "supply_fan_airflow"
 
@@ -591,7 +589,6 @@ BMS_ENABLE_KEYS = (C_ENABLE_ONOFF_BMS, C_ENABLE_DEHUM_BMS, C_ENABLE_COOLING_BMS)
 # hub after each decode cycle using model calibration parameters.
 COMPUTED_SENSORS: Dict[str, Dict[str, str]] = {
     C_MAX_TOTAL_AIRFLOW: {"NAME": "Max total airflow", "UNIT": "m³/h"},
-    C_SUPPLY_FAN_MIN_AIRFLOW: {"NAME": "Supply fan min airflow", "UNIT": "m³/h"},
     C_SUPPLY_FAN_MAX_AIRFLOW: {"NAME": "Supply fan max airflow", "UNIT": "m³/h"},
     C_SUPPLY_FAN_AIRFLOW: {"NAME": "Supply fan airflow", "UNIT": "m³/h"},
 }
