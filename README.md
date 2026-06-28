@@ -30,9 +30,12 @@ The integration talks to the unit's control board via Modbus TCP and exposes:
   * Fan mode is selectable: **off** (passive airflow from central MVHR only) /
     **low** / **medium** / **high** — controls the unit's own supply fan via
     the manual fan speed register. Fan mode persists across HVAC mode changes.
-* **Sensors** — see entity table below.
-* **Binary sensors** — dehumidify requested, fan integration active, probe
-  health, alarm active.
+* **Sensors** — see entity table below, including four computed airflow
+  sensors derived from your model's calibration data.
+* **Binary sensors** — dehumidify requested, recirculation active, probe
+  health, overall alarm active, four individual alarm sensors (compressor
+  low/high pressure, antifreeze, dirty filter), and two variant-detection
+  sensors (has recirculation fan, active cooling available).
 * **Switches** — unit on/off, dehumidify, active cooling, plus the three
   "enable control via Modbus" registers.
 * **Numbers** — humidity setpoint, summer/winter temperature setpoints, and the
@@ -77,16 +80,44 @@ for full detail.
 | `sensor.supply_fan_status` | enum | ³ Built-in | Off/Starting/On/Stopping/Alarm |
 | `sensor.compressor_status` | enum | ³ Built-in | Off/Wait/On/Alarm/Manual |
 | `sensor.operating_mode` | enum | ³ Built-in | Summer/Winter/Auto season |
+| `sensor.recirculation_damper` | enum | ³ Built-in | Reg 1134; Off/On/Disabled — state of the motorised recirculation damper (R-variant only) |
+| `sensor.supply_fan_airflow` | m³/h | ³ Built-in | Computed from live fan output % and calibration; see [Airflow sensors](#airflow-sensors) |
+| `sensor.supply_fan_min_airflow` | m³/h | — | Computed constant; minimum airflow at which the fan can run (from config) |
+| `sensor.supply_fan_max_airflow` | m³/h | — | Computed constant; maximum fan airflow (from config) |
+| `sensor.max_total_airflow` | m³/h | — | Computed constant; same as supply_fan_max_airflow (from config) |
 
 ### Binary sensors
+
+#### Status
 
 | Entity | Probe needed | What ON means |
 |--------|-------------|--------------|
 | `binary_sensor.dehumidify_request` | ³ | Dehumidification currently requested |
-| `binary_sensor.fan_integration_active` | ³ | Unit's supply fan is running (blending/integration) |
+| `binary_sensor.recirculation_active` | ³ | Unit's supply fan is running (reg 1112) |
 | `binary_sensor.alarm_active` | ³ | At least one alarm is active |
 | `binary_sensor.temp_probe_ok` | ³ | Room temperature probe healthy (AL28 not active) |
 | `binary_sensor.humidity_probe_ok` | ³ | Room humidity probe healthy (AL34 not active) |
+
+#### Variant detection
+
+These two sensors reflect hardware capability flags written by the installer
+(or the factory) to holding registers. They are read-only from the integration.
+
+| Entity | What ON means |
+|--------|--------------|
+| `binary_sensor.has_recirculation` | Unit has a recirculation fan + motorised damper (R-variant, PG01 = 1) |
+| `binary_sensor.active_cooling_available` | Active cooling is enabled on this unit (PG02 = 1) |
+
+#### Individual alarms
+
+Each sensor maps to a single bit of a packed alarm register. **ON = alarm is active.**
+
+| Entity | Alarm | Register bit | Effect |
+|--------|-------|-------------|--------|
+| `binary_sensor.alarm_compressor_lowpressure` | AL11 | Reg 768 bit 10 | Compressor stopped (low pressure / frost thermostat) |
+| `binary_sensor.alarm_compressor_highpressure` | AL12 | Reg 768 bit 11 | Compressor stopped (high pressure switch) |
+| `binary_sensor.alarm_water_antifreeze` | AL16 | Reg 768 bit 15 | Fan stopped (antifreeze protection) |
+| `binary_sensor.alarm_dirty_filter` | AL22 | Reg 769 bit 5 | Maintenance reminder; display only, manual reset |
 
 ### Switches
 
@@ -97,7 +128,7 @@ for full detail.
 | `switch.active_cooling` | 1139 | BMS active-cooling request (requires PH27 = 1, summer season) |
 | `switch.enable_onoff_bms` | 1778 | PH02 — auto-set on startup; expose to inspect/reset |
 | `switch.enable_dehumidify_bms` | 1870 | PH28 — auto-set on startup |
-| `switch.enable_integration_bms` | 1869 | PH27 — auto-set on startup |
+| `switch.enable_cooling_bms` | 1869 | PH27 — auto-set on startup |
 
 ### Numbers
 
@@ -143,10 +174,29 @@ Innova HRDS+**, then provide:
 | Port  | `502`   | Modbus TCP port |
 | Modbus slave ID | `1` | Factory default unit address |
 | Scan interval | `30 s` | Polling period (min 5 s) |
+| Model | `30`    | Device size: `30` = HRDS+30 (max 300 m³/h), `50` = HRDS+50 (max 500 m³/h). Sets airflow defaults. |
 
 On first connection the integration enables Modbus control on the unit
 (PH02/PH27/PH28) so on/off, dehumidify and cooling commands are honoured. These
 are also exposed as switches if you prefer to manage them yourself.
+
+### Airflow calibration (Options)
+
+After the integration is set up, open **Settings → Devices & Services →
+Innova HRDS+ → Configure** to adjust the airflow calibration used by the four
+computed `m³/h` sensors:
+
+| Field | Default (30/50) | Notes |
+|-------|-----------------|-------|
+| Model | `30` | Change here too if you need to switch model |
+| Supply fan max airflow (m³/h) | `300` / `500` | Fan airflow at 100 % output — adjust if your duct or filter raises back-pressure |
+| Supply fan min airflow (m³/h) | `130` / `190` | Fan airflow at its minimum operating point (firmware floor) |
+| Fan output % at which min airflow starts (%) | `50` | Output % below which the fan is off. Matches `PF28`/`PF27` defaults. Raise if you changed those parameters. |
+
+These values feed the live `sensor.supply_fan_airflow` calculation (band-linear
+interpolation between min and max). The three static sensors
+(`supply_fan_min_airflow`, `supply_fan_max_airflow`, `max_total_airflow`) are
+updated immediately when you save Options.
 
 ## Using the integration
 
@@ -181,13 +231,13 @@ it's worth being precise:
   still pushing air through the duct, so air keeps flowing. Set the **climate
   fan mode to "off"** to stop the unit's own fan; the central MVHR continues
   to push air through passively. There is no dedicated sensor for this state —
-  watch **Supply fan status = Off** while **Unit status = On** (and **Fan
-  integration active = off**). The unit cannot measure the upstream MVHR's
+  watch **Supply fan status = Off** while **Unit status = On** (and **Recirculation
+  active = off**). The unit cannot measure the upstream MVHR's
   flow, so rely on your central system for the actual rate.
 * **Fan integration** — the unit runs **its own fan** to blend (integrate) the
   central inflow air with room air across its coil. Set the climate fan mode to
-  **low / medium / high** to drive the fan at a fixed speed. The **Fan
-  integration active** binary sensor tells you when the fan is running; **Supply
+  **low / medium / high** to drive the fan at a fixed speed. The **Recirculation
+  active** binary sensor tells you when the fan is running; **Supply
   fan output %** and **Supply fan speed (RPM)** show the actual speed. Fine-grained
   modulation bands (per mode) are available via the standalone `number` entities.
 
@@ -210,7 +260,7 @@ This is exactly the climate entity's **Dry** mode:
 1. Set the climate entity to **Dry** (this turns the unit on, requests
    dehumidify, and leaves active cooling off).
 2. The compressor runs to condense moisture, so the **fan runs** — you'll see
-   **Supply fan status = On**, **Fan integration active = on**, and **Compressor
+   **Supply fan status = On**, **Recirculation active = on**, and **Compressor
    status = On**.
 3. **Active cooling (Modbus)** stays **off** — the compressor is working for
    dehumidification, not cooling.
@@ -221,36 +271,34 @@ If you prefer the individual switches over the climate entity, the same state is
 Technical details and register addresses are in
 [`references/MODBUS_REGISTERS.md` §13](references/MODBUS_REGISTERS.md#13-airflow-passive-flow-fan-integration-and-active-cooling).
 
-### Estimating recirculation airflow (m³/h) from fan output / RPM
+### Airflow sensors
 
-The unit reports fan **output %** (`sensor.supply_fan_output`) and **RPM**
-(`sensor.supply_fan_rpm`) but **never airflow in m³/h** — it cannot measure its
-own flow. You can estimate it.
+The integration provides four computed sensors that estimate the unit's
+recirculation airflow **automatically** from the live fan output reading and your
+calibration settings (see [Airflow calibration](#airflow-calibration-options)
+above):
 
-First identify your variant from the type-plate code `HRDS+ ` **`30`**/**`50`**:
+| Sensor | What it shows |
+|--------|--------------|
+| `sensor.supply_fan_airflow` | Live estimate in m³/h; updates every poll cycle |
+| `sensor.supply_fan_min_airflow` | Configured minimum (floor) airflow in m³/h |
+| `sensor.supply_fan_max_airflow` | Configured maximum airflow in m³/h |
+| `sensor.max_total_airflow` | Same as max airflow (provided for convenience) |
 
-| Variant | Nominal total | Recirc fan range | Recirc fan power |
-|---------|--------------:|-----------------:|-----------------:|
-| **HRDS+ 30** | 300 m³/h | 130–300 m³/h | 120 W |
-| **HRDS+ 50** | 500 m³/h | 190–500 m³/h | 170 W |
+The formula is a band-linear interpolation: below the configured "fan min output
+%" the fan is off (0 m³/h); between min-output% and 100 % output the airflow
+scales linearly from `min` to `max`. Default values per model:
 
-For a centrifugal EC fan on a fixed duct, **flow scales with speed** (`Q ∝ RPM`),
-so:
-
-```
-recirc m³/h  ≈  (RPM / RPM_at_100%) × Q_max          # via RPM
-recirc m³/h  ≈  (supply_fan_output% / 100) × Q_max    # via output %
-```
-
-where `Q_max` = 300 (HRDS+30) / 500 (HRDS+50). `RPM_at_100%` is not on the
-datasheet — read `sensor.supply_fan_rpm` once with `number.fan_manual_speed` at
-100 % to calibrate it. Note the recirc fan, when running, never delivers below
-its minimum (130 / 190 m³/h); below that it is simply **off** (0 m³/h).
+| Variant | Max | Min | Min output % |
+|---------|----:|----:|-------------:|
+| HRDS+ 30 | 300 m³/h | 130 m³/h | 50 % |
+| HRDS+ 50 | 500 m³/h | 190 m³/h | 50 % |
 
 This is an open-loop estimate — it assumes constant duct resistance, so loaded
-filters or restrictive ducts will make the real flow lower than estimated. The
-full derivation, the band-aware formula, and a two-point calibration recipe are
-in
+filters or restrictive ducts will make the real flow lower than estimated. If
+you can measure actual flow, adjust `airflow_max_m3h` and `airflow_min_m3h` in
+Options to match. The full derivation, the band-aware formula, and a two-point
+calibration recipe are in
 [`references/README.md` — Translating fan speed to airflow](references/README.md#translating-fan-speed--rpm-to-airflow-mh),
 with the underlying spec data in
 [Technical data](references/README.md#technical-data-airflow-capacity-power).
