@@ -13,12 +13,20 @@ from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PORT, CONF_SCAN_INTER
 from homeassistant.core import HomeAssistant, callback
 
 from .const import (
+    CONF_AIRFLOW_MAX,
+    CONF_AIRFLOW_MIN,
+    CONF_FAN_MIN_OUTPUT,
     CONF_HOSTID,
+    CONF_MODEL,
+    DEFAULT_FAN_MIN_OUTPUT,
     DEFAULT_HOSTID,
+    DEFAULT_MODEL,
     DEFAULT_NAME,
     DEFAULT_PORT,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    MODEL_SPECS,
+    MODELS,
 )
 
 DATA_SCHEMA = vol.Schema(
@@ -28,6 +36,7 @@ DATA_SCHEMA = vol.Schema(
         vol.Optional(CONF_PORT, default=DEFAULT_PORT): cv.port,
         vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): int,
         vol.Optional(CONF_HOSTID, default=DEFAULT_HOSTID): int,
+        vol.Required(CONF_MODEL, default=DEFAULT_MODEL): vol.In(MODELS),
     }
 )
 
@@ -88,6 +97,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
         data = self._config_entry.data
         options = self._config_entry.options
+        model = options.get(CONF_MODEL, data.get(CONF_MODEL, DEFAULT_MODEL))
+        spec = MODEL_SPECS.get(model, MODEL_SPECS[DEFAULT_MODEL])
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
@@ -115,6 +126,31 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                             CONF_HOSTID, data.get(CONF_HOSTID, DEFAULT_HOSTID)
                         ),
                     ): vol.Coerce(int),
+                    vol.Required(
+                        CONF_MODEL,
+                        default=model,
+                    ): vol.In(MODELS),
+                    vol.Optional(
+                        CONF_AIRFLOW_MAX,
+                        default=options.get(
+                            CONF_AIRFLOW_MAX,
+                            data.get(CONF_AIRFLOW_MAX, spec["max"]),
+                        ),
+                    ): vol.Coerce(float),
+                    vol.Optional(
+                        CONF_AIRFLOW_MIN,
+                        default=options.get(
+                            CONF_AIRFLOW_MIN,
+                            data.get(CONF_AIRFLOW_MIN, spec["min"]),
+                        ),
+                    ): vol.Coerce(float),
+                    vol.Optional(
+                        CONF_FAN_MIN_OUTPUT,
+                        default=options.get(
+                            CONF_FAN_MIN_OUTPUT,
+                            data.get(CONF_FAN_MIN_OUTPUT, DEFAULT_FAN_MIN_OUTPUT),
+                        ),
+                    ): vol.Coerce(float),
                 }
             ),
         )

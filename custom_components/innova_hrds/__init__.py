@@ -24,14 +24,26 @@ from .const import (
     BMS_ENABLE_KEYS,
     C_MAX_BLOCK,
     C_MAX_GAP,
+    C_MAX_TOTAL_AIRFLOW,
     C_REG_TYPE_HOLDING_REGISTERS,
     C_REG_TYPE_INPUT_REGISTERS,
+    C_SUPPLY_FAN_AIRFLOW,
+    C_SUPPLY_FAN_MAX_AIRFLOW,
+    C_SUPPLY_FAN_MIN_AIRFLOW,
+    C_SUPPLY_FAN_OUTPUT,
+    CONF_AIRFLOW_MAX,
+    CONF_AIRFLOW_MIN,
+    CONF_FAN_MIN_OUTPUT,
     CONF_HOSTID,
+    CONF_MODEL,
+    DEFAULT_FAN_MIN_OUTPUT,
     DEFAULT_HOSTID,
+    DEFAULT_MODEL,
     DEFAULT_PORT,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     ENTITIES_DICT,
+    MODEL_SPECS,
     get_entity_bitmask,
     get_entity_factor,
     get_entity_props,
@@ -76,7 +88,45 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except (TypeError, ValueError):
         hostid = DEFAULT_HOSTID
 
-    hub = HrdsModbusHub(hass, name, host, port, scan_interval, hostid)
+    model = entry.options.get(CONF_MODEL, entry.data.get(CONF_MODEL, DEFAULT_MODEL))
+    spec = MODEL_SPECS.get(model, MODEL_SPECS[DEFAULT_MODEL])
+    try:
+        airflow_max = float(
+            entry.options.get(
+                CONF_AIRFLOW_MAX, entry.data.get(CONF_AIRFLOW_MAX, spec["max"])
+            )
+        )
+    except (TypeError, ValueError):
+        airflow_max = spec["max"]
+    try:
+        airflow_min = float(
+            entry.options.get(
+                CONF_AIRFLOW_MIN, entry.data.get(CONF_AIRFLOW_MIN, spec["min"])
+            )
+        )
+    except (TypeError, ValueError):
+        airflow_min = spec["min"]
+    try:
+        fan_min_output = float(
+            entry.options.get(
+                CONF_FAN_MIN_OUTPUT,
+                entry.data.get(CONF_FAN_MIN_OUTPUT, DEFAULT_FAN_MIN_OUTPUT),
+            )
+        )
+    except (TypeError, ValueError):
+        fan_min_output = DEFAULT_FAN_MIN_OUTPUT
+
+    hub = HrdsModbusHub(
+        hass,
+        name,
+        host,
+        port,
+        scan_interval,
+        hostid,
+        airflow_max,
+        airflow_min,
+        fan_min_output,
+    )
     hass.data[DOMAIN][name] = {"hub": hub}
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -134,6 +184,9 @@ class HrdsModbusHub:
         port: int,
         scan_interval: int,
         hostid: int,
+        airflow_max: float,
+        airflow_min: float,
+        fan_min_output: float,
     ) -> None:
         self._hass = hass
         self._name = name
@@ -144,6 +197,9 @@ class HrdsModbusHub:
         self._unsub: Optional[Any] = None
         self._sensors: list = []
         self._bms_enabled = False
+        self._airflow_max = airflow_max
+        self._airflow_min = airflow_min
+        self._fan_min_output = fan_min_output
         self.data: Dict[str, Any] = {}
 
         # Pre-compute the block reads per register type.
@@ -212,6 +268,7 @@ class HrdsModbusHub:
         if raw_input is None or raw_holding is None:
             return False
         self._decode_all(raw_input, raw_holding)
+        self._compute_derived()
         return True
 
     def _read_blocks(self, blocks, fc: str) -> Optional[Dict[int, int]]:
@@ -278,6 +335,29 @@ class HrdsModbusHub:
                 )
             else:
                 self.data[key] = float(raw) * get_entity_factor(props)
+
+    def _compute_derived(self) -> None:
+        """Write airflow (m³/h) sensor values derived from calibration + live fan output."""
+        self.data[C_MAX_TOTAL_AIRFLOW] = self._airflow_max
+        self.data[C_SUPPLY_FAN_MIN_AIRFLOW] = self._airflow_min
+        self.data[C_SUPPLY_FAN_MAX_AIRFLOW] = self._airflow_max
+        out = self.data.get(C_SUPPLY_FAN_OUTPUT)
+        if out is None:
+            self.data.setdefault(C_SUPPLY_FAN_AIRFLOW, None)
+            return
+        if out <= 0.0:
+            self.data[C_SUPPLY_FAN_AIRFLOW] = 0.0
+            return
+        band = 100.0 - self._fan_min_output
+        if band <= 0.0:
+            self.data[C_SUPPLY_FAN_AIRFLOW] = self._airflow_max
+            return
+        flow = self._airflow_min + max(0.0, out - self._fan_min_output) / band * (
+            self._airflow_max - self._airflow_min
+        )
+        self.data[C_SUPPLY_FAN_AIRFLOW] = max(
+            self._airflow_min, min(self._airflow_max, flow)
+        )
 
     # ---- writing ----------------------------------------------------------
     async def write_entity_value(self, entity_key: str, value: Any) -> None:

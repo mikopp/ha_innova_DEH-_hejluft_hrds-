@@ -7,7 +7,8 @@
           "host": "Host",
           "port": "Port",
           "hostid": "Modbus slave ID",
-          "scan_interval": "Scan interval"
+          "scan_interval": "Scan interval",
+          "model": "Model (30 = HRDS+30, 50 = HRDS+50)"
         }
       }
     },
@@ -24,7 +25,11 @@
           "host": "Host",
           "port": "Port",
           "hostid": "Modbus slave ID",
-          "scan_interval": "Scan interval"
+          "scan_interval": "Scan interval",
+          "model": "Model (30 = HRDS+30, 50 = HRDS+50)",
+          "airflow_max_m3h": "Supply fan max airflow (m³/h)",
+          "airflow_min_m3h": "Supply fan min airflow (m³/h)",
+          "fan_min_output_pct": "Fan output % at which min airflow starts (%)"
         }
       }
     }
@@ -44,6 +49,18 @@
       "supply_fan_output": { "name": "Supply fan output" },
       "compressor_output": { "name": "Compressor output" },
       "supply_fan_rpm": { "name": "Supply fan speed" },
+      "max_total_airflow": { "name": "Max total airflow" },
+      "supply_fan_min_airflow": { "name": "Supply fan min airflow" },
+      "supply_fan_max_airflow": { "name": "Supply fan max airflow" },
+      "supply_fan_airflow": { "name": "Supply fan airflow" },
+      "recirculation_damper": {
+        "name": "Recirculation damper",
+        "state": {
+          "off": "Off",
+          "on": "On",
+          "disabled": "Disabled"
+        }
+      },
       "unit_status": {
         "name": "Unit status",
         "state": {
@@ -100,10 +117,12 @@
     },
     "binary_sensor": {
       "dehumidify_request": { "name": "Dehumidify requested" },
-      "fan_integration_active": { "name": "Fan integration active" },
+      "recirculation_active": { "name": "Recirculation active" },
       "alarm_active": { "name": "Alarm active" },
       "temp_probe_ok": { "name": "Room temperature probe OK" },
-      "humidity_probe_ok": { "name": "Room humidity probe OK" }
+      "humidity_probe_ok": { "name": "Room humidity probe OK" },
+      "has_recirculation": { "name": "Has recirculation fan" },
+      "active_cooling_available": { "name": "Active cooling available" }
     },
     "switch": {
       "unit_on_off": { "name": "Unit on/off (Modbus)" },
@@ -111,7 +130,7 @@
       "active_cooling": { "name": "Active cooling (Modbus)" },
       "enable_onoff_bms": { "name": "Enable on/off via Modbus" },
       "enable_dehumidify_bms": { "name": "Enable dehumidify via Modbus" },
-      "enable_integration_bms": { "name": "Enable cooling via Modbus" }
+      "enable_cooling_bms": { "name": "Enable cooling via Modbus" }
     },
     "select": {
       "probe_source": {
