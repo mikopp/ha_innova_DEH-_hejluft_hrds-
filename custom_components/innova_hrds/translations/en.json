@@ -122,7 +122,11 @@
       "temp_probe_ok": { "name": "Room temperature probe OK" },
       "humidity_probe_ok": { "name": "Room humidity probe OK" },
       "has_recirculation": { "name": "Has recirculation fan" },
-      "active_cooling_available": { "name": "Active cooling available" }
+      "active_cooling_available": { "name": "Active cooling available" },
+      "alarm_compressor_lowpressure": { "name": "Alarm: compressor low-pressure / frost" },
+      "alarm_compressor_highpressure": { "name": "Alarm: compressor high-pressure" },
+      "alarm_water_antifreeze": { "name": "Alarm: water antifreeze" },
+      "alarm_dirty_filter": { "name": "Alarm: dirty filter" }
     },
     "switch": {
       "unit_on_off": { "name": "Unit on/off (Modbus)" },

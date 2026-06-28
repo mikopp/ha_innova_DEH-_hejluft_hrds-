@@ -177,6 +177,11 @@ C_PROBE_SOURCE = "probe_source"
 # Derived binary sensors (bit-extracted from packed alarm registers)
 C_TEMP_PROBE_OK = "temp_probe_ok"
 C_HUMIDITY_PROBE_OK = "humidity_probe_ok"
+# Individual alarm sensors (bit-extracted; ON = alarm active)
+C_ALARM_COMPRESSOR_LP = "alarm_compressor_lowpressure"
+C_ALARM_COMPRESSOR_HP = "alarm_compressor_highpressure"
+C_ALARM_ANTIFREEZE = "alarm_water_antifreeze"
+C_ALARM_FILTER = "alarm_dirty_filter"
 # Computed (non-register-backed) airflow sensors
 C_MAX_TOTAL_AIRFLOW = "max_total_airflow"
 C_SUPPLY_FAN_MIN_AIRFLOW = "supply_fan_min_airflow"
@@ -534,6 +539,47 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "BITMASK": 1,
         "BITMASK_INVERT": True,
         "NAME": "Room humidity probe OK",
+    },
+    # --- Individual alarm sensors (PackedAlarm bit extraction; ON = alarm active) ---
+    # PackedAlarm_1 (reg 768): bit N = AL(N+1).
+    # AL11 (bit 10): compressor low-pressure / frost-thermostat — stops compressor.
+    #   This is the effective minimum-airflow protection: insufficient flow causes
+    #   evaporator icing which triggers low refrigerant pressure.
+    C_ALARM_COMPRESSOR_LP: {
+        "RT": C_REG_TYPE_INPUT_REGISTERS,
+        "REG": 768,
+        "DT": C_DT_UINT16,
+        "SWITCH": {"off": 0, "on": 1},
+        "BITMASK": 10,
+        "NAME": "Alarm: compressor low-pressure / frost",
+    },
+    # AL12 (bit 11): compressor high-pressure switch — stops compressor.
+    C_ALARM_COMPRESSOR_HP: {
+        "RT": C_REG_TYPE_INPUT_REGISTERS,
+        "REG": 768,
+        "DT": C_DT_UINT16,
+        "SWITCH": {"off": 0, "on": 1},
+        "BITMASK": 11,
+        "NAME": "Alarm: compressor high-pressure",
+    },
+    # AL16 (bit 15): water-circuit antifreeze — stops fan.
+    C_ALARM_ANTIFREEZE: {
+        "RT": C_REG_TYPE_INPUT_REGISTERS,
+        "REG": 768,
+        "DT": C_DT_UINT16,
+        "SWITCH": {"off": 0, "on": 1},
+        "BITMASK": 15,
+        "NAME": "Alarm: water antifreeze",
+    },
+    # PackedAlarm_2 (reg 769): bit N = AL(N+17).
+    # AL22 (bit 5): dirty filters — display-only, manual reset.
+    C_ALARM_FILTER: {
+        "RT": C_REG_TYPE_INPUT_REGISTERS,
+        "REG": 769,
+        "DT": C_DT_UINT16,
+        "SWITCH": {"off": 0, "on": 1},
+        "BITMASK": 5,
+        "NAME": "Alarm: dirty filter",
     },
 }
 

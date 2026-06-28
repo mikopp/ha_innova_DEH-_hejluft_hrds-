@@ -131,12 +131,13 @@ fan) always operates exactly this way — compressor dehumidifies and cools on
 MVHR passive flow alone. The concept is therefore confirmed by design, not just
 by assumption.
 
-**One open question for the `R` variant specifically:** when dehumidify is
-active and `fan_manual_speed` is set to 0 %, does the firmware respect the 0 %
-or does it silently clamp the output up to `MinSpeedFan_Dehum` (1853)?
-Verify by writing 0 to register 1614 while dehumidify is active, then reading
-`outAO_SupplyFan` (639) — non-zero means the firmware applied the minimum
-band. See `plans/todo.md` for the full check list.
+**Open question for the `R` variant:** when dehumidify is active and
+`fan_manual_speed` is set to 0 %, does the firmware respect the 0 % or clamp
+up to `MinSpeedFan_Dehum` (1853 / PF28)? Verify by writing 0 to register 1614
+while dehumidify is active, then reading `outAO_SupplyFan` (639). The firmware
+is confirmed to allow PF28 = 0 (configurable minimum), but whether a manual
+override of 0 is honoured during active DEU is unverified. The compressor will
+auto-protect via AL11 if passive airflow is insufficient.
 
 Fan mode is **independent of HVAC mode** — changing Dry ↔ Cool does not reset
 the fan mode; switching to Off also turns off the unit via `Status_OnOff_byBMS`
@@ -210,11 +211,20 @@ From the Technisches Handbuch §10, p.77 ("Leistungsdaten Luftaufbereitung" /
 
 ¹ At nominal airflow and the reference conditions footnoted in the handbook.
 
-**The recirculation fan does not run below its minimum** (130 m³/h on the 30,
-190 m³/h on the 50): when blending is active it delivers somewhere in that
-range, never less. The **total** flow (supply + recirc) **must not exceed the
-nominal** (300 / 500) — exceeding it costs efficiency, raises noise, and
-requires larger supply-duct sizing (handbook p.24).
+The 130–300 m³/h / 190–500 m³/h band in the table is the **tested operating
+range** from the performance spec — not a firmware-enforced floor. The firmware
+minimum during dehumidification is `PF28` (German handbook: "Minimale
+Geschwindigkeit Zuluftventilator bei Entfeuchtung"), which **defaults to 50 %
+but is configurable down to 0 %**. The equivalent for integration (cooling) is
+`PF27`, same defaults. In practice the unit's refrigerant circuit protects itself
+via **AL11** (compressor low-pressure / frost-thermostat: auto-stops the compressor
+if evaporator icing indicates insufficient airflow) and **AL12** (high-pressure
+stop). Passive MVHR airflow is sufficient for compressor operation — proven by the
+non-`R` variant which has no fan and always runs on passive flow.
+
+The **total** flow (supply + recirc) **must not exceed the nominal** (300 / 500)
+— exceeding it costs efficiency, raises noise, and requires larger supply-duct
+sizing (handbook p.24).
 
 ### Dehumidification capacity vs. airflow
 
@@ -262,9 +272,10 @@ Equivalently, via the analog output % (the same curve, already normalised):
 m³/h  ≈  (output% / 100) × Q_max
 ```
 
-with the floor that **a running recirc fan is never below 130 m³/h** (30) /
-190 m³/h (50): below the band-minimum % the fan is simply OFF (0 m³/h), not a
-proportional fraction. So a more faithful map across the running range is:
+with the practical note that the fan output % where recirculation actually begins
+corresponds to `PF28` (default 50 %, configurable to 0 %): below that the fan
+is simply OFF (0 m³/h passive MVHR flow only), not a proportional fraction. So
+a more faithful map across the running range is:
 
 ```
 m³/h  ≈  Q_min + (output% − band_min%) / (100 − band_min%) × (Q_max − Q_min)
