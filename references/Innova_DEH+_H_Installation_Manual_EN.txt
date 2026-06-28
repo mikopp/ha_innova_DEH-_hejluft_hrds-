@@ -1,0 +1,3138 @@
+Installation manual
+(Translation of ori- EN
+ginal language)
+
+N421174A - Rev. 00 - 06/2025
+
+DEH+
+Dehumidifier for
+radiant panels
+horizontal version
+
+First of all, we would like to thank you for having chosen one of our units.
+As you will realise, you have made a winning choice by purchasing a product that represents the
+state of the art in domestic air-conditioning technology.
+Thanks to the product you have purchased and by following the suggestions in this manual, you
+will benefit from optimal environmental conditions with the lowest possible energy investment.
+
+Compliance
+This unit complies with European directives:
+• Low Voltage Directive 2014/35/EU by transposition of
+the following technical standards: EN 60335-1:2012 +
+EN 60335-2-80:2003
+• EMC Directive 2014/30/EU, by transposition of technical standards: EN 55014-1:2021 + EN 55014-2:2021
+
+Markings
+
+2
+
++ EN IEC 61000-3-2:2019+A1:2021 + EN 61000-33:2013+A2:2021
+• RoHS Directive 2011/65/EU by transposition of the following technical standards: EN IEC 63000:2018
+• European ErP Ecodesign Regulation No. 1254/2014
+
+Contents
+
+CONTENTS
+Compliance ����������������������������������������������������������������� 2
+Markings����������������������������������������������������������������������� 2
+
+6.  Maintenance����������������������������������������������� 34
+
+1. General information����������������������������������� 4
+
+7. Faults and remedies ��������������������������������� 35
+
+1.1	About the manual��������������������������������������������� 4
+1.2	General warnings ��������������������������������������������� 5
+1.3	Basic safety rules����������������������������������������������� 5
+1.4	Disposal��������������������������������������������������������������� 6
+
+2. Product introduction ��������������������������������� 7
+2.1	Identification ����������������������������������������������������� 7
+2.2	Destination of use �������������������������������������������� 7
+2.3	Description of the appliance�������������������������� 7
+2.4	List of external components �������������������������� 8
+2.5	List of internal components��������������������������� 9
+2.6	Compatible accessories��������������������������������� 10
+
+6.1	Routine maintenance ������������������������������������ 34
+
+7.1	Preliminary warnings ������������������������������������ 35
+7.2	Troubleshooting table������������������������������������ 35
+7.3	Alarm table and card flashes������������������������ 36
+
+8. Technical information ����������������������������� 37
+8.1	Technical data��������������������������������������������������� 37
+8.2	Dimensions������������������������������������������������������� 39
+8.3	Refrigeration diagrams ��������������������������������� 41
+
+3.  Installation��������������������������������������������������� 12
+
+3.1	Preliminary warnings ������������������������������������ 12
+3.2	Reception���������������������������������������������������������� 12
+3.3	Dimensions and weights with packaging 12
+3.4	Handling with packaging������������������������������ 13
+3.5	Storage��������������������������������������������������������������� 13
+3.6	Unpacking��������������������������������������������������������� 13
+3.7	Handling without packaging������������������������ 14
+3.8	Installation site������������������������������������������������ 14
+3.9	Minimum installation distances������������������ 15
+3.10	Positioning ������������������������������������������������������� 16
+3.11	Condensate drain connection ��������������������� 17
+3.12	Aeraulic connections�������������������������������������� 18
+3.13	Hydraulic connections������������������������������������ 20
+3.14	Electrical connections������������������������������������ 21
+
+4.  Command����������������������������������������������������� 25
+
+4.1	Remote control������������������������������������������������ 26
+4.2	Digital commands ������������������������������������������ 30
+4.3	Control panel via Modbus RS485 RTU��������� 31
+4.4	Modbus RS485 RTU������������������������������������������ 31
+
+5.  Start-up��������������������������������������������������������� 32
+
+5.1	Preliminary warnings ������������������������������������ 32
+5.2	First start-up ���������������������������������������������������� 32
+5.3	Plant delivery��������������������������������������������������� 33
+5.4	Switching off for extended periods������������ 33
+
+3
+
+1. General information
+
+1.GENERAL INFORMATION
+
+1.1	About the manual
+This manual was written to provide all the explanations for
+the correct management of the appliance.
+ This instruction manual is an integral part of the appliance and must therefore be kept in a safe place and
+must ALWAYS accompany the appliance even if it is
+passed on to another owner or user, or transferred to
+another plant. If it is damaged or lost, download a copy
+from the website.
+ Read this manual carefully before proceeding with any
+operation and follow the instructions in the individual
+chapters.
+ Specific warnings are given in each chapter of the document and should be read before starting operations.
+ The manufacturer accepts no liability for damage to
+persons or property resulting from failure to observe
+the regulations contained in this booklet.
+ This document is confidential under the terms of the
+law and may not be reproduced or passed on to third
+parties without the express authorisation of the Manufactorer.
+
+Editorial pictograms
+
+The pictograms in the following chapter provide quick and
+unambiguous information necessary for the correct and
+safe use of the machine.
+Related to safety
+ High risk warning (bold text)
+• The operation described above presents a risk of serious physical injury, fatality, major damage to the appliance and/or to the environment if not carried out in
+compliance with safety regulations.
+ Low risk warning (plain text)
+• The operation described above presents a risk of minor
+physical injury or minor damage to the appliance and/or
+to the environment if not carried out in compliance with
+safety regulations.
+ Prohibition (normal text)
+• Marks actions that are prohibited.
+ Important information (bold text)
+• This indicates important information that must be taken
+into account during the operations.
+In the texts
+Purpose of the actions
+►►Actions required
+Expected responses following an action
+• Lists
+In the figures
+1 The numbers indicate the individual components.
+
+4
+
+A Capital letters indicate a combination of components
+and dimensions.
+1 	The white numbers in black marks indicate a series of actions to be carried out in sequence.
+A 	The black letter in white identifies an image when
+there are several images in the same figure.
+
+Pictograms on the product
+
+Symbols are used in some parts of the appliance:
+Related to safety
+Read the instruction manual
+Read the instructions carefully before performing any operation on the appliance.
+Instruction manual
+Read the information available in the technical documentation of the appliance.
+Attention electrical hazard
+• Warns relevant personnel of the presence of electricity
+and the risk of electric shock.
+
+Recipients
+
+User
+Non-expert person capable of operating the product in
+safe conditions for people, for the product itself and the
+environment, interpreting an elementary diagnostic of
+faults and abnormal operating conditions, carrying out
+simple adjustment, checking and maintenance operations.
+Installer
+Expert person qualified to position and connect (hydraulically, electrically, etc.) the unit to the plant; this person is
+responsible for handling and correct installation according
+to the instructions provided in this manual and the national
+standards currently in force.
+Service
+Expert and qualified person authorised directly by the
+Manufacturer to carry out all routine and supplementary maintenance operations, as well as every adjustment,
+check, repair and replacement of parts necessary during
+the life of the unit.
+
+Organisation of the manual
+
+The manual is divided into sections each dedicated to one
+or more target groups.
+General information
+It addresses all recipients.
+It contains general information and important warnings
+that should be known before installing and using the appliance.
+Product introduction
+
+1. General information
+Addressed to all recipients, contains general information
+on the product.
+Installation and Operation
+It is addressed exclusively to the installer.
+Contains specific warnings and all information necessary
+for positioning, mounting, connecting the device and operation.
+Commissioning, maintenance and troubleshooting
+
+They are addressed exclusively to the Authorised Service
+Centre.
+It contains specific warnings and useful information for the
+most common commissioning and routine maintenance.
+Technical information
+It addresses all recipients.
+It contains detailed technical information about the appliance.
+
+1.2	General warnings
+ Specific warnings are given in each chapter of the document and should be read before starting operations.
+ All personnel involved must be aware of the operations
+and dangers that may arise when beginning all unit installation operations.
+ Installation performed outside the warnings provided
+in this manual and use of the appliance outside the prescribed temperature limits will invalidate the warranty.
+ Any contractual or extra-contractual liability for damage
+caused to persons, animals or property, due to installation, adjustment and maintenance errors or improper
+use is excluded. All uses not expressly indicated in this
+manual are not permitted.
+ The installation of the appliances must be carried out by
+a qualified company which, on completion of the work,
+will issue a declaration of compliance to the person in
+charge of the plant in accordance with the regulations
+in force and the instructions provided in the instruction
+booklet accompanying the appliance.
+ First start-up and repair or maintenance operations
+must be carried out by the Authorised Service Centre
+or by qualified personnel following the provisions of this
+manual.
+ Do not modify or tamper with the appliance as this can
+lead to dangerous situations.
+ Use suitable personal protective clothing and equipment during installation and/or maintenance opera-
+
+tions. The Manufacturer is not liable for the non-observance of the current safety and accident prevention
+regulations.
+ In case of liquid or oil leaks, isolate the main power supply of the system and close any water valves. Promptly
+contact the Authorised Service Centre or professionally
+qualified personnel, and refrain from personally intervening on the equipment.
+ When replacing components, use only original spare
+parts.
+ The Manufacturer reserves the right to make changes
+to its models at any time to improve its product, without prejudice to the essential characteristics described
+in this manual. The Manufacturer is not obliged to add
+such modifications to machines previously manufactured, already delivered, or under construction.
+ The appliance can be used by children aged 8 years and
+above and by persons with reduced physical, sensory,
+or mental capabilities, or those lacking experience or
+necessary knowledge, provided they are under supervision or have been given instructions concerning the
+safe use of the appliance and understand the hazards
+involved. Children should not play with the appliance.
+Cleaning and maintenance intended to be carried out
+by the user should not be done by children without supervision.
+
+1.3	Basic safety rules
+We would like to remind you that the use of products that
+use electricity and water involves observing certain basic
+safety precautions such as:
+ It is forbidden to touch the appliance with wet or damp
+body parts.
+ It is forbidden to carry out any operation before disconnecting the appliance from the power supply by setting
+the plant master switch to "OFF".
+ It is forbidden to modify the safety or adjustment devices without the authorisation and instructions of the
+appliance manufacturer.
+ It is forbidden to pull, unplug or twist the electrical cables coming out of the appliance, even if it is disconnected from the mains supply.
+ It is forbidden to introduce objects and substances
+through the openings provided for the intake and delivery of air.
+ It is forbidden to open the access doors to the internal parts of the appliance without first setting the plant
+master switch to “OFF”.
+ It is forbidden to dispose of packaging material and
+leave it within reach of children as it can be a potential
+hazard.
+
+5
+
+1. General information
+
+1.4	Disposal
+
+The symbol on the product or packaging indicates that
+the product should not be treated as normal household
+waste. Instead, it should be taken to an appropriate collection point for recycling of electrical, electronic, and battery
+equipment.
+Proper disposal of this product avoids harm to humans
+and the environment and promotes the reuse of valuable
+raw materials.
+For more detailed information about the recycling of this
+product, contact your local authority, your household
+waste disposal service, or the shop where you purchased
+the product.
+Illegal disposal of the product by the user involves the application of the administrative sanctions provided for by the
+regulations in force.
+This provision is only valid in the EU Member States.
+ Avoid disassembling the appliance yourself.
+ Contact an Authorised Service Centre to disassemble the appliance.
+
+6
+
+2. Product introduction
+
+2.PRODUCT INTRODUCTION
+
+2.1	Identification
+Technical rating plate
+This shows the technical and performance specifications of
+the appliance.
+ Tampering with, removing or missing identification
+plates does not allow the product to be reliably identified by its serial number and therefore invalidates the
+warranty.
+
+The appliance can be identified by the rating plate:
+1.
+
+Technical rating plate
+
+1
+
+2.2	Destination of use
+The air conditioning unit is designed for specific dehumidification / air conditioning needs in low energy consumption
+environments.
+
+The unit is particularly suitable for single-family homes,
+apartments, and offices where a radiant air conditioning
+system is present.
+
+2.3	Description of the appliance
+Structure: self-supporting in galvanized sheet metal, panel insulation is made with polyethylene insulant.
+Fans: centrifugal EC with high-efficiency Brushless motor.
+Filters: flat with Coarse filtration class. Easily removable for
+routine maintenance.
+Refrigeration circuit: Made of brazed copper complete
+with high-efficiency compressor, filter drier, finned coils,
+water heat exchanger, solenoid valves, expansion device,
+liquid receiver, high-pressure switches.
+Models: 2 sizes with different flow rates are available.
+Versions:
+• D: Version for neutral air dehumidification (isothermal)
+• DC: Version for integration dehumidification
+
+7
+
+2. Product introduction
+
+2.4	List of external components
+1.
+2.
+
+3.
+4.
+
+Supply air
+Hydraulic connections
+
+Installation bracket
+Condensate drain
+
+1
+2
+3
+1.
+2.
+
+Electrical connection passage
+Indoor air extraction
+
+3.
+
+4
+
+Filter port
+
+1
+
+2
+
+3
+
+8
+
+2. Product introduction
+
+2.5	List of internal components
+Version D
+1.
+2.
+3.
+
+4.
+5.
+
+Finned coils
+Supply air fan
+Extracted air filter
+
+Electrical panel
+Compressor
+
+3
+
+2
+
+4
+
+1
+5
+
+DC version
+1.
+2.
+3.
+4.
+
+5.
+6.
+7.
+
+Finned coils
+Supply air fan
+Extracted air filter
+Electrical panel
+
+Compressor
+Solenoid valve
+Plate condenser
+
+3
+
+2
+
+4
+
+1
+5
+
+7
+
+6
+
+9
+
+2. Product introduction
+
+2.6	Compatible accessories
+Description
+
+Code
+
+Wall control commands – smart touch series
+Commands
+Wall control panel SMART TOUCH with thermostat and indoor air temperature and relative humidity
+sensor. Black color
+
+ECA033II
+
+Wall control panel SMART TOUCH with thermostat and indoor air temperature and relative humidity
+sensor. White color
+
+ECB033II
+
+VDZ2 Motorized zone valve On-Off 2-way 1/2"
+
+AHRD0314II
+
+VDZ3 Motorized zone valve On-Off 3-way 1/2"
+
+AHRD0315II
+
+FDR - Replacement filter DEH 30
+
+ARAD0123II
+
+FDR - Replacement filter DEH 50
+
+ARAD0124II
+
+Supply plenum TG2 3x125 for DEH 30 H
+
+AHRD0017II
+
+Supply plenum TG3 5x125 for DEH 50 H
+
+AHRD0018II
+
+Supply plenum TG2 8x 75/90 for DEH 30 H
+
+SCO312008II
+
+Supply plenum TG3 12x 75/90 for DEH 50 H
+
+SCO502512II
+
+Accessories supplied separately
+Zone valves
+
+Spare filters
+
+Supply plenum for flexible ducts
+
+Supply plenum for corrugated ducts
+
+Single duct plenum
+
+10
+
+2. Product introduction
+Description
+
+Code
+
+Supply plenum TG2 1x200 for DEH 30 H
+
+AHRD0217II
+
+Supply plenum TG3 1x200 for DEH 50 H
+
+AHRD0227II
+
+Silencer module to be matched with plenum / manifold TG2
+
+SCO454084II
+
+Silencer module to be matched with plenum / manifold TG3
+
+SCO654124II
+
+Round SYS - Manifold/plenum coupling for DN 75 mm duct outlet
+
+SRS075140II
+
+Round SYS - Manifold/plenum coupling for DN 90 mm duct outlet
+
+SRS090140II
+
+Silencers
+Sound silencer
+
+Distribution manifolds
+Corrugated duct outlet
+
+11
+
+3. Installation
+
+3.INSTALLATION
+
+3.1	Preliminary warnings
+ For detailed information on the products, refer to
+chapter "Technical information" p. 37.
+ The installation must be carried out by the installer.
+There is a risk of water leakage, electric shock or fire if
+the installation is not performed correctly.
+ During installation, it is necessary to observe the precautions mentioned in this manual, and on the labels
+affixed to the inside of the appliances, as well as to take
+
+every precaution suggested by common sense and the
+safety regulations in force at the place of installation.
+ Using only the supplied installation-specific components is recommended. Use of alternative components
+could lead to water leakage, electric shock or fire.
+ Failure to apply the indicated rules may cause malfunctions of the appliance and relieves the Manufacturer
+from any warranty and from any damage caused to
+persons, animals or property.
+
+3.2	Reception
+Preliminary warnings
+
+ Upon receipt of the package check that it is not damaged, otherwise accept the goods with reservation, producing photographic evidence of any damage.
+ In the event of damage, notify the shipper by registered
+mail with return receipt within 3 days of receipt. Presenting photographic documentation, similar information should also be sent by email to the Manufacturer.
+ No reports of damage will be taken into account later
+than 3 days after delivery.
+
+Package description
+
+The packaging is made of suitable material and carried out
+by experienced personnel.
+The units are all checked and tested and are delivered complete and in perfect condition.
+The appliance is shipped in standard packaging consisting
+of a cardboard box and a set of polystyrene foam protectors, placed on a wooden pallet and secured with straps.
+
+3.3	Dimensions and weights with packaging
+Models
+
+u.m.
+
+H
+
+Width
+
+mm
+
+760
+
+835
+
+Length
+
+mm
+
+835
+
+880
+
+Height
+
+mm
+
+330
+
+390
+
+Weight
+
+kg
+
+43,0
+
+57,0
+
+1. Excluding pallet
+
+12
+
+50
+
+Packaging dimensions (1)
+
+P
+
+L
+
+30
+
+3. Installation
+
+3.4	Handling with packaging
+Preliminary warnings
+
+ The product should only be handled by qualified personnel, adequately equipped, and using tools suitable
+for the weight and dimensions of the product.
+ Before each handling operation, check the lifting capacity of the machinery used in accordance with the indications on the packaging.
+
+Handling
+
+ When the load is lifted from the ground, stay clear of
+the immediate and surrounding area.
+ Check the information on the packaging for the amount
+of stackable packages.
+ In manual operations, the maximum weight per person required by current legislation must always be observed.
+
+With pallet:
+
+Without pallet:
+
+►►use a forklift
+
+►►use a forklift
+ The unit can only be moved manually for short trips in
+exceptional cases. In this case it is necessary to carefully
+check that the weight of the unit does not exceed what
+is stipulated by the regulations with respect to the number of persons employed.
+
+3.5	Storage
+Preliminary warnings
+
+ Stored in accordance with the applicable national regulations.
+
+ Store in a closed environment protected from the
+weather, off the ground by means of sleepers or pallets
+with temperatures not below 0 °C, up to a maximum of
+40 °C.
+
+3.6	Unpacking
+Preliminary warnings
+
+ Check that the individual components are present.
+ Check that no components were damaged during
+transport.
+ Dispose of the packaging components following the applicable waste disposal regulations. Check for disposal
+arrangements with your local authority.
+ Handle with care.
+ The device must always be moved in a horizontal position.
+ The packing material (cardboard, staples, plastic bags,
+etc.) must not be dispersed or abandoned in the surrounding environment and must be kept out of reach
+of children due to risk of hazard.
+
+13
+
+3. Installation
+
+Removing the packaging
+
+To remove the packaging:
+►►use a cutter
+►►open the cardboard packaging
+ To aid removal of the product, also cut the vertical
+edges.
+►►remove the accompanying components
+►►remove the polystyrene elements
+►►remove the appliance from the box
+Accompanying material
+They are included with the appliance, inside the packaging:
+• Control panel user manual
+• Installer manual
+ Check the presence of the individual components.
+
+3.7	Handling without packaging
+Preliminary warnings
+
+ The unit must be handled using non-slip gloves.
+ The product should only be handled by qualified personnel, adequately equipped, and using tools suitable
+for the weight and dimensions of the product.
+ Before each handling operation, check the lifting capacity of the machinery used in accordance with the indications on the packaging.
+ When the load is lifted from the ground, stay clear of
+the immediate and surrounding area.
+ Check the information on the packaging for the amount
+of stackable packages.
+
+ In manual operations, the maximum weight per person required by current legislation must always be observed.
+
+Movement methods
+►►use a fork lift, scaffolding or other suitable lifting system
+ The unit can only be moved manually for short trips in
+exceptional cases. In this case it is necessary to carefully
+check that the weight of the unit does not exceed what
+is stipulated by the regulations with respect to the number of persons employed.
+
+3.8	Installation site
+The location of the appliance must be determined by the
+plant engineer or a competent person and must take into
+account both purely technical requirements and any national/local legislation in force.
+The appliance is intended to be installed indoors in a horizontal position fixed to the ceiling.
+ The installation position must be chosen close to a wall
+connected to the outside.
+ The appliance is declared IPX0 protected, therefore not
+suitable for installation outdoors or in rooms with the
+presence of water (swimming pool, etc.).
+
+Preliminary warnings
+
+ Avoid installing the unit in the vicinity of:
+• obstacles or barriers that cause recirculation of the exhaust air
+
+14
+
+• narrow places where the sound level of the appliance
+can be enhanced by reverberations or resonances
+• environments with the presence of flammable or explosive gases
+• very damp environments (laundries, greenhouses, bathrooms with high humidity, etc.) to prevent the formation
+of condensation on the external panels of the unit
+• environments with the presence of flammable or explosive gases or flammable fluids
+• solar radiation and proximity to heat sources
+ Avoid installing the unit in the vicinity of the sea.
+Salty atmospheres cause corrosion and oxidation
+of the internal components, compromising the
+functioning of the unit.
+ Avoid placing the unit within 1 metre of radio and video
+equipment.
+
+3. Installation
+ Do not install above heat sources.
+ Ensure that:
+
+• the appliance must be installed in a position where it can
+be easily serviced
+
+• the installation site of the unit must be chosen with the
+utmost care to guarantee adequate protection from
+shocks and consequent damage
+
+• the safety distances between the units and other appliances or structures are scrupulously respected so that
+the air entering and leaving the fans is free to circulate
+ If the unit is installed incompletely or on an unsuitable
+surface, it could cause damage to persons or property
+if it becomes detached.
+ The appliance must not be in a position where the air
+flow is aimed directly at a person.
+ Provide the following:
+
+• the supporting surface is capable of supporting the
+weight of the appliance
+• the supporting surface does not affect load-bearing
+building elements, piping, or power lines
+• the functionality of load-bearing elements is not compromised
+• there are no obstacles to the free circulation of air
+through the holes (plants, leaves...)
+
+• a drain nearby for the outflow of condensation
+• a compliant power supply nearby
+
+3.9	Minimum installation distances
+The clearance zones for the installation and maintenance
+of the appliance are shown in the figure below. Established
+spaces are necessary to avoid barriers to airflow and allow
+for normal cleaning and maintenance.
+
+A
+
+ Make sure that there is sufficient space to allow the
+panels to be removed for routine and supplementary
+maintenance operations.
+
+C
+
+A
+
+B
+
+D
+
+u.m.
+
+30
+
+50
+
+A
+
+mm
+
+150
+
+150
+
+B
+
+mm
+
+50
+
+50
+
+C
+
+mm
+
+300
+
+300
+
+D
+
+mm
+
+300
+
+300
+
+Models
+
+Minimum distances
+
+Hatch dimensions
+
+ For installation in a ceiling, it is mandatory to create an
+access hatch for the inspection and maintenance of the
+device.
+
+15
+
+3. Installation
+
+C
+
+B
+
+A
+E
+
+D
+
+u.m.
+
+30
+
+50
+
+A
+
+mm
+
+990
+
+990
+
+B
+
+mm
+
+1040
+
+1150
+
+C
+
+mm
+
+300
+
+300
+
+D
+
+mm
+
+80
+
+50
+
+E
+
+mm
+
+150
+
+150
+
+Models
+
+Hatch dimensions
+
+3.10	Positioning
+Preliminary warnings
+
+The unit must be installed to a secure structure above the
+unit.
+ Check that:
+
+Positioning the unit
+1.
+
+Holes for ceiling fixing systems installation
+
+1
+
+1
+
+1
+
+1
+
+• the surface supports the weight of the appliance
+• the surface does not affect piping or power lines
+• the functionality of load-bearing elements is not compromised
+
+►►mark the position of the fixing holes
+ Check the correct orientation of the unit.
+
+16
+
+3. Installation
+
+►►use fixing systems appropriate for the type of supporting surface and the weight of the unit
+
+►►secure the unit to the fixing system
+ Check the horizontal alignment of the installation using
+a bubble level.
+
+3.11	Condensate drain connection
+Preliminary warnings
+
+ This appliance is equipped with trays for collecting the
+condensate that is produced during operation. Condensate must be routed to a suitable place for drainage.
+ The appliance is equipped with a connection for the
+condensate drain.
+ If the drainage line runs into a container (tank or other)
+it must be ensured that the container itself is hermetically sealed and most importantly it must be ensured
+that the drainage pipe is not immersed in water.
+ The hole for the condensate pipe must always have an
+downwards slope.
+ When connecting the condensate drain, take care not
+to crush the rubber pipe.
+
+Attachment position
+
+The size and the position of the condensate drain connection are shown below.
+1.
+
+Condensate drain connection
+
+1
+
+17
+
+3. Installation
+
+Connections
+1.
+2.
+3.
+
+HT
+H1
+H2
+
+Condensate drain connection
+Condensate drain pipe
+Hose clamp
+
+1
+
+2
+
+60 mm
+30 mm
+30 mm
+
+HT
+
+H1
+H2
+
+To connect the drain:
+►►connect the drainage pipe to the connection provided
+on the unit
+
+3
+1.
+
+►►install a siphon on the condensate drainage pipe near
+the unit
+
+Unit
+
+►►direct the condensate drain pipe to a suitable place for
+draining
+
+1
+
+3%
+
+►►maintain a minimum slope of 3% towards the drain location
+►►insulate junction points
+
+1
+
+1,5 ÷ 2 m
+
+1
+
+3.12	Aeraulic connections
+Preliminary warnings
+
+ The sizing of ducting and supply and extract grilles must
+be carried out by a professionally qualified person.
+ To prevent the transmission of any vibrations of the machine into the room, an anti-vibration joint should be
+placed between the fan outlets and the ducts.
+ The connecting pipes must be of a suitable diameter
+and supported so that their weight does not put strain
+on the appliance.
+
+18
+
+ It is mandatory to install an adequate siphon
+on the condensate drainage pipe to prevent the
+negative pressure generated by the fans from obstructing the proper flow of condensate, which
+could lead to spillage inside the premises.
+ The drainage system must include a suitable siphon to
+prevent unwanted air from entering the vacuum system. The siphon also prevents the entry of odours or
+insects.
+ The siphon must be fitted with a plug at the bottom or
+must in any case permit quick dismantling for cleaning.
+ Use plastic drainage pipes.
+ Avoid metal pipes.
+ Make sure all joints are sealed to prevent leakage of
+water.
+ Condensate drain pipes must be insulated for both indoor and outdoor sections to avoid condensation on
+the surface and/or frosting problems. The insulation
+must be inserted all the way to the condensate drain
+pipe connection on the unit.
+
+3. Installation
+
+Connections
+
+A
+B
+
+Extracted air connection (height)
+Extracted air connection (base)
+
+RIP: Extract air
+IMM: Supply air
+
+RIP
+A
+
+B
+
+IMM
+
+Models
+A
+B
+
+u.m.
+
+30
+
+50
+
+mm
+
+350 × 180
+
+511 × 245
+
+Connections
+
+Supply air connection (height)
+Supply air connection (base)
+
+Extract air
+connection (B
+x H)
+
+A
+
+B
+
+Models
+
+u.m.
+
+30
+
+50
+
+mm
+
+310 × 180
+
+490 × 255
+
+Connections
+Supply air
+connection (B
+x H)
+
+19
+
+3. Installation
+
+3.13	Hydraulic connections
+Chemical and physical characteristics of
+water
+
+Position and dimensions
+
+The quality of the water used must comply with the characteristics listed in the following table; otherwise, a treatment
+system should be provided.
+Water content
+
+Unit of measure
+
+Concentration
+
+Chlorides (Chloride)
+
+ppm
+
+< 50
+
+Dissolved oxygen
+
+ppm
+
+< 0,1
+
+Ammonia (NH₃)
+
+ppm
+
+< 0,5
+
+Sulfate (SO₄)
+
+ppm
+
+< 70
+
+Bicarbonate (HCO₃)
+
+ppm
+
+70 ÷ 300
+
+-
+
+> 1,0
+
+pH
+
+-
+
+7,5 ÷ 9,0
+
+Total hardness
+
+dH
+
+4,5 ÷ 8,5
+
+Phosphate (PO₄)
+
+ppm
+
+< 2,0
+
+Free chlorine (Cl₂)
+
+ppm
+
+< 0,5
+
+Iron (Fe³⁺)
+
+ppm
+
+< 0,2
+
+Manganese (Mn²⁺)
+
+ppm
+
+< 0,05
+
+Free carbon dioxide
+(CO₂)
+
+ppm
+
+<5
+
+Electrical conductivity
+
+µS/cm
+
+10 ÷ 500
+
+Nitrate (NO₃)
+
+ppm
+
+< 100
+
+Aluminum (Al)
+
+ppm
+
+< 0,2
+
+-
+
+-
+
+►►support the body of the connection with an additional
+wrench or spanner to avoid damage
+
+Chlorides (Cl)
+
+ppm
+
+< 50
+
+►►tighten the connections
+
+Hydrogen sulfide (H₂S)
+
+ppm
+
+< 0,05
+
+►►check for any leaks
+
+Bicarbonate/Sulfate ratio
+(HCO₃/SO₄)
+
+Ratio of [Ca²⁺, Mg²⁺] to
+[HCO₃⁻]
+
+ Incompatible chemical and physical characteristics
+could compromise the integrity of the hydraulic components of the unit.
+ Well or groundwater not sourced from the public water
+supply must always be carefully analyzed and, if necessary, treated with appropriate conditioning systems.
+ If the hardness of the starting water exceeds the value
+indicated in the table, a water softening system must
+be used.
+ Excessive softening of the water (total hardness < 1.5
+mmol/L) could generate corrosive phenomena in contact with metallic elements (pipes or parts of the boiler).
+Additionally, keep the conductivity value within 600 μS/
+cm.
+ Check the chloride concentration in the output after the
+regeneration of the resins.
+ It is prohibited to introduce acids into the washing circuit.
+ It is prohibited to constantly or frequently top up the
+system, as this can damage the heat exchanger of the
+device.
+
+20
+
+System connection
+
+To make the connections:
+
+►►position the hydraulic lines
+
+►►insulate the connections with insulation material
+ The hydraulic lines and joints must be thermally insulated.
+ Avoid partial insulation of the pipes.
+ Do not overtighten the connections to avoid damaging
+the insulation.
+ Carefully check the insulation seals to prevent condensation formation and dripping.
+
+3. Installation
+
+Connection with 2-way valve
+
+Connection with 3-way valve
+
+In case of choosing the 2-way valve option:
+
+In case of choosing the 3-way valve option:
+
+• electrical connections are required
+
+• electrical connections are required
+
+3.14	Electrical connections
+The appliance leaves the factory fully wired and only requires connection to the power supply, control and any
+accessories.
+
+Preliminary warnings
+
+ All operations of an electrical nature must be carried
+out by suitably qualified personnel having the necessary legal knowledge and informed about the risks related to such operations.
+ All connections must be made in accordance with the
+relevant regulations in force in the country of installation.
+ Before carrying out any work, make sure that the power
+supply is switched off.
+ The unit should only be powered after the plumbing
+and electrical work has been completed.
+ References:
+• for electrical connections please refer to the wiring diagrams in this manual, especially for the part concerning
+the power terminal board
+ Check that:
+• the main supply characteristics are adequate for the
+power consumption of the appliance, also taking into
+account any other machinery in parallel operation
+• the power supply voltage and frequency correspond to
+those specified on the nameplate of the appliance
+• the cables are suitable for installation in accordance
+with the IEC standards in force
+• the power supply is adequately protected against overloads and/or short circuits
+• the disconnection device is positioned in an easily accessible place to enable intervention in the event of an
+emergency
+
+ It is mandatory:
+• to connect the appliance to an effective grounding system
+• for units with three-phase power supply, check the correct phase connection
+• provide an all-pole switch with a contact opening distance of at least 3 mm that allows complete disconnection under overvoltage category III conditions
+• Install a ground fault circuit interrupter (GFCI). Failure to
+install this device could result in electric shock
+ Ensure that a connection to earth is made. Do not
+ground the appliance to distribution pipes, surge arresters or the ground of telephony systems. If not
+performed correctly, grounding can cause an electric
+shock. Momentary high voltage surges caused by lightning or other causes could damage the heat pump.
+ Use a dedicated power supply circuit. Never use a power supply to which another appliance is also connected
+due to risk of overheating, electric shock or fire.
+ For the electrical connection, use a cable of sufficient
+length to cover the entire distance without any connection. Do not use extension cables. Do not apply other
+loads on the power supply.
+ After connecting the interconnection and power supply
+cables, ensure that the cables are arranged so that they
+do not exert excessive forces on the covers or electrical panels. Install the covers on the cables. Incomplete
+connections of the covers can lead to overheating of
+the terminals, electric shock or fire.
+ Any replacement of the power cable must only be carried out by qualified personnel and in accordance with
+current national regulations.
+ The manufacturer is not liable for any damage caused
+by the lack of earthing or failure to comply with the
+specifications in the respective diagrams.
+
+21
+
+3. Installation
+ The appliance is equipped with a noise filter as required
+by current regulations. Use selective residual current
+circuit breakers to compensate for the micro leakage to
+earth of this device.
+ Using gas and water pipes to ground the appliance is
+prohibited.
+
+Power line dimensioning
+
+Use the tables below for the sizing of the power supply line
+and its protection device.
+These are not average draw or transient peaks, but values
+to be considered for the correct sizing of the plant and the
+request of the contractual power (excluding loads due to
+the normal operation of the building).
+ Maximum power is reached only in exceptional cases.
+Therefore, the indicated trip current is suggested to
+guarantee a balance between machine absorption and
+incidence in the general system.
+ The indicated minimum cable cross-section area must
+be verified according to the actual conditions of the
+installation: length of the cable, characteristics of the
+electrical supply, etc.
+ For units equipped with electrical heating elements, the
+draw values of the units must be added to those of the
+heating elements shown in the following tables.
+
+Access to the electrical panel
+
+ Access to the electrical panel is only permitted to qualified personnel.
+ Before carrying out any work, ensure that the power
+supply is switched off.
+1.
+
+Electrical connections passthrough
+
+1
+
+To access the connections:
+►►undo the fixing screws
+►►remove the electrical panel closing panel
+
+22
+
+Connections
+
+Before connecting the unit to the mains power supply,
+make sure that the isolator is open. The power supply of
+the single-phase unit must be connected to the appropriate terminals, subjected to the action of the isolating
+switch.
+ Use properly sized cables to avoid voltage drops or
+overheating.
+
+3. Installation
+
+Connection diagram
+1.
+2.
+3.
+
+4.
+5.
+6.
+
+230/1/50 power supply
+Isolator
+Power cable
+
+1
+
+2
+
+5
+
+Unit
+Remote control
+Wired controller communication cable
+
+3
+
+6
+
+4
+
+On-board electrical panel
+Connection terminal board
+
+US E R ALAR M
+
+B A +
+
+MO T O R
+
+IN 1
+
+N
+
+L
+
+N
+
+K1 N
+
+IN2
+
+K2
+
+C1
+
+C2
+
+23
+
+3. Installation
+Water valve connection
+
+L
+
+N
+
+C1
+
+C2
+
+ Terminal C1 is no longer a clean contact, but has 230 V
+AC mains voltage.
+
+24
+
+4. Command
+
+4.COMMAND
+
+The unit can be operated through three different operation modes:
+A
+B
+
+C
+D
+
+Remote control
+Digital commands
+
+Control panel via Modbus RS485 RTU
+Modbus RS485 RTU
+
+A
+
+B
+
+C
+
+D
+
+25
+
+4. Command
+
+4.1	Remote control
+Installation
+
+A
+B
+C
+D
+
+Description
+The control panel is an electronic controller with humidity
+and air quality sensors inside, with the possibility of control
+over several devices equipped with the same circuit board.
+It is equipped with a humidity and air quality sensor.
+ The temperature probe can be remote-controlled in
+one of the connected units.
+
+Control base
+Holes for fixing to the wall
+Screws
+Hole for the passage of electrical connections
+
+D
+
+A
+
+B
+
+Mounting
+
+B
+
+C
+
+For wall mounting of the control panel:
+►►drill holes in the wall
+►►pass the electrical cables through the prepared hole
+►►fix the base of the control unit to the wall using suitable
+screws and dowels
+►►make electrical connections
+The control panel must be installed:
+• on the outside walls
+• at a height of approx. 1.5 m above the floor
+• away from doors and windows
+• away from heat sources such as radiators, fan coils,
+cookers, direct sunlight
+ The control panel is supplied in the package already assembled.
+A
+
+Notches
+
+A
+
+A
+
+Before mounting on the wall:
+►►release the fastening notches on the rear side of the
+control panel
+►►separate the base from the control panel
+►►use the base as a template to mark out the fixing points
+
+26
+
+►►close the control panel
+ Take care not to crush the wires when closing the control panel.
+
+4. Command
+
+Electrical connections
+Connection diagram
+Condenser probe
+Evaporator probe
+Water probe
+
+T3
+
+COMM
+
+T2
+
+T1
+
+1
+
+2
+
+REMOTE DISPLAY
+
++0-10V
+
+ON
+3
+
+4
+
+5
+
+6
+
+ABCDEF
++
+
+FAN COIL
+A B -
+
+AA
+
+PC
+BB-
+
+ON/OFF = CP (Presence contact)
+Clean contact input NO
+(Normally open)
+USER ALARM
+
+BA+
+
+MOTOR
+Gnd
+
+FAN
+
+Vsp
+
+IN1
+
+Fg
+
+IN2
+
+Internal valve of the unit
+Deu/Int only DC version
+
+A2
+
+K1 A1
+N K1 N K2
+
+R/L
+
+VI
+
+CP C/N
+L
+
+C1
+
+N
+
+C2
+
+Compressor
+
+L
+
+230
+
+N
+
+50
+
+Generator consent / Pump / Valve
+
+Connections to be made by the customer
+L - PE - N
+
+Unit power supply
+
+230 / 1 / 50
+
+IN 1
+
+Integration input
+
+Contact closed / function active
+
+IN 2
+
+Dehumidification input
+
+Contact closed / function active
+
+C1
+
+Generator / Pump / Valve consent
+
+Free contact
+
+C2
+
+Alarm signal contact
+
+Free contact
+
+Remote display
+
+Remote control (wired)
+
+Remote On - Off (on display)
+
+On - Off remote contact on remote display
+
+Contact closed / Unit off
+
+ If the unit is in D version and used without connection
+to the hydraulic system, it is necessary to disconnect
+the water sensor T1; otherwise, the unit will not start.
+
+27
+
+4. Command
+Terminal board position
+A
+
+ It is forbidden to connect the PC input in parallel with
+other electronic boards. In this case, use separate contacts.
+
+terminal board
+
+Interface
+Description
+The control panel is an electronic controller with humidity
+and air quality sensors inside. It has the possibility of operating several units equipped with the same circuit board.
+Features:
+• unit’s stale air intake probe reading
+
+A
+
+The terminals allow the connection of rigid or flexible cables
+with cross-sections of 0.2 to 1 mm². For cables equipped
+with a cable lug with plastic collar the maximum cross-section is reduced to 0.75 mm².
+Connection to circuit board
+For the connection:
+
+8 mm
+
+0.2 - 1 mm2
+
+►►remove a portion of the insulation from the cable end
+►►insert the cable into the terminal
+►►screw tightly
+►►check for correct attachment by lightly pulling on the
+cable
+ The cable must be schielded twisted 4 x 0.75 mm², maximum length 50 m.
+On - Off remote connection
+Through this contact it is possible to connect an external
+device which inhibits the operation of the appliance, such
+as:
+• remote on/off (on display)
+Operation
+When the contact connected to the PC input is closed, all
+units are switched off.
+When a button is pressed on the display, the symbol
+flashes
+
+28
+
+• internal memory with data storage even in the event of
+abnormal shutdown or power failure
+ The room temperature probe provides frost protection
+even when the control panel is in stand-by mode.
+ The brightness of the control panel is reduced 20 seconds after the last action, the display only shows the
+room temperature. Pressing any button restores maximum brightness.
+ Refer to the User’s Manual for operation on the control
+panel.
+
+4. Command
+Display
+A
+
+Status and alarms shown on the display.
+
+Display area
+
+A
+
+Alarm indication
+Flashing with closed CP contact
+Lit for alarm indication
+Summer mode active
+Winter mode active
+Unit in stand-by
+Auto function
+Minimum ventilation speed activated
+Rated ventilation speed activated
+Maximum ventilation speed activated
+
+Keypad key functions
+A
+
+Related keys and functions
+
+Keypad area
+
+A
+
+Allows to decrease the set temperature
+Allows to increase the set temperature
+Allows to change the operation mode between
+summer and winter
+Allows to activate or put the control panel on
+stand-by
+	Allows to set the auto speed
+Allows to set the minimum ventilation speed
+Allows to set the nominal ventilation speed / Allows to set the desired humidity value
+	Allows to set the maximum ventilation
+speed
+
+General switch-on
+Before switching on:
+ Make sure that the control panel is connected to the
+power supply.
+ If there is a main switch on the power supply line, switch
+the system on by pressing the switch.
+To activate the device
+►►press and hold the button
+The symbol
+lights up
+
+Settings
+To set the desired humidity value
+for about 5 seconds
+►►press and hold
+the display shows the detected humidity value
+or
+►►press
+the display shows the previously set humidity value
+or
+to change the value
+►►use
+►►wait for about 5 seconds
+the setting is saved automatically
+the display returns to the initial screen
+
+29
+
+4. Command
+
+Warnings
+Switching off for extended periods
+In case of seasonal or long-term shutdown:
+►►deactivating the device
+►►set the system’s main switch to off
+ The anti-freezing function is deactivated.
+
+Error indication
+	Fault in the room temperature sensor
+located in the thermostat
+	
+Temperature/humidity
+working
+
+sensor
+
+not
+
+Error display
+
+4.2	Digital commands
+
+30
+
+This mode allows activation of dehumidification and integration functions, as well as alarm signal reception.
+
+Digital inputs can also be activated via wall thermostats
+and humidistats.
+
+Integration request connection
+
+Dehumidification request connection
+
+It is possible to connect a thermostat that forces the unit
+into integration mode.
+This is done through a contact provided by a standard thermostat with clean output contact:
+
+It is possible to connect a humidistat or a dehumidification
+control that forces the unit into dehumidification mode.
+This is done through a contact provided by a standard thermostat with clean output contact:
+
+• Closed contact: unit in integration
+ Via remote control, it is possible to enable or disable
+this function.
+
+• Closed contact: unit in dehumidification
+ Via remote control, it is possible to enable or disable
+this function.
+
+4. Command
+
+4.3	Control panel via Modbus RS485 RTU
+The control panel can be connected via an RS485 line to
+one or more units directly to the control board on the unit
+or via the remote displays.
+Refer to chapter "Remote control" p. 26 for installation,
+electrical connections, interface and warnings.
+
+RS485 serial connection
+
+For the connection:
+
+►►respect the indications "A" and "B"
+
+►►connect appliances in series
+ Use a shielded two-core cable suitable for serial RS485
+connection with a minimum cross-section of 0.35 mm².
+ Keep the two-core cable separate from the power supply cables.
+ Route in such a way as to minimise the length of deviations.
+ Terminate the line with a 120 Ω resistor.
+ “Star” (y) connections are prohibited.
+
+4.4	Modbus RS485 RTU
+The unit is equipped with a Modbus RS485 interface, allowing control via serial communication from an external
+master device.
+This mode allows activation and modification of all unit
+functionalities via Modbus RTU protocol, with 9600, N, 8, 1
+configuration.
+
+31
+
+5. Start-up
+
+5.START-UP
+
+5.1	Preliminary warnings
+ This section is dedicated to the Authorised Service Centre. The specifications of the Authorised
+Service Centre are described in chapter "Recipients" p. 4.
+ Initial commissioning must be carried out by the
+Authorised Service Centre.
+ For detailed information on accessories, please refer to the relevant instruction sheets.
+
+See chapter "Compatible accessories" p. 10
+ The customer must be present when the appliance is
+tested and informed of the contents of the manual and
+procedures. After commissioning, the manual and the
+warranty certificate must be handed over to the customer.
+ Before start-up, all works (electrical, hydraulic and airflow connections) must have been completed.
+
+5.2	First start-up
+Preliminary Checks
+
+Before commissioning, check that:
+Operational checks
+• all safety conditions have been met
+• the unit has been properly secured to the supporting
+surface or wall
+• the minimum technical spaces have been observed
+
+Settings
+Microswitches
+There are microswitches on the board for the various operating configurations of the unit. It is essential to set the
+microswitches correctly; the table shows the various operating modes.
+1.
+
+Microswitches
+
+Airflows
+• the airflow connections have been made according to
+the instructions in the manual
+• all airflow connections are correctly secured
+• the ducting is correctly supported
+• the ducting does not have any bottlenecks
+• the ducting is thermally insulated
+Electrical checks
+• the cross-section of the power supply cables is adequate
+for the absorption of the appliance and the length of the
+connection made
+• grounding is correctly performed
+• the electrical connections have been established correctly
+• all control wires are connected and that all electrical
+connections are secure
+
+32
+
+1
+
+5. Start-up
+MICROSWITCH FUNCTIONS
+Microswitch A
+
+Microswitch B
+
+Microswitches C - D
+
+Microswitch E
+Microswitch F
+
+ON
+
+OFF
+
+Summer-only operation
+
+Summer and winter
+operation
+
+ON
+
+OFF
+
+Unit in DC version:
+dehumidification and
+integration
+
+Unit in D version: dehumidification only
+
+OFF OFF
+
+ON OFF
+
+Minimum speed
+
+Medium speed
+
+ON ON
+
+OFF ON
+
+Maximum speed
+
+Speeds managed by
+control panel
+
+Not used
+ON
+
+OFF
+
+RTU
+
+ASCII
+
+ Micro-switch A
+
+If set to OFF:
+
+• With control panel: season change is done via panel
+• Without control panel: season change is done by the
+water probe
+ Micro-switch B
+The unit model is factory preset, do not change the setting.
+ Micro-switches C-D The combination of these micro-switches determines the ventilation speed.
+ When combined with wall control, set micro-switch
+C to OFF and D to ON.
+
+Start-up
+
+After all checks have been carried out, the unit can be put
+into operation.
+To activate the appliance:
+►►please refer to the user manual
+
+Checks with the machine switched on
+
+After starting up, check that
+Operational checks:
+
+• verify the different modes of operation
+• verify that the appliance stops and then restarts
+• switch the appliance off and on again and check that it
+restarts correctly
+• the appliance operates within the recommended operating conditions (see technical specifications table)
+• check that the air flow rates are correct
+• verify that the unit's configuration complies with the site
+requirements
+Hydraulic Checks
+• check for proper condensate drainage
+Electrical Checks
+• the current absorbed is less than the maximum indicated in the technical data table
+• the supply voltage value is within the set limits and does
+not fall below the nominal value -10 % during operation
+
+5.3	Plant delivery
+Once all the checks and controls on the correct operation
+of the plant have been completed, the installer must explain the following to the user:
+
+• the basic functional characteristics of the appliance
+• the instructions for use
+• the routine maintenance
+
+5.4	Switching off for extended periods
+If the appliance is not used for a long period of time, the
+following steps must be taken:
+►►deactivating the device
+►►isolate the power supply
+ To restart the appliance after it has been out of use for a
+long period, call in the Authorised Service Centre.
+
+33
+
+6. Maintenance
+
+6.MAINTENANCE
+
+6.1	Routine maintenance
+Annual operations
+
+The once-a-year maintenance plan includes the following
+operations and checks and must be carried out by the Authorised Service Centre or by qualified personnel.
+
+Cleaning or filter replacement
+1.
+2.
+
+Filter
+Filter port
+
+Electrical circuit
+Check:
+• electrical supply voltage
+• the electrical absorption
+• tightening connections
+• that there is no damage or excessive wear to electrical
+cables
+• that the gaskets and sealing materials have not deteriorated to such an extent that they are no longer suitable
+for the purpose of preventing the development of flammable atmospheres inside
+• the correct fixing of cable glands
+
+1
+
+• safety devices
+Mechanical checks
+Check:
+• tightening of the screws, fans and electrical box, of the
+unit’s external panelling
+• the state of the structure
+ Bad fixings result in abnormal noise and vibration.
+ If oxidised parts are present, treat them with suitable
+paints to eliminate or reduce oxidation.
+
+To remove:
+►►isolate the power supply to the unit
+
+Hydraulic controls
+Check:
+
+►►open the filter access hatch
+
+• the regular drainage of condensate
+
+ Pay attention to sharp surfaces
+ If the condition of the filters is acceptable, they
+can be cleaned using a vacuum cleaner or a
+low-pressure compressor.
+ If it is impossible to clean them, the filters must
+be replaced.
+
+• cleaning the condensate collection trays
+• cleaning the exhaust ducts
+Airflow controls
+Check:
+• the regular flow of air
+• cleaning of any intake grilles
+• cleaning the ducting
+Cleaning
+• cleaning of aesthetic cover
+• cleaning or filter replacement
+• cleaning the heat exchanger
+
+34
+
+2
+
+►►take out the filter
+
+To reposition:
+►►perform in reverse order
+
+7. Faults and remedies
+
+7.FAULTS AND REMEDIES
+
+7.1	Preliminary warnings
+If one of the following faults is found:
+
+►►immediately isolate the power supply
+
+• ventilation does not activate
+
+►►contact an Authorised Service Centre or professionally
+qualified personnel
+
+• the appliance makes excessive noise
+
+ The intervention must be carried out by a qualified installer or an Authorised Service Centre.
+ Personal intervention is prohibited.
+
+• there is dew formation on the front panel
+Follow the instructions below:
+
+7.2	Troubleshooting table
+DESCRIPTION OF FAULT
+Display off
+Low or absent air flow
+
+CAUSE
+
+REMEDY
+
+No power supply (light switch off)
+
+Check the electrical connection to the power supply
+
+Clogged filters
+
+Replace filters
+
+Dirty fan
+
+Clean the fan
+
+Clogged fan ducts
+
+Clean the ventilation ducts
+
+Noise coming from the unit
+High noise level
+Noise coming from the ducts
+
+Check for cracks and/or air leaks from the unit panels
+Check if the motors are running correctly (bearings)
+Check for the presence of cracks on the intake/exhaust
+ducts
+Check the integrity of the unit panels and profiles
+
+Vibrating panels
+
+Check the proper closure of the unit’s cover and the
+panel covering the electronic board
+Check that there are no walls that could transmit
+vibrations to the wall/floor/ceiling
+
+High vibrations
+
+Check the integrity of the fan blades
+Imbalanced fan blades
+
+Clogged condensate drain
+
+Clean the fans
+Check that the small metal clips for balancing the fan
+blades are still present on the fans
+Clean condensate drain
+Check that the unit is perfectly level
+
+Condensate leak
+
+The condensation does not flow from the drainage
+pipe into the collection tray
+
+Check the siphon connection
+Ensure that the condensate drain connections are not
+clogged
+
+35
+
+7. Faults and remedies
+
+7.3	Alarm table and card flashes
+PRIORITY
+
+DESCRIPTION OF
+ALARM
+
+RESET
+
+CONTACT
+
+ACTION
+
+LED
+
+1
+
+COMMUNICATION
+ERROR
+
+Automatic
+
+Closed
+
+Turns off all loads
+
+LED off
+
+E1
+
+2
+
+REMOTE CONTROL AIR
+PROBE ALARM
+
+Automatic
+
+Closed
+
+Turns off all loads
+
+7 flashes - off 10
+seconds
+
+E3
+
+3
+
+REMOTE CONTROL
+HUMIDITY PROBE
+ALARM
+
+Automatic
+
+Closed
+
+Turns off all loads
+
+8 flashes - off 10
+seconds
+
+4
+
+WATER PROBE ALARM
+
+Automatic
+
+Closed
+
+Turns off all loads
+
+5 flashes - off 10
+seconds
+
+5
+
+CONDENSER PROBE
+T3 ALARM
+
+Automatic
+
+Closed
+
+Turns off all loads
+
+6 flashes - off 10
+seconds
+
+6
+
+MOTOR ALARM
+
+Automatic
+
+Closed
+
+Turns off all loads
+
+1 flash - off 10
+seconds
+
+7
+
+HIGH CONDENSATION
+ALARM (permanent)
+
+Manual
+
+Closed
+
+Turns off all loads
+
+2 flashes - off 10
+seconds
+
+8
+
+HIGH CONDENSATION
+ALARM (temporary)
+
+Automatic
+
+Open
+
+Turn off the compressor for 5 minutes
+
+9 flashes - off 10
+seconds
+
+9
+
+UNSUITABLE WATER
+TEMPERATURE
+
+Automatic
+
+Open
+
+Does not activate fan,
+keeps other loads
+unchanged
+
+3 flashes - off 10
+seconds
+
+10
+
+EVAPORATOR PROBE
+T2 ALARM
+
+Automatic
+
+Closed
+
+Does not act on loads
+
+10 flashes - off 10
+seconds
+
+11
+
+ANTIFREEZE ALARM
+
+Automatic
+
+Open
+
+Turns on fan only
+
+11 flashes - off 10
+seconds
+
+12
+
+HIGH EVAPORATION
+TEMPERATURE ALARM
+T2
+
+Manual
+
+Closed
+
+Turns off the compressor
+
+12 flashes - off 10
+seconds
+
+13
+
+LOW EVAPORATION
+TEMPERATURE ALARM
+T2 (temporary)
+
+Automatic
+
+Open
+
+Turns off the compressor
+
+13 flashes - off 10
+seconds
+
+14
+
+LOW EVAPORATION
+TEMPERATURE ALARM
+T2 (permanent)
+
+Manual
+
+Closed
+
+Turns off the compressor
+
+14 flashes - off 10
+seconds
+
+CODE
+
+36
+
+8. Technical information
+
+8.TECHNICAL INFORMATION
+
+8.1	Technical data
+DEH+ D
+Models
+
+u.m.
+
+DEH+ DC
+
+30
+
+50
+
+30
+
+50
+
+Aeraulic performance in dehumidification
+Nominal air flow rate
+
+m³/h
+
+300
+
+500
+
+300
+
+500
+
+Available pressure
+
+Pa
+
+150
+
+98
+
+150
+
+98
+
+18,90
+
+36,20
+
+18,90
+
+36,20
+
+0,62
+
+1,30
+
+0,62
+
+1,30
+
+Dehumidification performance (W 16; A 26) (1)
+Dehumidification capacity
+
+L/24h
+
+Heating performance (W 35; A 20) (2)
+Total capacity
+
+kW
+
+Cooling performance (W 16; A 26) (1)
+Cooling capacity of hydronic coil
+
+kW
+
+0,58
+
+1,22
+
+-
+
+-
+
+Total capacity
+
+kW
+
+-
+
+-
+
+1,27
+
+2,39
+
+Sensible capacity
+
+kW
+
+-
+
+-
+
+0,77
+
+1,44
+
+Room side fan
+Type
+Number
+
+Forward-curved EC Brushless centrifugal fan
+No.
+
+1
+
+1
+
+1
+
+1
+
+1
+
+1
+
+Air recirculation filter
+Type
+Number
+
+Coarse
+No.
+
+1
+
+1
+
+Compressor
+Type
+
+Alternative
+
+Refrigerant type
+
+R134a
+
+Heat exchanger
+Type
+
+Hydronic coil
+
+Water flow rate
+
+L/h
+
+150
+
+300
+
+150
+
+300
+
+Pressure drop
+
+kPa
+
+4,50
+
+9,00
+
+4,50
+
+9,00
+
+Electrical characteristics
+Power supply
+
+V / ph / Hz
+
+230/1/50
+
+Maximum total absorbed power
+
+W
+
+1
+
+0
+
+1
+
+0
+
+Maximum total absorbed
+current
+
+A
+
+3,20
+
+5,30
+
+3,20
+
+5,30
+
+Protection rating
+
+IP
+
+20
+
+Room side sound levels (UNI EN 3741; 3744) (3)
+Sound power transmitted to the
+Lw structure
+
+dB (A)
+
+53,0
+
+55,0
+
+53,0
+
+55,0
+
+Sound power radiated in the Lw
+channel
+
+dB (A)
+
+51,0
+
+54,0
+
+51,0
+
+54,0
+
+1. Water temperature in finned coil 16 °C; Indoor air temperature 26 °C
+2. Water temperature in finned coil 35 °C; Indoor air temperature 20 °C
+3. Data refers to the UNI EN 3741 and UNI EN 3744 standards
+
+37
+
+8. Technical information
+DEH+ D
+
+DEH+ DC
+
+u.m.
+
+30
+
+50
+
+30
+
+50
+
+Average sound pressure at 1
+m Lp
+
+dB(A)
+
+41,0
+
+43,0
+
+41,0
+
+43,0
+
+Average sound pressure at 3
+m Lp
+
+dB(A)
+
+36,0
+
+38,0
+
+36,0
+
+38,0
+
+Width
+
+mm
+
+686
+
+806
+
+686
+
+806
+
+Length
+
+mm
+
+679
+
+678
+
+679
+
+678
+
+Height
+
+mm
+
+260
+
+317
+
+260
+
+317
+
+Weight
+
+kg
+
+40,0
+
+53,0
+
+42,0
+
+55,0
+
+Condensate drain connection
+
+mm
+
+16
+
+16
+
+16
+
+16
+
+Supply air connection (B x H)
+
+mm
+
+310 × 180
+
+490 × 255
+
+310 × 180
+
+490 × 255
+
+Extract air connection (B x H)
+
+mm
+
+350 × 180
+
+511 × 245
+
+350 × 180
+
+511 × 245
+
+Models
+
+Product dimensions
+
+Connections
+
+1. Water temperature in finned coil 16 °C; Indoor air temperature 26 °C
+2. Water temperature in finned coil 35 °C; Indoor air temperature 20 °C
+3. Data refers to the UNI EN 3741 and UNI EN 3744 standards
+
+38
+
+8. Technical information
+
+8.2	Dimensions
+Size 30
+A
+B
+
+C
+D
+
+Power supply
+Condensate drain
+
+Filter port
+Installation bracket
+
+686,5
+D
+
+679,3
+
+D
+
+C
+
+D
+
+259,6
+
+D
+
+B
+
+180,0
+
+180,0
+
+30,0
+
+310,0
+
+A
+
+340,0
+
+39
+
+8. Technical information
+
+Size 50
+A
+B
+
+C
+D
+
+Power supply
+Condensate drain
+
+Filter port
+Installation bracket
+
+806
+D
+
+678
+
+D
+
+C
+
+D
+
+317
+
+D
+
+B
+
+245
+
+255
+
+30
+
+490
+
+40
+
+A
+
+511
+
+8. Technical information
+
+8.3	Refrigeration diagrams
+CO
+
+Compressor
+
+BA
+
+PS
+
+Service port
+
+FI	Filter drier
+
+CN1
+
+Air condenser
+
+LM
+
+Expansion device
+
+EV
+
+Evaporator
+
+OUT
+
+IN
+
+Version D
+
+EV
+
+CN1
+
+BA
+
+Water coil
+
+BA
+AIR FLOW
+
+FI
+
+LM
+
+AIR FLOW
+
+CO
+
+PS
+
+41
+
+8. Technical information
+
+DC version
+
+FI	Filter drier
+
+Service port
+
+LM
+
+Expansion device
+
+CN1
+
+Air condenser
+
+CD2
+
+Water condenser
+
+EV
+
+Evaporator
+
+LM
+
+Expansion device
+
+BA
+
+Water coil
+
+VC
+
+Solenoid valve
+
+IN
+
+Compressor
+
+PS
+
+OUT
+
+CO
+
+BA
+
+EV
+
+CN1
+
+BA
+AIR FLOW
+
+CD2
+
+FI
+
+VC
+
+M
+
+LM
+
+AIR FLOW
+
+CO
+
+PS
+
+42
+
+INNOVA S.r.l.
+Via I Maggio 8 - 38089 (TN) - ITALY
+tel. +39.0465.670104 – fax +39.0465.674965
+info@innovaenergie.com
+
+

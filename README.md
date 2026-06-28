@@ -221,6 +221,40 @@ If you prefer the individual switches over the climate entity, the same state is
 Technical details and register addresses are in
 [`references/MODBUS_REGISTERS.md` §13](references/MODBUS_REGISTERS.md#13-airflow-passive-flow-fan-integration-and-active-cooling).
 
+### Estimating recirculation airflow (m³/h) from fan output / RPM
+
+The unit reports fan **output %** (`sensor.supply_fan_output`) and **RPM**
+(`sensor.supply_fan_rpm`) but **never airflow in m³/h** — it cannot measure its
+own flow. You can estimate it.
+
+First identify your variant from the type-plate code `HRDS+ ` **`30`**/**`50`**:
+
+| Variant | Nominal total | Recirc fan range | Recirc fan power |
+|---------|--------------:|-----------------:|-----------------:|
+| **HRDS+ 30** | 300 m³/h | 130–300 m³/h | 120 W |
+| **HRDS+ 50** | 500 m³/h | 190–500 m³/h | 170 W |
+
+For a centrifugal EC fan on a fixed duct, **flow scales with speed** (`Q ∝ RPM`),
+so:
+
+```
+recirc m³/h  ≈  (RPM / RPM_at_100%) × Q_max          # via RPM
+recirc m³/h  ≈  (supply_fan_output% / 100) × Q_max    # via output %
+```
+
+where `Q_max` = 300 (HRDS+30) / 500 (HRDS+50). `RPM_at_100%` is not on the
+datasheet — read `sensor.supply_fan_rpm` once with `number.fan_manual_speed` at
+100 % to calibrate it. Note the recirc fan, when running, never delivers below
+its minimum (130 / 190 m³/h); below that it is simply **off** (0 m³/h).
+
+This is an open-loop estimate — it assumes constant duct resistance, so loaded
+filters or restrictive ducts will make the real flow lower than estimated. The
+full derivation, the band-aware formula, and a two-point calibration recipe are
+in
+[`references/README.md` — Translating fan speed to airflow](references/README.md#translating-fan-speed--rpm-to-airflow-mh),
+with the underlying spec data in
+[Technical data](references/README.md#technical-data-airflow-capacity-power).
+
 ## Probe requirements
 
 The unit's control board exposes temperature and humidity readings, but most

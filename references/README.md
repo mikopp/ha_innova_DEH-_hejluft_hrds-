@@ -77,6 +77,12 @@ A short summary:
   OFF while `sm_UnitStatus` (1104) = ON. The HRDS+ cannot see the upstream MVHR's
   flow, so it cannot report a passive flow rate. Source:
   `HRDS+_Technisches_Handbuch_DE.pdf`, § Lüfterregelung / Funktionsweise.
+
+  **Architectural proof:** the non-`R` variant (no recirc fan fitted) has no
+  supply fan at all, yet the compressor runs normally for dehumidification and
+  cooling on passive MVHR flow alone. This confirms that passive airflow is
+  sufficient for compressor operation by design — it is not a special or
+  unsupported state.
 * **Fan integration** — the unit's **own fan runs** to blend the central-MVHR
   inflow air with recirculated room air across the coil. Exposed by the new
   read-only `FanIntegration_Request` (1112) → `fan_integration_active` binary
@@ -117,16 +123,172 @@ to the nearest preset using midpoint thresholds (42.5 % → low/medium boundary,
 
 **Fan mode "off" while HVAC mode is Dry or Cool** relies on the unit honouring
 a 0 % manual setpoint while dehumidification/cooling is requested. The
-expectation is that the unit's compressor still runs, but airflow comes from
-the central MVHR passive inflow rather than the unit's own fan.
-*This has not yet been verified on physical hardware* — see `plans/todo.md`
-for the specific checks needed. In particular, it is unknown whether the unit
-internally clamps the manual speed up to `MinSpeedFan_Dehum` (1853) /
-`MinSpeedFan_Integ` (1852) even when 0 is written to 1614.
+compressor continues to run, with airflow from the central MVHR passive inflow
+only.
+
+This pattern is **architecturally correct**: the non-`R` variant (no recirc
+fan) always operates exactly this way — compressor dehumidifies and cools on
+MVHR passive flow alone. The concept is therefore confirmed by design, not just
+by assumption.
+
+**Open question for the `R` variant:** when dehumidify is active and
+`fan_manual_speed` is set to 0 %, does the firmware respect the 0 % or clamp
+up to `MinSpeedFan_Dehum` (1853 / PF28)? Verify by writing 0 to register 1614
+while dehumidify is active, then reading `outAO_SupplyFan` (639). The firmware
+is confirmed to allow PF28 = 0 (configurable minimum), but whether a manual
+override of 0 is honoured during active DEU is unverified. The compressor will
+auto-protect via AL11 if passive airflow is insufficient.
 
 Fan mode is **independent of HVAC mode** — changing Dry ↔ Cool does not reset
 the fan mode; switching to Off also turns off the unit via `Status_OnOff_byBMS`
 (1105) but does not change the fan speed register.
+
+## Two HRDS+ variants — 30 vs 50
+
+The unit comes in two airflow sizes, identified by the **second field of the
+product code** on the type plate (Technisches Handbuch §2.4, p.9):
+`HRDS + ` **`30`** ` H R K DC`.
+
+| Code field | Meaning |
+|-----------|---------|
+| `HRDS+` | Inverter (variable-speed compressor) variant |
+| **`30` / `50`** | **Total airflow class: `30` → up to 300 m³/h, `50` → up to 500 m³/h** |
+| `H` | Horizontal install |
+| `R` | **with recirculation (Umluft) fan + damper** — only this variant can blend room air; a non-`R` build has no recirc fan |
+| `K` | Electronics revision K |
+| `DC` | Dehumidify **and** cooling |
+
+There is also a build **without recirculation** ("Version ohne Umluftumwälzung",
+lighter — see weights below); it has no `outAO_SupplyFan` blending and cannot
+top up airflow with room air.
+
+### Detecting the variant over Modbus
+
+The product code is on the type plate only — there is no hardware-ID register.
+The table below lists the best Modbus proxies, exposed as HA sensors:
+
+| Variant axis | Best Modbus indicator | Register | HA entity |
+|---|---|---|---|
+| **Airflow size (30 vs 50)** | Not readable — set manually in integration setup | — | config `model` field |
+| **Recirculation fan present (`R` / non-`R`)** | `PG01_MachineType` (1797): `1` = VMC (has recirc fan), `0` = dehumidifier only | FC 03, R/W configured as R/O | `binary_sensor.has_recirculation` |
+| **Recirculation damper state** | `outDO_RecircDamper` (1134): `off` = damper closed (room-air duct blocked, MVHR passive flow only), `on` = damper open (room air drawn in and blended), `disabled` = no damper output wired (non-`R` build, no recirculation assembly) | FC 04, R/O | `sensor.recirculation_damper` |
+| **Active cooling present (`DC` / `D`)** | `PG02_EnableIntegration` (1798): `1` = cooling enabled on this unit | FC 03, R/W configured as R/O | `binary_sensor.active_cooling_available` |
+
+**What the damper is:** a motorised flap in the room-air return duct. When
+recirculation is active the control board opens the damper so the fan can draw
+room air across the coil and blend it with the MVHR supply inflow. When idle
+the damper closes, sealing the return duct, and only passive MVHR airflow
+passes through. In German: *Umluft-Klappe* (Umluft = return/recirculation air,
+Klappe = flap). The `outDO_RecircDamper` register reflects the board's digital
+output to the damper motor.
+
+**Caveats:** `PG01` and `PG02` are configuration parameters written by the
+installer, not hard-wired hardware IDs. A unit with cooling hardware but
+`PG02 = 0` (disabled by installer) reads as `active_cooling_available = OFF`.
+The damper sensor (`outDO_RecircDamper`) is the most reliable hardware signal:
+`disabled` means the control board sees no damper output wired up, i.e. the
+unit physically lacks the recirculation assembly.
+
+## Technical data (airflow, capacity, power)
+
+From the Technisches Handbuch §10, p.77 ("Leistungsdaten Luftaufbereitung" /
+"Elektrische Daten"). The two columns are the **30** and **50** variants.
+
+| Spec | HRDS+ 30 | HRDS+ 50 |
+|------|---------:|---------:|
+| **Nominal total airflow (supply + recirc)** | **300 m³/h** | **500 m³/h** |
+| External share (supply from the MVHR) | 0–300 m³/h | 0–500 m³/h |
+| **Recirculation share (room air via own fan)** | **130–300 m³/h** | **190–500 m³/h** |
+| Register-pack pressure drop @ nominal | 31 kPa | 38 kPa |
+| Usable dehumidification capacity ¹ | 56 L/24h | 89 L/24h |
+| Total cooling capacity ¹ | 2.59 kW | 3.95 kW |
+| Compressor frequency range | 23–63 Hz | 23–78 Hz |
+| **Max. electrical power (operating)** | **820 W** | **1130 W** |
+| — compressor nominal | 690 W | 950 W |
+| — **recirc fan nominal** | **120 W** | **170 W** |
+| Sound pressure @ 3 m | 39.5 dB(A) | 40.8 dB(A) |
+| Weight (with recirc / without) | 46 / 43 kg | 57 / 54 kg |
+
+¹ At nominal airflow and the reference conditions footnoted in the handbook.
+
+The 130–300 m³/h / 190–500 m³/h band in the table is the **tested operating
+range** from the performance spec — not a firmware-enforced floor. The firmware
+minimum during dehumidification is `PF28` (German handbook: "Minimale
+Geschwindigkeit Zuluftventilator bei Entfeuchtung"), which **defaults to 50 %
+but is configurable down to 0 %**. The equivalent for integration (cooling) is
+`PF27`, same defaults. In practice the unit's refrigerant circuit protects itself
+via **AL11** (compressor low-pressure / frost-thermostat: auto-stops the compressor
+if evaporator icing indicates insufficient airflow) and **AL12** (high-pressure
+stop). Passive MVHR airflow is sufficient for compressor operation — proven by the
+non-`R` variant which has no fan and always runs on passive flow.
+
+The **total** flow (supply + recirc) **must not exceed the nominal** (300 / 500)
+— exceeding it costs efficiency, raises noise, and requires larger supply-duct
+sizing (handbook p.24).
+
+### Dehumidification capacity vs. airflow
+
+More airflow over the coil = faster drying, with clear diminishing returns near
+the nominal flow. From the per-flow performance tables (handbook p.78 / p.79,
+reference inlet conditions):
+
+| Airflow | HRDS+ 30 dehum. | HRDS+ 50 dehum. |
+|--------:|----------------:|----------------:|
+| 150 m³/h | 31.2 L/d | — |
+| 200 m³/h | 41.1 L/d | 42.6 L/d |
+| 250 m³/h | 50.7 L/d | — |
+| 300 m³/h | 54.4 L/d | 62.4 L/d |
+| 400 m³/h | — | 81.1 L/d |
+| 500 m³/h | — | 83.2 L/d |
+
+## Translating fan speed (% / RPM) to airflow (m³/h)
+
+The unit exposes two fan-speed readouts but **no register that reports airflow
+directly** — it cannot measure its own m³/h:
+
+| Reading | Register | Entity | Scale |
+|---------|----------|--------|-------|
+| Supply-fan analog **output %** | `outAO_SupplyFan` (639) | `sensor.supply_fan_output` | ×0.01 → % |
+| Supply-fan **RPM** | (1117) | `sensor.supply_fan_rpm` | raw rpm |
+| Manual fan **setpoint %** | `PM20_SupplyFan_Manual` (1614) | `number.fan_manual_speed` | ×0.01 → % (write) |
+
+The performance curves in the handbook (§10.3, p.80–81) are **pressure-vs-flow
+system curves**, not an RPM-vs-flow table, so there is no published direct
+RPM→m³/h conversion. Estimate it with the **fan affinity law**: for a
+centrifugal EC fan on a fixed duct (constant static pressure), **flow is
+proportional to fan speed** — `Q ∝ N`. Hence:
+
+```
+m³/h  ≈  (RPM / RPM_max) × Q_max
+```
+
+- `Q_max` = the variant's recirc nominal max: **300** (HRDS+30) / **500** (HRDS+50).
+- `RPM_max` = the RPM read back at 100 % output — **not published, calibrate once**:
+  drive `fan_manual_speed` to 100 %, let it settle, read `sensor.supply_fan_rpm`.
+
+Equivalently, via the analog output % (the same curve, already normalised):
+
+```
+m³/h  ≈  (output% / 100) × Q_max
+```
+
+with the practical note that the fan output % where recirculation actually begins
+corresponds to `PF28` (default 50 %, configurable to 0 %): below that the fan
+is simply OFF (0 m³/h passive MVHR flow only), not a proportional fraction. So
+a more faithful map across the running range is:
+
+```
+m³/h  ≈  Q_min + (output% − band_min%) / (100 − band_min%) × (Q_max − Q_min)
+         clamped to [Q_min, Q_max];   Q_min = 130 (30) / 190 (50)
+```
+
+**Accuracy caveats:** the affinity law holds only at constant duct resistance.
+Higher static pressure (filters loading, longer/narrower ducts) means the same
+RPM moves *less* air — see the available-pressure curves on p.81. For better
+accuracy do a **two-point calibration** (read RPM/output% at two known balanced
+flows from the MVHR commissioning report) and fit a line, rather than assuming a
+single `Q_max`. The estimate is open-loop either way; treat derived m³/h as
+indicative, not metered.
 
 ## Probes: built-in, display, and external sensors
 

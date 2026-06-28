@@ -7,7 +7,8 @@
           "host": "Host",
           "port": "Port",
           "hostid": "Modbus-Slave-ID",
-          "scan_interval": "Abfrageintervall"
+          "scan_interval": "Abfrageintervall",
+          "model": "Modell (30 = HRDS+30, 50 = HRDS+50)"
         }
       }
     },
@@ -24,7 +25,11 @@
           "host": "Host",
           "port": "Port",
           "hostid": "Modbus-Slave-ID",
-          "scan_interval": "Abfrageintervall"
+          "scan_interval": "Abfrageintervall",
+          "model": "Modell (30 = HRDS+30, 50 = HRDS+50)",
+          "airflow_max_m3h": "Zuluftventilator max. Volumenstrom (m³/h)",
+          "airflow_min_m3h": "Zuluftventilator min. Volumenstrom (m³/h)",
+          "fan_min_output_pct": "Ventilatorausgang (%) ab dem der Mindest-Volumenstrom gilt (%)"
         }
       }
     }
@@ -44,6 +49,18 @@
       "supply_fan_output": { "name": "Zuluftventilator-Ausgang" },
       "compressor_output": { "name": "Kompressor-Ausgang" },
       "supply_fan_rpm": { "name": "Zuluftventilator-Drehzahl" },
+      "max_total_airflow": { "name": "Max. Gesamt-Volumenstrom" },
+      "supply_fan_min_airflow": { "name": "Zuluftventilator min. Volumenstrom" },
+      "supply_fan_max_airflow": { "name": "Zuluftventilator max. Volumenstrom" },
+      "supply_fan_airflow": { "name": "Zuluftventilator Volumenstrom" },
+      "recirculation_damper": {
+        "name": "Umluft-Klappe",
+        "state": {
+          "off": "Geschlossen",
+          "on": "Geöffnet",
+          "disabled": "Deaktiviert"
+        }
+      },
       "unit_status": {
         "name": "Gerätestatus",
         "state": {
@@ -100,10 +117,16 @@
     },
     "binary_sensor": {
       "dehumidify_request": { "name": "Entfeuchtung angefordert" },
-      "fan_integration_active": { "name": "Lüfter-Integration aktiv" },
+      "recirculation_active": { "name": "Umluft aktiv" },
       "alarm_active": { "name": "Alarm aktiv" },
       "temp_probe_ok": { "name": "Raumtemperaturfühler OK" },
-      "humidity_probe_ok": { "name": "Raumfeuchtesensor OK" }
+      "humidity_probe_ok": { "name": "Raumfeuchtesensor OK" },
+      "has_recirculation": { "name": "Umluftventilator vorhanden" },
+      "active_cooling_available": { "name": "Aktive Kühlung verfügbar" },
+      "alarm_compressor_lowpressure": { "name": "Alarm: Kompressor Niederdruck / Frostschutz" },
+      "alarm_compressor_highpressure": { "name": "Alarm: Kompressor Hochdruck" },
+      "alarm_water_antifreeze": { "name": "Alarm: Wasserkreislauf Frostschutz" },
+      "alarm_dirty_filter": { "name": "Alarm: Filter verschmutzt" }
     },
     "switch": {
       "unit_on_off": { "name": "Gerät ein/aus (Modbus)" },
@@ -111,7 +134,7 @@
       "active_cooling": { "name": "Aktive Kühlung (Modbus)" },
       "enable_onoff_bms": { "name": "Ein/Aus über Modbus freigeben" },
       "enable_dehumidify_bms": { "name": "Entfeuchtung über Modbus freigeben" },
-      "enable_integration_bms": { "name": "Kühlung über Modbus freigeben" }
+      "enable_cooling_bms": { "name": "Kühlung über Modbus freigeben" }
     },
     "select": {
       "probe_source": {

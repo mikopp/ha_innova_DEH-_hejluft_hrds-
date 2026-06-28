@@ -29,6 +29,7 @@ from homeassistant.components.sensor import (
 from homeassistant.const import (
     Platform,
     UnitOfTemperature,
+    UnitOfVolumeFlowRate,
 )
 from pymodbus.client import ModbusTcpClient
 
@@ -41,6 +42,17 @@ DEFAULT_SCAN_INTERVAL = 30
 DEFAULT_PORT = 502
 DEFAULT_HOSTID = 1
 CONF_HOSTID = "hostid"
+CONF_MODEL = "model"
+DEFAULT_MODEL = "30"
+MODELS = ["30", "50"]
+MODEL_SPECS: Dict[str, Dict[str, float]] = {
+    "30": {"max": 300.0, "min": 130.0},
+    "50": {"max": 500.0, "min": 190.0},
+}
+CONF_AIRFLOW_MAX = "airflow_max_m3h"
+CONF_AIRFLOW_MIN = "airflow_min_m3h"
+CONF_FAN_MIN_OUTPUT = "fan_min_output_pct"
+DEFAULT_FAN_MIN_OUTPUT = 50.0
 ATTR_MANUFACTURER = "Innova / hej.luft"
 
 # ------------------------------------------------------------------
@@ -97,6 +109,7 @@ COMPRESSOR_STATUS = {
     6: "off",
 }
 OPERATING_MODE = {0: "summer", 1: "winter", 2: "auto"}
+RECIRCULATION_DAMPER = {0: "off", 1: "on", 2: "disabled"}
 
 # HA00 (reg 1803) — source for room temperature and humidity probes.
 # 0 = no display sensors; external probes on AI2/AI3 are used if wired.
@@ -136,8 +149,13 @@ C_COMPRESSOR_STATUS = "compressor_status"
 C_OPERATING_MODE = "operating_mode"
 # Read-only binary sensors
 C_DEHUM_REQUEST = "dehumidify_request"
-C_FAN_INTEGRATION_ACTIVE = "fan_integration_active"
+C_RECIRCULATION_ACTIVE = "recirculation_active"
 C_ALARM_ACTIVE = "alarm_active"
+# Read-only binary sensors derived from holding registers (RW=0)
+C_HAS_RECIRCULATION = "has_recirculation"
+C_ACTIVE_COOLING_AVAILABLE = "active_cooling_available"
+# Read-only enum sensor from digital output register
+C_RECIRCULATION_DAMPER = "recirculation_damper"
 # Read-write numbers
 C_HUMIDITY_SETPOINT = "humidity_setpoint"
 C_SUMMER_SETPOINT = "summer_setpoint"
@@ -153,12 +171,22 @@ C_DEHUMIDIFY = "dehumidify"
 C_ACTIVE_COOLING = "active_cooling"
 C_ENABLE_ONOFF_BMS = "enable_onoff_bms"
 C_ENABLE_DEHUM_BMS = "enable_dehumidify_bms"
-C_ENABLE_INTEG_BMS = "enable_integration_bms"
+C_ENABLE_COOLING_BMS = "enable_cooling_bms"
 # Read-write selects
 C_PROBE_SOURCE = "probe_source"
 # Derived binary sensors (bit-extracted from packed alarm registers)
 C_TEMP_PROBE_OK = "temp_probe_ok"
 C_HUMIDITY_PROBE_OK = "humidity_probe_ok"
+# Individual alarm sensors (bit-extracted; ON = alarm active)
+C_ALARM_COMPRESSOR_LP = "alarm_compressor_lowpressure"
+C_ALARM_COMPRESSOR_HP = "alarm_compressor_highpressure"
+C_ALARM_ANTIFREEZE = "alarm_water_antifreeze"
+C_ALARM_FILTER = "alarm_dirty_filter"
+# Computed (non-register-backed) airflow sensors
+C_MAX_TOTAL_AIRFLOW = "max_total_airflow"
+C_SUPPLY_FAN_MIN_AIRFLOW = "supply_fan_min_airflow"
+C_SUPPLY_FAN_MAX_AIRFLOW = "supply_fan_max_airflow"
+C_SUPPLY_FAN_AIRFLOW = "supply_fan_airflow"
 
 # Keys the (composite) climate entity reads/writes.
 CLIMATE_CURRENT_TEMP = C_ROOM_TEMPERATURE
@@ -305,12 +333,19 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "SWITCH": {"off": 0, "on": 1},
         "NAME": "Dehumidify requested",
     },
-    C_FAN_INTEGRATION_ACTIVE: {
+    C_RECIRCULATION_ACTIVE: {
         "RT": C_REG_TYPE_INPUT_REGISTERS,
         "REG": 1112,
         "DT": C_DT_UINT16,
         "SWITCH": {"off": 0, "on": 1},
-        "NAME": "Fan integration active",
+        "NAME": "Recirculation active",
+    },
+    C_RECIRCULATION_DAMPER: {
+        "RT": C_REG_TYPE_INPUT_REGISTERS,
+        "REG": 1134,
+        "DT": C_DT_UINT16,
+        "VALUES": RECIRCULATION_DAMPER,
+        "NAME": "Recirculation damper",
     },
     C_ALARM_ACTIVE: {
         "RT": C_REG_TYPE_INPUT_REGISTERS,
@@ -445,12 +480,32 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "SWITCH": {"off": 0, "on": 1},
         "NAME": "Enable dehumidify via Modbus",
     },
-    C_ENABLE_INTEG_BMS: {
+    C_ENABLE_COOLING_BMS: {
         "RT": C_REG_TYPE_HOLDING_REGISTERS,
         "REG": 1869,
         "DT": C_DT_UINT16,
         "SWITCH": {"off": 0, "on": 1},
         "NAME": "Enable cooling via Modbus",
+    },
+    # --- Hardware-variant read-only sensors (holding registers, RW=0) ---
+    # PG01_MachineType (1797): 0=dehumidifier only, 1=dehumidifier+VMC (has recirc fan).
+    # PG02_EnableIntegration (1798): 0=cooling disabled, 1=cooling enabled on this unit.
+    # RW=0 forces classification as binary sensor even though RT is HOLDING.
+    C_HAS_RECIRCULATION: {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": 1797,
+        "DT": C_DT_UINT16,
+        "SWITCH": {"off": 0, "on": 1},
+        "RW": 0,
+        "NAME": "Has recirculation fan",
+    },
+    C_ACTIVE_COOLING_AVAILABLE: {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": 1798,
+        "DT": C_DT_UINT16,
+        "SWITCH": {"off": 0, "on": 1},
+        "RW": 0,
+        "NAME": "Active cooling available",
     },
     # --- T/H probe source (HA00, holding register R/W) ---
     # Controls which sensor supplies room temperature and humidity readings.
@@ -485,11 +540,61 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "BITMASK_INVERT": True,
         "NAME": "Room humidity probe OK",
     },
+    # --- Individual alarm sensors (PackedAlarm bit extraction; ON = alarm active) ---
+    # PackedAlarm_1 (reg 768): bit N = AL(N+1).
+    # AL11 (bit 10): compressor low-pressure / frost-thermostat — stops compressor.
+    #   This is the effective minimum-airflow protection: insufficient flow causes
+    #   evaporator icing which triggers low refrigerant pressure.
+    C_ALARM_COMPRESSOR_LP: {
+        "RT": C_REG_TYPE_INPUT_REGISTERS,
+        "REG": 768,
+        "DT": C_DT_UINT16,
+        "SWITCH": {"off": 0, "on": 1},
+        "BITMASK": 10,
+        "NAME": "Alarm: compressor low-pressure / frost",
+    },
+    # AL12 (bit 11): compressor high-pressure switch — stops compressor.
+    C_ALARM_COMPRESSOR_HP: {
+        "RT": C_REG_TYPE_INPUT_REGISTERS,
+        "REG": 768,
+        "DT": C_DT_UINT16,
+        "SWITCH": {"off": 0, "on": 1},
+        "BITMASK": 11,
+        "NAME": "Alarm: compressor high-pressure",
+    },
+    # AL16 (bit 15): water-circuit antifreeze — stops fan.
+    C_ALARM_ANTIFREEZE: {
+        "RT": C_REG_TYPE_INPUT_REGISTERS,
+        "REG": 768,
+        "DT": C_DT_UINT16,
+        "SWITCH": {"off": 0, "on": 1},
+        "BITMASK": 15,
+        "NAME": "Alarm: water antifreeze",
+    },
+    # PackedAlarm_2 (reg 769): bit N = AL(N+17).
+    # AL22 (bit 5): dirty filters — display-only, manual reset.
+    C_ALARM_FILTER: {
+        "RT": C_REG_TYPE_INPUT_REGISTERS,
+        "REG": 769,
+        "DT": C_DT_UINT16,
+        "SWITCH": {"off": 0, "on": 1},
+        "BITMASK": 5,
+        "NAME": "Alarm: dirty filter",
+    },
 }
 
 # Registers written (in order) when the integration is set up, to make sure
 # Modbus control is actually permitted by the unit.
-BMS_ENABLE_KEYS = (C_ENABLE_ONOFF_BMS, C_ENABLE_DEHUM_BMS, C_ENABLE_INTEG_BMS)
+BMS_ENABLE_KEYS = (C_ENABLE_ONOFF_BMS, C_ENABLE_DEHUM_BMS, C_ENABLE_COOLING_BMS)
+
+# Computed sensors: not backed by Modbus registers; values are written by the
+# hub after each decode cycle using model calibration parameters.
+COMPUTED_SENSORS: Dict[str, Dict[str, str]] = {
+    C_MAX_TOTAL_AIRFLOW: {"NAME": "Max total airflow", "UNIT": "m³/h"},
+    C_SUPPLY_FAN_MIN_AIRFLOW: {"NAME": "Supply fan min airflow", "UNIT": "m³/h"},
+    C_SUPPLY_FAN_MAX_AIRFLOW: {"NAME": "Supply fan max airflow", "UNIT": "m³/h"},
+    C_SUPPLY_FAN_AIRFLOW: {"NAME": "Supply fan airflow", "UNIT": "m³/h"},
+}
 
 
 # ------------------------------------------------------------------
@@ -664,6 +769,12 @@ def _unit_mapping(
         )
     if u == "rpm":
         return "rpm", None, SensorStateClass.MEASUREMENT
+    if u == UnitOfVolumeFlowRate.CUBIC_METERS_PER_HOUR:
+        return (
+            UnitOfVolumeFlowRate.CUBIC_METERS_PER_HOUR,
+            SensorDeviceClass.VOLUME_FLOW_RATE,
+            SensorStateClass.MEASUREMENT,
+        )
     return u, None, SensorStateClass.MEASUREMENT
 
 
@@ -760,6 +871,17 @@ def init() -> None:
             )
         else:
             _LOGGER.warning("Unclassified entity %s: %s", key, props)
+
+    for key, props in COMPUTED_SENSORS.items():
+        unit, device_class, state_class = _unit_mapping(props.get("UNIT"))
+        SENSOR_TYPES[key] = MySensorEntityDescription(
+            key=key,
+            name=props["NAME"],
+            translation_key=key,
+            native_unit_of_measurement=unit,
+            device_class=device_class,
+            state_class=state_class,
+        )
 
     _initialized = True
 

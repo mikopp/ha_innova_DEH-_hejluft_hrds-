@@ -16,10 +16,10 @@ verified on hardware.
       Verify sign handling on outdoor/water temps below 0 °C.
 - [ ] **Humidity is integer %RH (no scale)** on both the room probe (505) and the
       setpoint (1586). Confirm no ×0.1.
-- [ ] **`fan_integration_active` (reg 1112) is a 0/1 flag**, not a 0–100 %
+- [ ] **`recirculation_active` (reg 1112) is a 0/1 flag**, not a 0–100 %
       value. It sits next to the 0–100 % fan-request registers; if hardware shows
       a percentage, change it from a binary sensor to a `sensor` with
-      `FAKTOR: 0.01`. (See `const.py` `C_FAN_INTEGRATION_ACTIVE`.)
+      `FAKTOR: 0.01`. (See `const.py` `C_RECIRCULATION_ACTIVE`.)
 - [ ] **Air quality (506)** unit/scale and whether the probe is even fitted;
       device_class `AQI` + "ppm" is a guess.
 
@@ -72,19 +72,20 @@ The climate entity now exposes **fan_mode** (off / low / medium / high):
 Read-back maps `outAO_SupplyFan` (639) back to the nearest preset via midpoint
 thresholds (42.5 / 70.0 %).
 
-- [ ] **Core assumption: fan off (0 %) while DRY/COOL is active is supported
-      by the unit**, relying on the central MVHR's passive inflow instead of the
-      unit's own fan. User confirms this is believed correct — verify on hardware.
-- [ ] Confirm that writing `1614 = 0` actually stops the fan while a mode is
-      active, and is not clamped up to `MinSpeedFan_Dehum` (1853) /
-      `MinSpeedFan_Integ` (1852) by the unit's internal logic.
+- [x] **Core assumption: compressor/dehumidify can run on passive MVHR flow
+      alone (no unit fan running)** — this is architecturally confirmed: the
+      non-`R` variant (no recirc fan installed) always operates this way. The
+      compressor dehumidifies and cools with MVHR passive flow only, by design.
+- [ ] **Open firmware question (R variant only):** When `Status_Dehum_byBMS`
+      (1140) = 1 with fan mode set to off, does the firmware honour `1614 = 0`
+      or silently clamp the fan output up to `MinSpeedFan_Dehum` (1853)?
+      Verify: write 0 to 1614 while dehumidify is active, then read
+      `outAO_SupplyFan` (639). Non-zero = firmware clamped.
 - [ ] Confirm `SupplyFan_Status` (1119) reports `1` (OFF) when fan mode = off
-      and a mode is active, and that `fan_integration_active` (1112) goes 0.
+      and a mode is active, and that `recirculation_active` (1112) goes 0.
 - [ ] Verify the Low / Medium / High percentages (30 / 55 / 85 %) are
       reasonable for the real unit; adjust in `climate.py` `_FAN_MODE_PCT` if
       not. These are nominal choices, not values from the PDF.
-- [ ] Check whether `PG01_MachineType` (1797: 0=dehumidifier only, 1=+VMC)
-      affects whether the fan can be set to off while a mode is active.
 
 ## Entities documented but not yet exposed
 
@@ -96,5 +97,5 @@ thresholds (42.5 / 70.0 %).
 - [ ] **Season / operating-mode change**: only the R/O feedback (1583) is
       exposed. Writing the season via `DI4_Configuration` (1825, only 3/4 valid)
       and the `PriorityChangeMode` (1878) ownership flag are not implemented.
-- [ ] **Manual fan request / remote request** (1114 / 1116, R/O) and the
-      recirculation damper status (1134) are not exposed.
+- [ ] **Manual fan request / remote request** (1114 / 1116, R/O) are not exposed.
+- [x] Recirculation damper status (1134) — now exposed as `sensor.recirculation_damper`.

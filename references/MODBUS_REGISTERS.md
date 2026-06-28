@@ -139,7 +139,7 @@ for 40 %). Min/Max apply to the modulation band used in each mode.
 | `0x045F` | 1119 | `SupplyFan_Status`   | `0=Disable`, `1=OFF`, `2=Wait ON`, `3=ON`, `4=Wait OFF`, `5=Alarm` |
 | `0x0461` | 1121 | `DehumRequest`       | `0=No`, `1=Yes` — dehumidification currently requested |
 | `0x0462` | 1122 | `CmpStatus`          | `0=Disable`, `1=Alarm`, `2=Manual`, `3=Wait ON`, `4=ON`, `5=Wait OFF`, `6=OFF` — compressor (active cooling/dehum) |
-| `0x046E` | 1134 | `outDO_RecircDamper` | `0=OFF`, `1=ON`, `2=Disable` |
+| `0x046E` | 1134 | `outDO_RecircDamper` | `0=OFF` (damper closed — room-air duct sealed, MVHR passive flow only), `1=ON` (damper open — room air blended with MVHR inflow), `2=Disable` (no damper wired, non-`R` variant) |
 | `0x027F` | 639  | `outAO_SupplyFan`    | Supply-fan output % (×0.01) |
 | `0x0281` | 641  | `outAO_Cmp`          | Compressor output % (×0.01) |
 | `0x044F` | 1103 | `OR_Alarms`          | `0/1` cumulative "any alarm active" flag |
