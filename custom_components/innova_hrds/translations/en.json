@@ -28,8 +28,7 @@
           "scan_interval": "Scan interval",
           "model": "Model (30 = HRDS+30, 50 = HRDS+50)",
           "airflow_max_m3h": "Supply fan max airflow (m³/h)",
-          "airflow_min_m3h": "Supply fan min airflow (m³/h)",
-          "fan_min_output_pct": "Fan output % at which min airflow starts (%)"
+          "fan_min_output_pct": "Fan output % below which fan is treated as off (%)"
         }
       }
     }
@@ -50,7 +49,6 @@
       "compressor_output": { "name": "Compressor output" },
       "supply_fan_rpm": { "name": "Supply fan speed" },
       "max_total_airflow": { "name": "Max total airflow" },
-      "supply_fan_min_airflow": { "name": "Supply fan min airflow" },
       "supply_fan_max_airflow": { "name": "Supply fan max airflow" },
       "supply_fan_airflow": { "name": "Supply fan airflow" },
       "recirculation_damper": {

@@ -272,15 +272,20 @@ Equivalently, via the analog output % (the same curve, already normalised):
 m³/h  ≈  (output% / 100) × Q_max
 ```
 
-with the practical note that the fan output % where recirculation actually begins
-corresponds to `PF28` (default 50 %, configurable to 0 %): below that the fan
-is simply OFF (0 m³/h passive MVHR flow only), not a proportional fraction. So
-a more faithful map across the running range is:
+with the practical note that `PF28` (default 50 %, configurable to 0 %) is a
+firmware gate, not a minimum airflow floor: below `PF28` the fan is simply OFF
+(0 m³/h — passive MVHR flow only). Above it the proportional model applies
+directly:
 
 ```
-m³/h  ≈  Q_min + (output% − band_min%) / (100 − band_min%) × (Q_max − Q_min)
-         clamped to [Q_min, Q_max];   Q_min = 130 (30) / 190 (50)
+m³/h  ≈  (output% / 100) × Q_max   when output% > PF28
+       =  0                          when output% ≤ PF28
 ```
+
+Note: the 130–300 m³/h / 190–500 m³/h band in the performance table is the
+**tested operating range**, not a hardware or firmware minimum. `PF28` and
+`PF27` are both configurable from 0 % (see MODBUS_REGISTERS.md), so there is
+no mandatory minimum fan speed.
 
 **Accuracy caveats:** the affinity law holds only at constant duct resistance.
 Higher static pressure (filters loading, longer/narrower ducts) means the same
