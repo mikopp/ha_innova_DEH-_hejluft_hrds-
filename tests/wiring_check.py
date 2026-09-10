@@ -81,6 +81,11 @@ class ClimateEntityDescription(EntityDescription):
     pass
 
 
+@dataclass
+class FanEntityDescription(EntityDescription):
+    pass
+
+
 class ClimateEntityFeature(enum.IntFlag):
     TARGET_TEMPERATURE = 1
     TARGET_HUMIDITY = 2
@@ -147,6 +152,10 @@ def install_stubs() -> None:
         "homeassistant.components.climate",
         ClimateEntityDescription=ClimateEntityDescription,
         ClimateEntityFeature=ClimateEntityFeature,
+    )
+    _stub(
+        "homeassistant.components.fan",
+        FanEntityDescription=FanEntityDescription,
     )
     _stub(
         "homeassistant.components.number",
@@ -231,7 +240,7 @@ def main() -> int:
     const = load_const()
 
     print("== typed dicts populated ==")
-    for name in [*TYPED_DICT_PLATFORM, "CLIMATE_TYPES"]:
+    for name in [*TYPED_DICT_PLATFORM, "CLIMATE_TYPES", "FAN_TYPES"]:
         entries = getattr(const, name)
         check(len(entries) > 0, f"{name} has {len(entries)} entries")
     check("probe_source" in const.SELECT_TYPES, "probe_source classified as a select")

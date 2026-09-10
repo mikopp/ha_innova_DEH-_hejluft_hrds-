@@ -40,7 +40,8 @@ The integration talks to the unit's control board via Modbus TCP and exposes:
   "enable control via Modbus" registers.
 * **Numbers** — humidity setpoint, summer/winter temperature setpoints, and the
   per-mode fan speed bands.
-* **Select** — T/H probe source (HA00).
+* **Select** — T/H probe source (HA00), winter dehumidification mode (PU02).
+* **Fan** — the supply/recirculation fan as a settable percentage.
 
 See [`references/README.md`](references/README.md) for the full capability list
 and [`references/MODBUS_REGISTERS.md`](references/MODBUS_REGISTERS.md) for the
@@ -59,7 +60,7 @@ for full detail.
 
 | Entity | What it shows / does |
 |--------|---------------------|
-| `climate.hrds_climate` | HVAC mode (Off/Dry/Cool), action, fan mode, target T & RH. `current_temperature`¹ and `current_humidity`² are suppressed when the corresponding probe is absent. |
+| `climate.hrds_climate` | HVAC mode (Off/Dry/Cool), action, fan mode, target T & RH. `current_temperature`¹ and `current_humidity`² are suppressed when the corresponding probe is absent. Target-humidity bounds follow the unit's own PH29/PH30 clamps. |
 
 ### Sensors
 
@@ -75,6 +76,10 @@ for full detail.
 | `sensor.supply_fan_output` | % | ³ Built-in | Reg 639 (×0.01 %); actual fan analog output |
 | `sensor.compressor_output` | % | ³ Built-in | Reg 641 (×0.01 %); compressor modulation level |
 | `sensor.supply_fan_rpm` | rpm | ³ Built-in | Reg 1117 |
+| `sensor.exhaust_temperature` | °C | External NTC | Reg 502; monitoring only |
+| `sensor.evaporator_temperature` | °C | ³ Built-in | Reg 511; drives compressor modulation, works on a headless unit |
+| `sensor.fan_manual_request` | % | ³ Built-in | Reg 1114; the **display's** manual request, not ours — diagnostic |
+| `sensor.recirculation_damper` | enum | ³ Built-in | Reg 1134; Open confirms room air is being recirculated across the coil |
 | `sensor.unit_status` | enum | ³ Built-in | OFF by display/DI/BMS/scheduler/clock, or ON |
 | `sensor.mode_status` | enum | ³ Built-in | Summer/Winter × manual/auto/DI |
 | `sensor.supply_fan_status` | enum | ³ Built-in | Off/Starting/On/Stopping/Alarm |
@@ -128,6 +133,9 @@ Each sensor maps to a single bit of a packed alarm register. **ON = alarm is act
 | `switch.enable_onoff_bms` | 1778 | PH02 — auto-set on startup; expose to inspect/reset |
 | `switch.enable_dehumidify_bms` | 1870 | PH28 — auto-set on startup |
 | `switch.enable_cooling_bms` | 1869 | PH27 — auto-set on startup |
+| `switch.force_dehumidify_in_cooling` | 1692 | PU05; couple dehumidify to a cooling request |
+| `switch.enable_integration` | 1798 | PG02; master enable for active cooling |
+| `switch.enable_free_cooling` | 1799 | PG03; while off, outdoor temperature drives nothing |
 
 ### Numbers
 
@@ -140,13 +148,27 @@ Each sensor maps to a single bit of a packed alarm register. **ON = alarm is act
 | `number.fan_max_speed_dehumidify` | 1647 | 0–100 % | PF10; upper fan bound in dehumidify mode |
 | `number.fan_min_speed_cooling` | 1852 | 0–100 % | PF27; lower fan bound in active cooling |
 | `number.fan_max_speed_cooling` | 1646 | 0–100 % | PF09; upper fan bound in active cooling |
-| `number.fan_manual_speed` | 1614 | 0–100 % | PM20; manual fan speed (climate fan mode writes here) |
+| `number.fan_manual_speed` | 1614 | 0–100 % | PM20; manual fan speed (the fan entity and climate fan mode write here) |
+| `number.dehumidify_differential` | 1694 | 0–100 %RH | PU07; the unit's own dehumidify hysteresis |
+| `number.min_room_temp_dehumidify` | 1889 | 0–30 °C | PU13; **below this the unit refuses to dehumidify, including over Modbus** |
+| `number.min_room_temp_diff_dehumidify` | 1890 | 0.1–20 °C | PU14; re-enable differential above PU13 |
+| `number.fan_min_runtime` | 1638 | 0–999 s | PF01; device-side minimum fan runtime |
+| `number.fan_post_run_time` | 1640 | 0–999 s | PF03; post-ventilation run-on |
+| `number.humidity_setpoint_min` | 1892 | 0–100 %RH | PH29; lower clamp on target humidity |
+| `number.humidity_setpoint_max` | 1893 | 0–100 %RH | PH30; upper clamp on target humidity |
 
 ### Select
 
 | Entity | Register | Options | Notes |
 |--------|----------|---------|-------|
 | `select.probe_source` | 1803 | None/external, CNU2 T, CNU2 T+H, CNU T, CNU T+H, EPJ T, EPJ T+H | HA00 — which sensor feeds room T/H readings. **Set to "None / external probes" when running without a display.** |
+| `select.winter_dehumidify` | 1689 | Disabled, With water, Without water | PU02; dehumidification during the heating season |
+
+### Fan
+
+| Entity | What it does |
+|--------|-------------|
+| `fan.hrds_supply_fan` | The unit's supply/recirculation fan as a percentage (`fan.set_percentage`, turn on/off). Writes PM20 (1614) and reports the **commanded** speed; actual output %, RPM and fan status are state attributes. Because the unit's own fan recirculates room air *in addition* to whatever the central MVHR pushes through the duct, this is the lever for topping combined airflow up to a target. |
 
 ## Installation
 
@@ -326,6 +348,23 @@ is expected, not an error.
 See [`references/README.md` — Probes](references/README.md#probes-built-in-display-and-external-sensors)
 and [`references/MODBUS_REGISTERS.md` §14](references/MODBUS_REGISTERS.md#14-probes-built-in-display-and-external-sensors)
 for full probe specifications, wiring, and the HA00/PH01 configuration detail.
+
+## Requirements
+
+* **Home Assistant 2026.9 or newer.**
+* `pymodbus` 3.13.1 (pinned in the manifest to match what HA 2026.9 ships).
+
+### Availability
+
+Entities go **`unavailable`** when a poll fails, rather than continuing to show
+the last good reading. If you drive this integration from templates or
+automations, gate them on `has_value()` — a dehumidifier that acts on a
+three-day-old humidity reading is worse than one that does nothing.
+
+Writes that the unit rejects now raise an error instead of silently succeeding.
+In an automation a failed service call **aborts the remaining steps**, so if you
+issue several writes in sequence, either put the critical one first or mark the
+rest `continue_on_error: true`.
 
 ## Prerequisites
 

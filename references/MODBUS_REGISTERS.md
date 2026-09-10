@@ -469,3 +469,39 @@ display or any room sensors. In this mode:
    (because AL28/AL34 are active). This is expected and not an error.
 5. The evaporator and water-circuit probes remain active (factory-wired) and
    continue to protect the unit against AL03/AL04/AL11/AL12.
+
+---
+
+## 15. Control parameters used by the HA integration
+
+Extracted from `HRDS+_Modbus_RTU_RS485_DE.pdf` §6 (FULL MODBUS REGISTER LIST).
+These are the parameters an external controller needs in order to reason about
+what the unit will do on its own, rather than fighting it.
+
+| Addr HEX | Addr DEC | Name | R/W | Range | Why it matters |
+|----------|----------|------|-----|-------|----------------|
+| `0x069E` | 1694 | `PU07_Dehumidity_Diff` | R/W | 0-100 %RH | The unit's **own** dehumidify hysteresis: the auto request turns on at `PU01 + PU07` and off at `PU01`. An external controller's hysteresis should not be narrower than this. |
+| `0x0761` | 1889 | `PU13_MinTRoom_disableDEU` | R/W | 0-30.0 °C (×0.1) | **Minimum room temperature below which dehumidification is disabled.** This interlock applies to Modbus requests too, so on a unit with no room probe it can silently block a dehumidify command. |
+| `0x0762` | 1890 | `PU14_TRoomDIFF_enableDEU` | R/W | 0.1-20.0 °C (×0.1) | Differential above `PU13` at which dehumidification is re-enabled. |
+| `0x0666` | 1638 | `PF01_MinTimeOnFan` | R/W | 0-999 s | **Device-side minimum fan runtime.** The fan stays on for this long even if the request clears, so the unit already provides anti-short-cycling. |
+| `0x0668` | 1640 | `PF03_MinTimePostFan` | R/W | 0-999 s | Post-ventilation run-on after the compressor stops (`0` disables it). |
+| `0x0707` | 1799 | `PG03_EnableFreeCoolingHeating` | R/W | `0=No`, `1=Yes` | Enables the Free-Cooling/Free-Heating function. **While this is `0` (the factory default), `AI_Toutdoor` (500) drives nothing** - it is display-only. |
+
+> The `PF01`/`PF03` unit is inferred from the parameter's 0-999 range and the
+> technical manual's description ("Mindestlaufzeit" / "Nachlauf"); it is not
+> stated explicitly in the Modbus table. Confirm against the wired display
+> before relying on the absolute value.
+
+### 15.1 What this means for an external controller
+
+* **Minimum runtime is already enforced by the unit** (`PF01`). A controller
+  does not need its own compressor-protection timer, only hysteresis on its
+  *decision* input.
+* **`PU13` can veto a Modbus dehumidify request.** If a request appears to be
+  accepted but the compressor never starts, read `PU13` and the room
+  temperature before looking anywhere else.
+* **`PU07` interacts with an external hysteresis band.** If the controller's
+  band is narrower than `PU07`, the unit's own auto logic decides the edges.
+* **`PG03` decides whether outdoor temperature is a control input.** Leave it
+  at `0` if the central MVHR owns free cooling, as is the case when the HRDS+
+  sits on that system's supply branch.

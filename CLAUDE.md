@@ -1,7 +1,8 @@
 # ha_innova_hrds
 
 Home Assistant custom integration for the **Innova DEH+ / hej.luft HRDS+** air
-dehumidification module via **Modbus TCP**. It serves a similar purpose to the
+dehumidification module via **Modbus TCP**. Minimum Home Assistant version is
+**2026.9**; `pymodbus` is pinned to `3.13.1`, the version HA 2026.9 ships. It serves a similar purpose to the
 sibling `ha_comfoconnectpro` integration and shares its architecture.
 
 The integration domain is `innova_hrds`; the component lives in
@@ -17,9 +18,9 @@ All Modbus registers are declared once in `ENTITIES_DICT` in `const.py`. The
 `entity_common.py`, which instantiates the appropriate `HubBackedEntity`
 subclass for every entry in its dict.
 
-The **climate entity** is the exception: it is a composite entity not backed by
-a single register. It is created manually in `climate.py:async_setup_entry`
-using `get_hub_and_device_info()` and aggregates several status registers.
+The **climate** and **fan** entities are the exceptions: they are composite,
+not backed by a single register, and are declared directly in `init()`
+(`CLIMATE_TYPES` / `FAN_TYPES`) rather than derived from `ENTITIES_DICT`.
 
 ## Device specifics (important — differ from comfoconnectpro)
 
@@ -34,8 +35,10 @@ using `get_hub_and_device_info()` and aggregates several status registers.
   chunks** (`_build_blocks` in `__init__.py`, capped at `C_MAX_BLOCK`, merging
   gaps up to `C_MAX_GAP`).
 * **"by BMS" enables are mandatory.** Writes are ignored unless PH02/PH27/PH28
-  are set. The hub writes these once per connection (`_enable_bms_control_locked`,
-  driven by `BMS_ENABLE_KEYS`); they are also exposed as switches.
+  are set. `_sync_bms_enables_locked` re-asserts them **every poll**, driven by
+  the polled read-back rather than a one-shot flag, so a device power-cycle that
+  clears them self-heals. They are also exposed as switches — and because the
+  hub re-asserts them, turning one off by hand is undone on the next poll.
 * **Scaling:** temperatures/setpoints ×0.1 (`FAKTOR`), fan/percent registers
   ×0.01, humidity ×1.
 
@@ -60,11 +63,17 @@ from the manufacturer PDFs in `references/`.
 1. Add/edit the entry in `ENTITIES_DICT` in `const.py`.
 2. Register fields: `RT` (register type), `REG` (decimal address), `DT`
    (`C_DT_INT16`/`C_DT_UINT16`), `NAME`, and optionally `UNIT`, `FAKTOR`, `MIN`,
-   `MAX`, `STEP`, `VALUES` (enum/select), `SWITCH` (0/1 flag), `PF` (platform
-   override).
+   `MAX`, `STEP`, `VALUES` (enum/select), `DEFAULT` (default raw value for a
+   select), `DC` (explicit sensor device class, overriding the `UNIT`-derived
+   default), `SWITCH` (0/1 flag), `BITMASK`/`BITMASK_INVERT` (extract one bit
+   from a packed register), `PF` (platform override).
 3. Add translation strings to `translations/en.json` and `translations/de.json`
    under the matching platform key (and `state` slugs for enums).
-4. No platform code changes are needed unless you add a new platform.
+4. No platform code changes are needed unless you add a new platform. If you do
+   add one, it needs **both** a module and an entry in `PLATFORMS` — a typed
+   dict with no platform file produces no entities at all, silently.
+5. Run `python3 tests/wiring_check.py`, which catches exactly that mistake plus
+   missing translations and undocumented registers.
 
 ### Bitmask binary sensors (alarm / packed-register bits)
 
@@ -121,10 +130,18 @@ figures in the technical data are the tested spec range, **not** a firmware floo
 
 * Polls all registers every N seconds (default 30) via
   `async_refresh_modbus_data()`, reading input and holding blocks separately.
+  Blocks never span an address belonging to the other function code, and a
+  failed block is retried register-by-register so one bad address cannot blank
+  every entity.
+* `last_update_success` drives `HubBackedEntity.available`. Listeners are
+  notified on failure too — that is what moves entities to `unavailable`
+  instead of leaving them showing stale readings.
 * Decoded values are stored in `hub.data[entity_key]` as Python-native types
   (`str` for selects/switches → `"on"`/`"off"` or slug, `float` for numerics).
 * Write via `hub.write_entity_value(entity_key, value)` — encodes, writes, and
-  triggers a refresh. `setter_function_callback` is the entity-facing wrapper.
+  schedules a **debounced** refresh. It raises `HomeAssistantError` if the write
+  did not take, so a rejected write is not silently reported as success.
+  `setter_function_callback` is the entity-facing wrapper.
 * Entity callbacks register via `hub.async_add_my_modbus_sensor(callback)`.
 
 ## Climate entity mapping
@@ -135,6 +152,17 @@ figures in the technical data are the tested spec range, **not** a firmware floo
 * `hvac_action` derived from `unit_status` / `compressor_status` /
   `dehumidify_request`.
 * `target_humidity` ← `humidity_setpoint`; `target_temperature` ← `summer_setpoint`.
+* `min_humidity` / `max_humidity` follow the unit's own PH29/PH30 clamps.
+* `current_temperature` / `current_humidity` report `None` while the matching
+  probe-fault alarm is active.
+
+## Fan entity
+
+`fan.py` exposes the recirculation fan as a percentage. It reports the
+**commanded** speed (holding register 1614, which is also polled), not
+`outAO_SupplyFan` (639) — reading back the modulated output would make the
+entity chase the unit's own modulation away from the setpoint. Actual output
+and RPM are exposed as state attributes instead.
 
 ## Linting
 
@@ -151,4 +179,9 @@ GitHub Actions (in `.github/workflows/`):
 * `hacs.yaml` — HACS repository validation (also daily); ignores `brands` (not yet in the HACS brands repo).
 * `release.yaml` — re-runs hassfest + hacs when a release is published.
 
-No unit tests yet.
+`tests/wiring_check.py` runs without Home Assistant installed: it stubs the HA
+API, imports `const.py`, and asserts that every entity is classified, every
+declared platform has a module, every entity has `en`/`de` translations, every
+register is documented in `references/MODBUS_REGISTERS.md`, and no input block
+spans a holding address. It is not a substitute for real tests, but it catches
+the failures this integration has actually had.

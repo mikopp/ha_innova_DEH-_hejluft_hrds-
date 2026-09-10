@@ -32,6 +32,8 @@ from .const import (
     C_UNIT_STATUS,
     CLIMATE_CURRENT_HUMIDITY,
     CLIMATE_CURRENT_TEMP,
+    CLIMATE_MAX_HUMIDITY,
+    CLIMATE_MIN_HUMIDITY,
     CLIMATE_TARGET_HUMIDITY,
     CLIMATE_TARGET_TEMP,
     CLIMATE_TYPES,
@@ -118,6 +120,13 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
             hum = data.get(CLIMATE_CURRENT_HUMIDITY)
             if hum is not None:
                 self._attr_current_humidity = int(hum)
+
+        # Advertise the unit's own PU01 clamps (PH29/PH30) instead of a guess.
+        hum_min = data.get(CLIMATE_MIN_HUMIDITY)
+        hum_max = data.get(CLIMATE_MAX_HUMIDITY)
+        if hum_min is not None and hum_max is not None and hum_min < hum_max:
+            self._attr_min_humidity = int(hum_min)
+            self._attr_max_humidity = int(hum_max)
 
         target_hum = data.get(CLIMATE_TARGET_HUMIDITY)
         if target_hum is not None:

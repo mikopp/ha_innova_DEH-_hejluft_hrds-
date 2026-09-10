@@ -67,6 +67,7 @@ PLATFORMS = [
     Platform.NUMBER,
     Platform.SELECT,
     Platform.CLIMATE,
+    Platform.FAN,
 ]
 
 

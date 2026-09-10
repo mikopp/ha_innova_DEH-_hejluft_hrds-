@@ -48,6 +48,9 @@
       "supply_fan_output": { "name": "Zuluftventilator-Ausgang" },
       "compressor_output": { "name": "Kompressor-Ausgang" },
       "supply_fan_rpm": { "name": "Zuluftventilator-Drehzahl" },
+      "exhaust_temperature": { "name": "Fortlufttemperatur" },
+      "evaporator_temperature": { "name": "Verdampfertemperatur" },
+      "fan_manual_request": { "name": "Manuelle Lüfteranforderung (Display)" },
       "max_total_airflow": { "name": "Max. Gesamt-Volumenstrom" },
       "supply_fan_max_airflow": { "name": "Zuluftventilator max. Volumenstrom" },
       "supply_fan_airflow": { "name": "Zuluftventilator Volumenstrom" },
@@ -132,7 +135,10 @@
       "active_cooling": { "name": "Aktive Kühlung (Modbus)" },
       "enable_onoff_bms": { "name": "Ein/Aus über Modbus freigeben" },
       "enable_dehumidify_bms": { "name": "Entfeuchtung über Modbus freigeben" },
-      "enable_cooling_bms": { "name": "Kühlung über Modbus freigeben" }
+      "enable_cooling_bms": { "name": "Kühlung über Modbus freigeben" },
+      "force_dehumidify_in_cooling": { "name": "Entfeuchtung bei Kühlung erzwingen" },
+      "enable_integration": { "name": "Integration (aktive Kühlung) freigeben" },
+      "enable_free_cooling": { "name": "Free-Cooling/Heating freigeben" }
     },
     "select": {
       "probe_source": {
@@ -146,7 +152,18 @@
           "cnu2_temp": "CNU2-Display (nur Temperatur)",
           "cnu2_temp_humidity": "CNU2-Display (Temperatur + Feuchte)"
         }
+      },
+      "winter_dehumidify": {
+        "name": "Winter-Entfeuchtung",
+        "state": {
+          "disabled": "Deaktiviert",
+          "with_water": "Mit Wasser",
+          "without_water": "Ohne Wasser"
+        }
       }
+    },
+    "fan": {
+      "hrds_supply_fan": { "name": "Zuluftventilator" }
     },
     "number": {
       "humidity_setpoint": { "name": "Feuchte-Sollwert" },
@@ -156,7 +173,14 @@
       "fan_max_speed_dehumidify": { "name": "Ventilator max. Drehzahl (Entfeuchtung)" },
       "fan_min_speed_cooling": { "name": "Ventilator min. Drehzahl (Kühlung)" },
       "fan_max_speed_cooling": { "name": "Ventilator max. Drehzahl (Kühlung)" },
-      "fan_manual_speed": { "name": "Manuelle Ventilatordrehzahl" }
+      "fan_manual_speed": { "name": "Manuelle Ventilatordrehzahl" },
+      "dehumidify_differential": { "name": "Entfeuchtungs-Differenz" },
+      "min_room_temp_dehumidify": { "name": "Min. Raumtemperatur für Entfeuchtung" },
+      "min_room_temp_diff_dehumidify": { "name": "Min. Raumtemperatur-Differenz" },
+      "fan_min_runtime": { "name": "Lüfter-Mindestlaufzeit" },
+      "fan_post_run_time": { "name": "Lüfter-Nachlaufzeit" },
+      "humidity_setpoint_min": { "name": "Feuchte-Sollwert Minimum" },
+      "humidity_setpoint_max": { "name": "Feuchte-Sollwert Maximum" }
     }
   }
 }

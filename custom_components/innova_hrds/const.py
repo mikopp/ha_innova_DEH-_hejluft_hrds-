@@ -19,6 +19,7 @@ from homeassistant.components.climate import (
     ClimateEntityDescription,
     ClimateEntityFeature,
 )
+from homeassistant.components.fan import FanEntityDescription
 from homeassistant.components.number import NumberEntityDescription, NumberMode
 from homeassistant.components.select import SelectEntityDescription
 from homeassistant.components.sensor import (
@@ -109,6 +110,8 @@ COMPRESSOR_STATUS = {
 }
 OPERATING_MODE = {0: "summer", 1: "winter", 2: "auto"}
 RECIRCULATION_DAMPER = {0: "off", 1: "on", 2: "disabled"}
+# PU02 - dehumidification during the winter season.
+WINTER_DEHUM = {0: "disabled", 1: "with_water", 2: "without_water"}
 
 # HA00 (reg 1803) — source for room temperature and humidity probes.
 # 0 = no display sensors; external probes on AI2/AI3 are used if wired.
@@ -139,6 +142,9 @@ C_ACTUAL_SETPOINT = "actual_setpoint"
 C_SUPPLY_FAN_OUTPUT = "supply_fan_output"
 C_COMPRESSOR_OUTPUT = "compressor_output"
 C_SUPPLY_FAN_RPM = "supply_fan_rpm"
+C_EXHAUST_TEMPERATURE = "exhaust_temperature"
+C_EVAPORATOR_TEMPERATURE = "evaporator_temperature"
+C_FAN_MANUAL_REQUEST = "fan_manual_request"
 # Read-only enum sensors
 C_UNIT_STATUS = "unit_status"
 C_MODE_STATUS = "mode_status"
@@ -163,6 +169,13 @@ C_FAN_MAX_DEHUM = "fan_max_speed_dehumidify"
 C_FAN_MIN_COOLING = "fan_min_speed_cooling"
 C_FAN_MAX_COOLING = "fan_max_speed_cooling"
 C_FAN_MANUAL = "fan_manual_speed"
+C_DEHUM_DIFFERENTIAL = "dehumidify_differential"
+C_MIN_ROOM_TEMP_DEHUM = "min_room_temp_dehumidify"
+C_MIN_ROOM_TEMP_DIFF = "min_room_temp_diff_dehumidify"
+C_FAN_MIN_RUNTIME = "fan_min_runtime"
+C_FAN_POST_RUN_TIME = "fan_post_run_time"
+C_HUMIDITY_SETPOINT_MIN = "humidity_setpoint_min"
+C_HUMIDITY_SETPOINT_MAX = "humidity_setpoint_max"
 # Read-write switches
 C_UNIT_ON_OFF = "unit_on_off"
 C_DEHUMIDIFY = "dehumidify"
@@ -170,8 +183,12 @@ C_ACTIVE_COOLING = "active_cooling"
 C_ENABLE_ONOFF_BMS = "enable_onoff_bms"
 C_ENABLE_DEHUM_BMS = "enable_dehumidify_bms"
 C_ENABLE_COOLING_BMS = "enable_cooling_bms"
+C_FORCE_DEHUM_IN_COOLING = "force_dehumidify_in_cooling"
+C_ENABLE_INTEGRATION = "enable_integration"
+C_ENABLE_FREE_COOLING = "enable_free_cooling"
 # Read-write selects
 C_PROBE_SOURCE = "probe_source"
+C_WINTER_DEHUM = "winter_dehumidify"
 # Derived binary sensors (bit-extracted from packed alarm registers)
 C_TEMP_PROBE_OK = "temp_probe_ok"
 C_HUMIDITY_PROBE_OK = "humidity_probe_ok"
@@ -190,6 +207,10 @@ CLIMATE_CURRENT_TEMP = C_ROOM_TEMPERATURE
 CLIMATE_CURRENT_HUMIDITY = C_ROOM_HUMIDITY
 CLIMATE_TARGET_HUMIDITY = C_HUMIDITY_SETPOINT
 CLIMATE_TARGET_TEMP = C_SUMMER_SETPOINT
+# PH29/PH30 - the unit clamps PU01 to this band, so the climate entity should
+# advertise it rather than a hardcoded guess.
+CLIMATE_MIN_HUMIDITY = C_HUMIDITY_SETPOINT_MIN
+CLIMATE_MAX_HUMIDITY = C_HUMIDITY_SETPOINT_MAX
 
 # ------------------------------------------------------------------
 # ENTITIES_DICT — the single source of truth.
@@ -582,6 +603,144 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "BITMASK": 5,
         "NAME": "Alarm: dirty filter",
     },
+    # --- Additional sensors (input registers, FC 04) ---
+    C_EXHAUST_TEMPERATURE: {
+        "RT": C_REG_TYPE_INPUT_REGISTERS,
+        "REG": 502,
+        "DT": C_DT_INT16,
+        "FAKTOR": 0.1,
+        "UNIT": "\u00b0C",
+        "NAME": "Exhaust air temperature",
+    },
+    C_EVAPORATOR_TEMPERATURE: {
+        "RT": C_REG_TYPE_INPUT_REGISTERS,
+        "REG": 511,
+        "DT": C_DT_INT16,
+        "FAKTOR": 0.1,
+        "UNIT": "\u00b0C",
+        "NAME": "Evaporator temperature",
+    },
+    # Mirrors the *display's* manual fan request, not ours. Diagnostic only:
+    # the faithful read-back of our own write is holding register 1614.
+    C_FAN_MANUAL_REQUEST: {
+        "RT": C_REG_TYPE_INPUT_REGISTERS,
+        "REG": 1114,
+        "DT": C_DT_UINT16,
+        "FAKTOR": 0.01,
+        "UNIT": "%",
+        "NAME": "Manual fan request (display)",
+    },
+    # --- Additional numbers (holding registers, FC 03) ---
+    C_DEHUM_DIFFERENTIAL: {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": 1694,
+        "DT": C_DT_UINT16,
+        "UNIT": "%",
+        "MIN": 0,
+        "MAX": 100,
+        "STEP": 1,
+        "NAME": "Dehumidify differential (PU07)",
+    },
+    # PU13: the unit refuses to dehumidify below this room temperature. On a
+    # unit with no room probe this interlock can block a Modbus request.
+    C_MIN_ROOM_TEMP_DEHUM: {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": 1889,
+        "DT": C_DT_INT16,
+        "FAKTOR": 0.1,
+        "UNIT": "\u00b0C",
+        "MIN": 0.0,
+        "MAX": 30.0,
+        "STEP": 0.1,
+        "PF": Platform.NUMBER,
+        "NAME": "Min room temp for dehumidify (PU13)",
+    },
+    C_MIN_ROOM_TEMP_DIFF: {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": 1890,
+        "DT": C_DT_INT16,
+        "FAKTOR": 0.1,
+        "UNIT": "\u00b0C",
+        "MIN": 0.1,
+        "MAX": 20.0,
+        "STEP": 0.1,
+        "PF": Platform.NUMBER,
+        "NAME": "Min room temp differential (PU14)",
+    },
+    # PF01/PF03 are the device's own anti-short-cycle timers, so an external
+    # controller usually does not need a minimum-runtime timer of its own.
+    C_FAN_MIN_RUNTIME: {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": 1638,
+        "DT": C_DT_UINT16,
+        "UNIT": "s",
+        "MIN": 0,
+        "MAX": 999,
+        "STEP": 1,
+        "NAME": "Fan minimum runtime (PF01)",
+    },
+    C_FAN_POST_RUN_TIME: {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": 1640,
+        "DT": C_DT_UINT16,
+        "UNIT": "s",
+        "MIN": 0,
+        "MAX": 999,
+        "STEP": 1,
+        "NAME": "Fan post-run time (PF03)",
+    },
+    C_HUMIDITY_SETPOINT_MIN: {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": 1892,
+        "DT": C_DT_UINT16,
+        "UNIT": "%",
+        "MIN": 0,
+        "MAX": 100,
+        "STEP": 1,
+        "NAME": "Humidity setpoint min (PH29)",
+    },
+    C_HUMIDITY_SETPOINT_MAX: {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": 1893,
+        "DT": C_DT_UINT16,
+        "UNIT": "%",
+        "MIN": 0,
+        "MAX": 100,
+        "STEP": 1,
+        "NAME": "Humidity setpoint max (PH30)",
+    },
+    # --- Additional switches ---
+    C_FORCE_DEHUM_IN_COOLING: {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": 1692,
+        "DT": C_DT_UINT16,
+        "SWITCH": {"off": 0, "on": 1},
+        "NAME": "Force dehumidify when cooling (PU05)",
+    },
+    C_ENABLE_INTEGRATION: {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": 1798,
+        "DT": C_DT_UINT16,
+        "SWITCH": {"off": 0, "on": 1},
+        "NAME": "Enable integration / active cooling (PG02)",
+    },
+    # When off, outdoor temperature (reg 500) is decoration, not a control input.
+    C_ENABLE_FREE_COOLING: {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": 1799,
+        "DT": C_DT_UINT16,
+        "SWITCH": {"off": 0, "on": 1},
+        "NAME": "Enable free cooling/heating (PG03)",
+    },
+    # --- Additional selects ---
+    C_WINTER_DEHUM: {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": 1689,
+        "DT": C_DT_UINT16,
+        "VALUES": WINTER_DEHUM,
+        "DEFAULT": 0,
+        "NAME": "Winter dehumidification (PU02)",
+    },
 }
 
 # Registers written (in order) when the integration is set up, to make sure
@@ -632,6 +791,11 @@ class MyNumberEntityDescription(NumberEntityDescription):
 
 
 @dataclass
+class MyFanEntityDescription(FanEntityDescription):
+    """Describes the composite supply-fan entity."""
+
+
+@dataclass
 class MyClimateEntityDescription(ClimateEntityDescription):
     """Describes the composite climate entity."""
 
@@ -652,6 +816,7 @@ BINARY_TYPES: dict[str, MyBinaryEntityDescription] = {}
 SELECT_TYPES: dict[str, MySelectEntityDescription] = {}
 NUMBER_TYPES: dict[str, MyNumberEntityDescription] = {}
 CLIMATE_TYPES: dict[str, MyClimateEntityDescription] = {}
+FAN_TYPES: dict[str, MyFanEntityDescription] = {}
 
 
 # ------------------------------------------------------------------
@@ -809,6 +974,12 @@ def init() -> None:
         key="hrds_climate",
         name="Climate",
         translation_key="hrds_climate",
+    )
+    # Also composite: backed by the manual-speed register plus status readings.
+    FAN_TYPES["hrds_supply_fan"] = MyFanEntityDescription(
+        key="hrds_supply_fan",
+        name="Supply fan",
+        translation_key="hrds_supply_fan",
     )
 
     for key, props in ENTITIES_DICT.items():
