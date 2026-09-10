@@ -27,8 +27,7 @@
           "hostid": "Modbus slave ID",
           "scan_interval": "Scan interval",
           "model": "Model (30 = HRDS+30, 50 = HRDS+50)",
-          "airflow_max_m3h": "Supply fan max airflow (m³/h)",
-          "fan_min_output_pct": "Fan output % below which fan is treated as off (%)"
+          "airflow_max_m3h": "Supply fan max airflow (m³/h)"
         }
       }
     }
@@ -172,6 +171,7 @@
       "fan_min_speed_dehumidify": { "name": "Fan min speed (dehumidify)" },
       "fan_max_speed_dehumidify": { "name": "Fan max speed (dehumidify)" },
       "fan_min_speed_cooling": { "name": "Fan min speed (cooling)" },
+      "fan_min_speed_vmc": { "name": "Fan min speed (VMC)" },
       "fan_max_speed_cooling": { "name": "Fan max speed (cooling)" },
       "fan_manual_speed": { "name": "Manual fan speed" },
       "dehumidify_differential": { "name": "Dehumidify differential" },

@@ -50,9 +50,11 @@ MODEL_SPECS: Dict[str, Dict[str, float]] = {
     "30": {"max": 300.0},
     "50": {"max": 500.0},
 }
+# Max airflow is a *model* property with no register (see CLAUDE.md, Device
+# variants), so it stays a config option. The fan *minimum*, by contrast, is
+# per-mode and register-backed (PF27/PF28/PF07) - the device owns it, and it is
+# exposed as writable numbers rather than shadowed by a config option.
 CONF_AIRFLOW_MAX = "airflow_max_m3h"
-CONF_FAN_MIN_OUTPUT = "fan_min_output_pct"
-DEFAULT_FAN_MIN_OUTPUT = 50.0
 ATTR_MANUFACTURER = "Innova / hej.luft"
 
 # ------------------------------------------------------------------
@@ -167,6 +169,7 @@ C_WINTER_SETPOINT = "winter_setpoint"
 C_FAN_MIN_DEHUM = "fan_min_speed_dehumidify"
 C_FAN_MAX_DEHUM = "fan_max_speed_dehumidify"
 C_FAN_MIN_COOLING = "fan_min_speed_cooling"
+C_FAN_MIN_VMC = "fan_min_speed_vmc"
 C_FAN_MAX_COOLING = "fan_max_speed_cooling"
 C_FAN_MANUAL = "fan_manual_speed"
 C_DEHUM_DIFFERENTIAL = "dehumidify_differential"
@@ -442,6 +445,19 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "MAX": 100,
         "STEP": 1,
         "NAME": "Fan min speed (cooling)",
+    },
+    # PF07 - the third per-mode minimum, for VMC (ventilation-only) operation.
+    # Completes the set alongside PF28 (dehumidify) and PF27 (integration).
+    C_FAN_MIN_VMC: {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": 1644,
+        "DT": C_DT_UINT16,
+        "FAKTOR": 0.01,
+        "UNIT": "%",
+        "MIN": 0,
+        "MAX": 100,
+        "STEP": 1,
+        "NAME": "Fan min speed (VMC)",
     },
     C_FAN_MAX_COOLING: {
         "RT": C_REG_TYPE_HOLDING_REGISTERS,

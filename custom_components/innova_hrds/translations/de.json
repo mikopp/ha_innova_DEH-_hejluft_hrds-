@@ -27,8 +27,7 @@
           "hostid": "Modbus-Slave-ID",
           "scan_interval": "Abfrageintervall",
           "model": "Modell (30 = HRDS+30, 50 = HRDS+50)",
-          "airflow_max_m3h": "Zuluftventilator max. Volumenstrom (m³/h)",
-          "fan_min_output_pct": "Ventilatorausgang (%) unterhalb dessen der Ventilator als aus gilt (%)"
+          "airflow_max_m3h": "Zuluftventilator max. Volumenstrom (m³/h)"
         }
       }
     }
@@ -172,6 +171,7 @@
       "fan_min_speed_dehumidify": { "name": "Ventilator min. Drehzahl (Entfeuchtung)" },
       "fan_max_speed_dehumidify": { "name": "Ventilator max. Drehzahl (Entfeuchtung)" },
       "fan_min_speed_cooling": { "name": "Ventilator min. Drehzahl (Kühlung)" },
+      "fan_min_speed_vmc": { "name": "Ventilator min. Drehzahl (VMC)" },
       "fan_max_speed_cooling": { "name": "Ventilator max. Drehzahl (Kühlung)" },
       "fan_manual_speed": { "name": "Manuelle Ventilatordrehzahl" },
       "dehumidify_differential": { "name": "Entfeuchtungs-Differenz" },

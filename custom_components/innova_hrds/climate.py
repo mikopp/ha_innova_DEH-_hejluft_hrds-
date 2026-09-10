@@ -25,6 +25,7 @@ from .const import (
     C_DEHUMIDIFY,
     C_FAN_MANUAL,
     C_HUMIDITY_PROBE_OK,
+    C_SUPPLY_FAN_OUTPUT,
     C_SUPPLY_FAN_STATUS,
     C_TEMP_PROBE_OK,
     C_UNIT_ON_OFF,
@@ -42,10 +43,15 @@ from .entity_common import HubBackedEntity, setup_platform_from_types
 
 _LOGGER = logging.getLogger(__name__)
 
-# Fan mode labels and their manual-speed percentages.
-# "off" relies on the unit honouring a 0 % setpoint while a mode is active —
-# the unit pushes air via the central MVHR's passive inflow instead.
-# Needs hardware verification (plans/todo.md).
+# Fan mode labels and the percentages written to PM20 (reg 1614).
+#
+# Read-back is the *actual* output (reg 639), so the mode shown is what the fan
+# is doing, not what was asked of it. Those can differ: the manual describes the
+# manual request as being scaled linearly across the active mode's min/max band
+# (PF28/PF10 for dehumidify, PF27/PF09 for integration), so with the factory
+# 50-85 % band, "low" (30) may read back as `medium`. Open PF28 to 0 and PF10 to
+# 100 - both writable numbers - for the presets to map one-for-one.
+# See plans/todo.md.
 _FAN_OFF = "off"
 _FAN_LOW = "low"
 _FAN_MEDIUM = "medium"
@@ -151,13 +157,11 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
         status = data.get(C_SUPPLY_FAN_STATUS)
         if status in ("off", "disabled", "wait_off"):
             return _FAN_OFF
-        # Read back the *commanded* speed (register 1614), the same source
-        # fan.py uses. Deriving this from outAO_SupplyFan (639) instead would
-        # report the unit's modulated output - clamped into its dehumidify band
-        # - so the climate entity and the fan entity would contradict each
-        # other about the same fan. Actual output stays on the sensor and on
-        # the fan entity's attributes.
-        pct = data.get(C_FAN_MANUAL)  # float 0-100
+        # The *actual* output (reg 639), same source as fan.hrds_supply_fan, so
+        # the two entities always agree about what the fan is doing. The
+        # commanded setpoint is on number.fan_manual_speed and on the fan
+        # entity's `commanded_percent` attribute.
+        pct = data.get(C_SUPPLY_FAN_OUTPUT)  # float 0-100
         if pct is None:
             return _FAN_OFF
         if pct < 5.0:
@@ -205,7 +209,8 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
         pct = _FAN_MODE_PCT.get(fan_mode)
         if pct is None:
             return
-        self._attr_fan_mode = fan_mode
+        # No optimistic update: fan_mode reflects actual output, which the unit
+        # decides. Write and let the next poll report it.
         await self._hub.write_entity_value(C_FAN_MANUAL, pct)
 
     async def async_set_temperature(self, **kwargs) -> None:

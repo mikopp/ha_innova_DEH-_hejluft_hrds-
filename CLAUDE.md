@@ -164,16 +164,35 @@ figures in the technical data are the tested spec range, **not** a firmware floo
 
 ## Fan entity
 
-`fan.py` exposes the recirculation fan as a percentage. It reports the
-**commanded** speed (holding register 1614, which is also polled), not
-`outAO_SupplyFan` (639) — reading back the modulated output would make the
-entity chase the unit's own modulation away from the setpoint. Actual output
-and RPM are exposed as state attributes instead.
+Read and write are deliberately separate, because on this device they are not
+the same number.
 
-The climate entity's `fan_mode` derives from the **same** register 1614, so the
-two entities cannot contradict each other about one fan. Both write 1614; that
-is fine, last writer wins. If you ever change one read-back source, change the
-other.
+* **Read (actual):** `fan.hrds_supply_fan.percentage`, the climate entity's
+  `fan_mode`, and `sensor.supply_fan_output` all report `outAO_SupplyFan`
+  (639) — what the fan is *doing*. `sensor.supply_fan_airflow` converts the
+  same figure to m³/h.
+* **Write (commanded):** `fan.set_percentage`, `climate.set_fan_mode` and
+  `number.fan_manual_speed` all write `PM20_SupplyFan_Manual` (1614).
+
+Neither the fan nor the climate entity updates optimistically on write: the
+state means *actual*, and the unit may not adopt a setpoint verbatim. Write,
+then let the poll report reality. The commanded value stays visible on
+`number.fan_manual_speed` and the fan entity's `commanded_percent` attribute —
+the divergence between the two is the diagnostic.
+
+**Why it may diverge:** the manual describes the fan request as *scaled linearly
+across the active mode's min/max band* (PF28/PF10 dehumidify, PF27/PF09
+integration, PF07 VMC), so a request of 30 at the factory 50–85 % band could
+produce ≈60 % output, and 0 would not stop the fan. Unconfirmed on hardware —
+see `references/MODBUS_REGISTERS.md` §6.1 and `plans/todo.md`.
+
+**The per-mode minimum is device state.** All three minima are writable
+registers exposed as `number` entities. The integration must not carry its own
+"fan is off below X %" config option — that would shadow the registers and
+misreport airflow. `_compute_derived` therefore keys its zero on the device's
+own `supply_fan_status`, not on a percentage threshold. (`airflow_max_m3h`
+*is* legitimately a config option: max airflow is a model property with no
+register.)
 
 ## Linting
 

@@ -147,8 +147,9 @@ Each sensor maps to a single bit of a packed alarm register. **ON = alarm is act
 | `number.fan_min_speed_dehumidify` | 1853 | 0–100 % | PF28; lower fan bound in dehumidify mode |
 | `number.fan_max_speed_dehumidify` | 1647 | 0–100 % | PF10; upper fan bound in dehumidify mode |
 | `number.fan_min_speed_cooling` | 1852 | 0–100 % | PF27; lower fan bound in active cooling |
+| `number.fan_min_speed_vmc` | 1644 | 0–100 % | PF07; lower fan bound in VMC (ventilation-only) mode |
 | `number.fan_max_speed_cooling` | 1646 | 0–100 % | PF09; upper fan bound in active cooling |
-| `number.fan_manual_speed` | 1614 | 0–100 % | PM20; manual fan speed (the fan entity and climate fan mode write here) |
+| `number.fan_manual_speed` | 1614 | 0–100 % | PM20; the fan **setpoint** — what was asked for. The fan entity and climate fan mode write here too. See the note below on the min/max band. |
 | `number.dehumidify_differential` | 1694 | 0–100 %RH | PU07; the unit's own dehumidify hysteresis |
 | `number.min_room_temp_dehumidify` | 1889 | 0–30 °C | PU13; **below this the unit refuses to dehumidify, including over Modbus** |
 | `number.min_room_temp_diff_dehumidify` | 1890 | 0.1–20 °C | PU14; re-enable differential above PU13 |
@@ -168,7 +169,7 @@ Each sensor maps to a single bit of a packed alarm register. **ON = alarm is act
 
 | Entity | What it does |
 |--------|-------------|
-| `fan.hrds_supply_fan` | The unit's supply/recirculation fan as a percentage (`fan.set_percentage`, turn on/off). Writes PM20 (1614) and reports the **commanded** speed; actual output %, RPM and fan status are state attributes. Because the unit's own fan recirculates room air *in addition* to whatever the central MVHR pushes through the duct, this is the lever for topping combined airflow up to a target. |
+| `fan.hrds_supply_fan` | The unit's supply/recirculation fan as a percentage. Reports the **actual** output (reg 639) — what the fan is doing — while `fan.set_percentage` writes the setpoint PM20 (1614). The commanded value, RPM and fan status are state attributes. Because the unit's own fan recirculates room air *in addition* to whatever the central MVHR pushes through the duct, this is the lever for topping combined airflow up to a target. |
 
 ## Installation
 
@@ -324,6 +325,27 @@ The full derivation and a two-point calibration recipe are in
 [`references/README.md` — Translating fan speed to airflow](references/README.md#translating-fan-speed--rpm-to-airflow-mh),
 with the underlying spec data in
 [Technical data](references/README.md#technical-data-airflow-capacity-power).
+
+### Commanded vs actual fan speed
+
+The device does not necessarily run the fan at the percentage you ask for. The
+technical handbook says the manual request is **scaled linearly between the
+active mode's minimum and maximum** (PF28/PF10 for dehumidify, PF27/PF09 for
+cooling, PF07 for VMC), so at the factory 50–85 % band a request of 30 % could
+produce roughly 60 % output, and a request of 0 % would not stop the fan.
+
+The integration therefore keeps the two apart:
+
+* **Actual** — `sensor.hrds_supply_fan_output` (%),
+  `sensor.hrds_supply_fan_airflow` (m³/h), `sensor.hrds_supply_fan_rpm`, and the
+  state of `fan.hrds_supply_fan` and the climate entity's `fan_mode`.
+* **Commanded** — `number.hrds_manual_fan_speed`, and the fan entity's
+  `commanded_percent` attribute.
+
+If you want a commanded percentage to mean an absolute percentage, set the
+active mode's minimum to `0` and its maximum to `100` — both are writable
+numbers. Whether PM20 really follows the band is **not yet confirmed on
+hardware**; see [`plans/todo.md`](plans/todo.md).
 
 ## Probe requirements
 

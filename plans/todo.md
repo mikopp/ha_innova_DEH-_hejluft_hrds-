@@ -85,33 +85,45 @@ The climate entity now exposes **fan_mode** (off / low / medium / high):
 | medium | 55 % |
 | high   | 85 % |
 
-Read-back maps the **commanded** speed (`PM20_SupplyFan_Manual`, 1614) to the
-nearest preset via midpoint thresholds (42.5 / 70.0 %). `fan.hrds_supply_fan`
-reads the same register, so the two entities always agree; `outAO_SupplyFan`
-(639) is the unit's *actual* modulated output and is exposed separately as a
-sensor and as the fan entity's `actual_output_percent` attribute.
+Read-back maps the **actual** output (`outAO_SupplyFan`, 639) to the nearest
+preset via midpoint thresholds (42.5 / 70.0 %). `fan.hrds_supply_fan` reads the
+same register, so the two entities always agree about what the fan is doing.
+The **commanded** setpoint is `number.fan_manual_speed` (1614) and the fan
+entity's `commanded_percent` attribute.
 
-The gap between those two is the interesting measurement: if 639 does not track
-1614, the unit is clamping the commanded speed into its own band.
+The gap between commanded and actual is the interesting measurement — see the
+rescale-vs-clamp item below. Note the presets are written to 1614 as-is, so if
+the band scales them, "low" will not read back as `low` until PF28/PF10 are
+opened to 0/100.
 
 - [x] **Core assumption: compressor/dehumidify can run on passive MVHR flow
       alone (no unit fan running)** — this is architecturally confirmed: the
       non-`R` variant (no recirc fan installed) always operates this way. The
       compressor dehumidifies and cools with MVHR passive flow only, by design.
-- [ ] **Open firmware question (R variant only):** When `Status_Dehum_byBMS`
-      (1140) = 1 with fan mode set to off, does the firmware honour `1614 = 0`
-      or silently clamp the fan output up to `MinSpeedFan_Dehum` (1853)?
-      Verify: write 0 to 1614 while dehumidify is active, then read
-      `outAO_SupplyFan` (639). Non-zero = firmware clamped.
+- [ ] **Rescale or clamp? (R variant only) — the key fan question.** The technical
+      handbook says manual fan control is *„linear zwischen den jeweiligen
+      Minimal- und Maximalwerten (PF28/PF10 bzw. PF27/PF09) skaliert"*, i.e. the
+      request is a **position within the band**, not an absolute percentage. If
+      PM20 (1614) shares that logic — likely, since 1114 is the "manual display
+      request" — then at the factory 50–85 % band a request of 30 yields ≈60.5 %
+      output, and a request of 0 yields 50 %, not a stopped fan.
 
-      Easiest way to run this now: `fan.hrds_supply_fan` reports the
-      **commanded** percentage and carries the unit's actual output in its
-      `actual_output_percent` attribute, so sweep `fan.set_percentage` across
-      30 / 60 / 95 % and watch the two diverge on a single entity. If the
-      firmware clamps, an external controller cannot use PM20 as its airflow
-      lever and must drive the band registers (`fan_min_speed_dehumidify` 1853 /
-      `fan_max_speed_dehumidify` 1647) instead — `fan.py` keeps the write in one
-      method so that fallback can be added there.
+      Distinguish the three possibilities by sweeping PM20 with the band at its
+      defaults and reading `outAO_SupplyFan` (639):
+
+      | PM20 = 0 / 30 / 100 → actual | Interpretation |
+      |------------------------------|----------------|
+      | 50 / 60.5 / 85 | **rescaling** — request is a band position |
+      | 50 / 50 / 85 | **clamping** — request is absolute, clipped to the band |
+      | 0 / 30 / 100 | band does not apply to the Modbus setpoint at all |
+
+      Then set PF28 = 0 and PF10 = 100 and repeat: under either of the first two
+      the output should now track PM20 one-for-one. That is the configuration an
+      external controller wants, and both bounds are writable numbers
+      (`fan_min_speed_dehumidify` / `_cooling` / `_vmc`, `fan_max_speed_*`).
+
+      This decides whether an external airflow controller can command percent
+      directly or must open the band first.
 - [ ] Confirm `SupplyFan_Status` (1119) reports `1` (OFF) when fan mode = off
       and a mode is active, and that `recirculation_active` (1112) goes 0.
 - [ ] Verify the Low / Medium / High percentages (30 / 55 / 85 %) are
@@ -120,8 +132,8 @@ The gap between those two is the interesting measurement: if 639 does not track
 
 ## Entities documented but not yet exposed
 
-- [ ] **Exhaust air temp (502)** and **evaporator temp (511)** are in the
-      register map but not in `ENTITIES_DICT` — add as sensors if useful.
+- [x] **Exhaust air temp (502)** and **evaporator temp (511)** — now exposed as
+      sensors.
 - [ ] **Alarm detail**: only the cumulative `alarm_active` (1103) is exposed.
       The per-bit alarm bitmaps `PackedAlarm_1/2/3` (768/769/770) and the
       `BMS_ALxx` reset registers are not decoded into entities yet.

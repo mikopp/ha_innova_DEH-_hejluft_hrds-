@@ -108,12 +108,45 @@ for 40 %). Min/Max apply to the modulation band used in each mode.
 | `0x073D` | 1853 | `MinSpeedFan_Dehum` (PF28) | R/W | 50.00 | 0–100 | Supply-fan min speed in dehumidify |
 | `0x066F` | 1647 | `MaxSpeedFan_Dehum` (PF10) | R/W | 85.00 | 0–100 | Supply-fan max speed in dehumidify |
 | `0x073C` | 1852 | `MinSpeedFan_Integ` (PF27) | R/W | 50.00 | 0–100 | Supply-fan min speed in integration (cooling) |
+| `0x066C` | 1644 | `MinSpeedSupplyFan_VMC` (PF07) | R/W | — | 0–100 | Supply-fan min speed in VMC (ventilation-only) mode |
 | `0x066E` | 1646 | `MaxSpeedFan_Integ` (PF09) | R/W | 85.00 | 0–100 | Supply-fan max speed in integration (cooling) |
 | `0x064E` | 1614 | `PM20_SupplyFan_Manual`    | R/W | — | 0–100 | Manual supply-fan setpoint |
 | `0x045A` | 1114 | `SupplyFan_ManualRequest`  | R/O | — | 0–100 | Current manual fan request |
 | `0x045C` | 1116 | `SupplyFan_RemoteRequest`  | R/O | — | 0–100 | Current potentiometer fan request |
 | `0x027F` | 639  | `outAO_SupplyFan`          | R/O | — | 0–100 | Actual supply-fan analog output % |
 | `0x045D` | 1117 | `actRPMsupplyFan`          | R/O | — | 0–65535 | Supply-fan actual RPM |
+
+### 6.1 The min/max band is a scaling range, not just a clamp
+
+`HRDS+_Technisches_Handbuch_DE.txt` § Lüfter-Regelung, on manual fan control:
+
+> „Die Drehzahl wird **linear zwischen den jeweiligen Minimal- und
+> Maximalwerten** (PF28/PF10 bzw. PF27/PF09) **skaliert**."
+
+So the manual request is a **position within the active mode's band**, not an
+absolute percentage. At the factory band (50–85 %) a request of 30 would produce
+roughly `50 + 0.30 × (85 − 50) ≈ 60.5 %` actual output, and a request of 0 would
+produce 50 %, **not** a stopped fan.
+
+That passage describes manual control *at the display*. `PM20_SupplyFan_Manual`
+(1614) is the Modbus manual setpoint and `SupplyFan_ManualRequest` (1114) is
+documented as the "manual display request", which strongly suggests they feed the
+same logic — but **this has not been confirmed on hardware**. See `plans/todo.md`.
+
+Consequences if it holds:
+
+* To command an absolute percentage, first open the band: set the mode's minimum
+  (`PF28` 1853 dehumidify, `PF27` 1852 integration, `PF07` 1644 VMC) to `0` and
+  the maximum (`PF10` 1647 / `PF09` 1646) to `100`. Then request == output.
+* To actually stop the fan, the minimum must be `0`; otherwise the floor applies.
+* `outAO_SupplyFan` (639) is the only trustworthy reading of what the fan is
+  doing. The integration's `fan` and `climate` entities both report it for that
+  reason, and expose the commanded value separately.
+
+**The per-mode minimum is device state, not integration state.** All three minima
+are writable holding registers and are exposed as `number` entities; the
+integration deliberately does not carry its own "fan is off below X %" setting,
+which would shadow them.
 
 ## 7. Sensors (read-only, FC 04)
 

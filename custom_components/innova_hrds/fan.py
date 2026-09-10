@@ -3,9 +3,14 @@
 The unit's own supply fan draws room air across the dehumidifier coil *in
 addition* to whatever the central MVHR is already pushing through the duct, so
 it is the lever an external controller uses to top the combined airflow up to a
-target. `number.fan_manual_speed` writes the same register; this entity exists
-because `fan.set_percentage` is the natural service for that job and it carries
-commanded-vs-actual in one place.
+target.
+
+Standard HA fan semantics: the entity's ``percentage`` is what the fan is
+*actually* doing (``outAO_SupplyFan``, reg 639), and ``set_percentage`` issues a
+command (``PM20_SupplyFan_Manual``, reg 1614). The commanded value stays visible
+as an attribute, so a divergence between the two is legible - which is exactly
+how firmware clamping or band-rescaling shows up. ``number.fan_manual_speed``
+exposes the same setpoint register as a plain input.
 """
 
 from __future__ import annotations
@@ -60,12 +65,10 @@ class HrdsFan(HubBackedEntity, FanEntity):
     def _on_hub_update(self) -> None:
         data = self._hub.data
 
-        # Report the *commanded* speed (holding register 1614, which we also
-        # poll). Reading back the modulated analog output instead would make
-        # the entity chase the unit's own modulation away from the setpoint.
-        commanded = data.get(C_FAN_MANUAL)
-        if commanded is not None:
-            self._attr_percentage = int(round(float(commanded)))
+        # Report what the fan is actually doing, not what was asked for.
+        actual = data.get(C_SUPPLY_FAN_OUTPUT)
+        if actual is not None:
+            self._attr_percentage = int(round(float(actual)))
 
         status = data.get(C_SUPPLY_FAN_STATUS)
         if status is not None:
@@ -77,21 +80,23 @@ class HrdsFan(HubBackedEntity, FanEntity):
 
     @property
     def extra_state_attributes(self) -> dict:
-        """Expose actual output and RPM next to the commanded percentage.
+        """Expose the commanded setpoint next to the actual state.
 
-        Whether the unit honours a commanded speed or clamps it into its
-        dehumidify band is exactly what these two reveal.
+        The state is the actual output; `commanded_percent` is what was last
+        written to PM20. If those disagree, the firmware is not taking the
+        setpoint at face value - see `plans/todo.md` on band rescaling.
         """
         data = self._hub.data
         return {
-            "actual_output_percent": data.get(C_SUPPLY_FAN_OUTPUT),
+            "commanded_percent": data.get(C_FAN_MANUAL),
             "actual_rpm": data.get(C_SUPPLY_FAN_RPM),
             "supply_fan_status": data.get(C_SUPPLY_FAN_STATUS),
         }
 
     async def async_set_percentage(self, percentage: int) -> None:
-        self._attr_percentage = percentage
-        self._attr_is_on = percentage > 0
+        # Deliberately no optimistic update: `percentage` means *actual* output,
+        # and the unit may not adopt the setpoint verbatim. Write, then let the
+        # next poll report what really happened.
         await self._hub.write_entity_value(C_FAN_MANUAL, float(percentage))
 
     async def async_turn_on(

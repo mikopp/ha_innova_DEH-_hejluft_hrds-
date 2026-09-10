@@ -4,6 +4,47 @@ All notable changes to this project are documented here, newest first.
 
 ---
 
+## 2026-09-10 (2)
+
+### refactor: fan entities report actual speed; drop the shadowed fan minimum
+
+**`fan.hrds_supply_fan` and the climate entity's `fan_mode` now report the
+ACTUAL fan output** (`outAO_SupplyFan`, reg 639) rather than the commanded
+setpoint. Writing still goes to `PM20_SupplyFan_Manual` (1614) via
+`fan.set_percentage`, `climate.set_fan_mode` or `number.fan_manual_speed`, so
+read and write are cleanly separated: sensors and entity state tell you what the
+fan is doing, the number tells you what was asked of it.
+
+Neither entity updates optimistically on write any more — the state means
+*actual*, which the unit decides. The commanded value is visible on
+`number.fan_manual_speed` and the fan entity's `commanded_percent` attribute.
+
+**Removed the `fan_min_output_pct` config option.** It duplicated device state:
+the fan minimum is per-mode and register-backed (PF28 dehumidify 1853, PF27
+integration 1852, PF07 VMC 1644), all writable and all exposed as `number`
+entities. The integration should mirror the device, not shadow it. The m³/h
+estimate now treats the fan as stopped when the device's own
+`supply_fan_status` says so, instead of when output falls below a percentage of
+our choosing — which previously reported 0 m³/h while the fan was really running
+below 50 %.
+
+`airflow_max_m3h` stays a config option: maximum airflow is a model property
+with no register.
+
+**New `number.fan_min_speed_vmc`** — PF07 (reg 1644), the third per-mode
+minimum, completing the set.
+
+**Documented in `references/MODBUS_REGISTERS.md` §6.1:** the technical handbook
+states the manual fan request is *scaled linearly between the active mode's min
+and max*, so it is a position within the band rather than an absolute
+percentage. If that applies to PM20, a request of 30 at the factory 50–85 %
+band yields ≈60.5 % output and a request of 0 does not stop the fan. This is
+recorded as the key open hardware question in `plans/todo.md`, with a sweep that
+distinguishes rescaling from clamping — it decides whether an external airflow
+controller can command percent directly or must open the band first.
+
+---
+
 ## 2026-09-10
 
 ### feat: Home Assistant 2026.9 baseline, select + fan platforms, availability
@@ -29,11 +70,9 @@ workflow could not be performed.
 
 **New `fan.hrds_supply_fan`** — the supply/recirculation fan as a percentage
 (`fan.set_percentage`, turn on/off), with actual output %, RPM and fan status as
-attributes. It reports the *commanded* speed (register 1614), not
-`outAO_SupplyFan` (639); reading back the modulated output would make the entity
-chase the unit's own modulation away from the setpoint. The climate entity's
-`fan_mode` now derives from the same register, so the two cannot contradict each
-other about one fan.
+attributes. (Superseded the same day — see the entry above: both it and the
+climate `fan_mode` now report the *actual* output rather than the commanded
+setpoint.)
 
 **New registers:** exhaust (502) and evaporator (511) temperatures, display
 manual fan request (1114), `PU07` dehumidify differential (1694), `PU13`/`PU14`

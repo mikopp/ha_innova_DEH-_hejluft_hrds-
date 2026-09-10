@@ -14,10 +14,8 @@ from homeassistant.core import HomeAssistant, callback
 
 from .const import (
     CONF_AIRFLOW_MAX,
-    CONF_FAN_MIN_OUTPUT,
     CONF_HOSTID,
     CONF_MODEL,
-    DEFAULT_FAN_MIN_OUTPUT,
     DEFAULT_HOSTID,
     DEFAULT_MODEL,
     DEFAULT_NAME,
@@ -132,13 +130,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                         default=options.get(
                             CONF_AIRFLOW_MAX,
                             data.get(CONF_AIRFLOW_MAX, spec["max"]),
-                        ),
-                    ): vol.Coerce(float),
-                    vol.Optional(
-                        CONF_FAN_MIN_OUTPUT,
-                        default=options.get(
-                            CONF_FAN_MIN_OUTPUT,
-                            data.get(CONF_FAN_MIN_OUTPUT, DEFAULT_FAN_MIN_OUTPUT),
                         ),
                     ): vol.Coerce(float),
                 }

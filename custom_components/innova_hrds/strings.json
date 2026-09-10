@@ -7,7 +7,8 @@
           "host": "Host",
           "port": "Port",
           "hostid": "Modbus slave ID",
-          "scan_interval": "Scan interval"
+          "scan_interval": "Scan interval",
+          "model": "Model (30 = HRDS+30, 50 = HRDS+50)"
         }
       }
     },
@@ -24,7 +25,9 @@
           "host": "Host",
           "port": "Port",
           "hostid": "Modbus slave ID",
-          "scan_interval": "Scan interval"
+          "scan_interval": "Scan interval",
+          "model": "Model (30 = HRDS+30, 50 = HRDS+50)",
+          "airflow_max_m3h": "Supply fan max airflow (m³/h)"
         }
       }
     }
@@ -65,6 +68,32 @@
       },
       "supply_fan_rpm": {
         "name": "Supply fan speed"
+      },
+      "exhaust_temperature": {
+        "name": "Exhaust air temperature"
+      },
+      "evaporator_temperature": {
+        "name": "Evaporator temperature"
+      },
+      "fan_manual_request": {
+        "name": "Manual fan request (display)"
+      },
+      "max_total_airflow": {
+        "name": "Max total airflow"
+      },
+      "supply_fan_max_airflow": {
+        "name": "Supply fan max airflow"
+      },
+      "supply_fan_airflow": {
+        "name": "Supply fan airflow"
+      },
+      "recirculation_damper": {
+        "name": "Recirculation damper",
+        "state": {
+          "off": "Off",
+          "on": "On",
+          "disabled": "Disabled"
+        }
       },
       "unit_status": {
         "name": "Unit status",
@@ -118,31 +147,14 @@
           "winter": "Winter",
           "auto": "Auto"
         }
-      },
-      "exhaust_temperature": {
-        "name": "Exhaust air temperature"
-      },
-      "evaporator_temperature": {
-        "name": "Evaporator temperature"
-      },
-      "fan_manual_request": {
-        "name": "Manual fan request (display)"
-      },
-      "recirculation_damper": {
-        "name": "Recirculation damper",
-        "state": {
-          "off": "Closed",
-          "on": "Open",
-          "disabled": "Disabled"
-        }
       }
     },
     "binary_sensor": {
       "dehumidify_request": {
         "name": "Dehumidify requested"
       },
-      "fan_integration_active": {
-        "name": "Fan integration active"
+      "recirculation_active": {
+        "name": "Recirculation active"
       },
       "alarm_active": {
         "name": "Alarm active"
@@ -152,6 +164,24 @@
       },
       "humidity_probe_ok": {
         "name": "Room humidity probe OK"
+      },
+      "has_recirculation": {
+        "name": "Has recirculation fan"
+      },
+      "active_cooling_available": {
+        "name": "Active cooling available"
+      },
+      "alarm_compressor_lowpressure": {
+        "name": "Alarm: compressor low-pressure / frost"
+      },
+      "alarm_compressor_highpressure": {
+        "name": "Alarm: compressor high-pressure"
+      },
+      "alarm_water_antifreeze": {
+        "name": "Alarm: water antifreeze"
+      },
+      "alarm_dirty_filter": {
+        "name": "Alarm: dirty filter"
       }
     },
     "switch": {
@@ -170,7 +200,7 @@
       "enable_dehumidify_bms": {
         "name": "Enable dehumidify via Modbus"
       },
-      "enable_integration_bms": {
+      "enable_cooling_bms": {
         "name": "Enable cooling via Modbus"
       },
       "force_dehumidify_in_cooling": {
@@ -205,6 +235,11 @@
         }
       }
     },
+    "fan": {
+      "hrds_supply_fan": {
+        "name": "Supply fan"
+      }
+    },
     "number": {
       "humidity_setpoint": {
         "name": "Humidity setpoint"
@@ -223,6 +258,9 @@
       },
       "fan_min_speed_cooling": {
         "name": "Fan min speed (cooling)"
+      },
+      "fan_min_speed_vmc": {
+        "name": "Fan min speed (VMC)"
       },
       "fan_max_speed_cooling": {
         "name": "Fan max speed (cooling)"
@@ -250,11 +288,6 @@
       },
       "humidity_setpoint_max": {
         "name": "Humidity setpoint maximum"
-      }
-    },
-    "fan": {
-      "hrds_supply_fan": {
-        "name": "Supply fan"
       }
     }
   }

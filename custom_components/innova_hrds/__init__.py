@@ -34,11 +34,10 @@ from .const import (
     C_SUPPLY_FAN_AIRFLOW,
     C_SUPPLY_FAN_MAX_AIRFLOW,
     C_SUPPLY_FAN_OUTPUT,
+    C_SUPPLY_FAN_STATUS,
     CONF_AIRFLOW_MAX,
-    CONF_FAN_MIN_OUTPUT,
     CONF_HOSTID,
     CONF_MODEL,
-    DEFAULT_FAN_MIN_OUTPUT,
     DEFAULT_HOSTID,
     DEFAULT_MODEL,
     DEFAULT_PORT,
@@ -100,15 +99,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
     except (TypeError, ValueError):
         airflow_max = spec["max"]
-    try:
-        fan_min_output = float(
-            entry.options.get(
-                CONF_FAN_MIN_OUTPUT,
-                entry.data.get(CONF_FAN_MIN_OUTPUT, DEFAULT_FAN_MIN_OUTPUT),
-            )
-        )
-    except (TypeError, ValueError):
-        fan_min_output = DEFAULT_FAN_MIN_OUTPUT
 
     hub = HrdsModbusHub(
         hass,
@@ -118,7 +108,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         scan_interval,
         hostid,
         airflow_max,
-        fan_min_output,
     )
 
     # Prime the cache before creating entities so they do not sit at `unknown`
@@ -190,7 +179,6 @@ class HrdsModbusHub:
         scan_interval: int,
         hostid: int,
         airflow_max: float,
-        fan_min_output: float,
     ) -> None:
         self._hass = hass
         self._name = name
@@ -201,7 +189,6 @@ class HrdsModbusHub:
         self._unsub: Optional[Any] = None
         self._sensors: list = []
         self._airflow_max = airflow_max
-        self._fan_min_output = fan_min_output
         self._pending_refresh: Optional[Any] = None
         # False until a full read cycle succeeds; entities key their
         # availability off this so a dead gateway is visible in HA.
@@ -440,7 +427,12 @@ class HrdsModbusHub:
         if out is None:
             self.data.setdefault(C_SUPPLY_FAN_AIRFLOW, None)
             return
-        if out <= self._fan_min_output:
+        # "Fan is not moving air" is the device's own judgement, not a
+        # percentage threshold of ours. The per-mode minimum speed lives in
+        # PF28/PF27/PF07 and is exposed as writable numbers; duplicating it as
+        # a config option here would shadow the registers and silently report
+        # 0 m3/h while the fan was actually running below that figure.
+        if self.data.get(C_SUPPLY_FAN_STATUS) in ("off", "disabled", "alarm"):
             self.data[C_SUPPLY_FAN_AIRFLOW] = 0.0
             return
         self.data[C_SUPPLY_FAN_AIRFLOW] = min(
