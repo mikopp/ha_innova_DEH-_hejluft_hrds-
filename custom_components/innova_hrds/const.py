@@ -19,7 +19,7 @@ from homeassistant.components.climate import (
     ClimateEntityDescription,
     ClimateEntityFeature,
 )
-from homeassistant.components.number import NumberEntityDescription
+from homeassistant.components.number import NumberEntityDescription, NumberMode
 from homeassistant.components.select import SelectEntityDescription
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -123,7 +123,6 @@ PROBE_SOURCE = {
     4: "epj_temp_humidity",
     5: "cnu2_temp",
     6: "cnu2_temp_humidity",
-    "default": 6,
 }
 
 # ------------------------------------------------------------------
@@ -205,6 +204,8 @@ CLIMATE_TARGET_TEMP = C_SUMMER_SETPOINT
 #   MIN/MAX/STEP   bounds for numbers
 #   VALUES enum map {raw: slug} for selects/enum sensors
 #   SWITCH {"off": 0, "on": 1} marks a 0/1 register as a switch/binary sensor
+#   DC     explicit sensor device class (overrides the UNIT-derived default)
+#   DEFAULT  default raw value for a select
 #   PF     platform override (e.g. Platform.NUMBER to keep a temp off climate)
 #   (* = required)
 # ------------------------------------------------------------------
@@ -247,6 +248,7 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "REG": 505,
         "DT": C_DT_INT16,
         "UNIT": "%",
+        "DC": SensorDeviceClass.HUMIDITY,
         "NAME": "Room humidity",
     },
     C_AIR_QUALITY: {
@@ -514,6 +516,7 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "REG": 1803,
         "DT": C_DT_UINT16,
         "VALUES": PROBE_SOURCE,
+        "DEFAULT": 6,
         "NAME": "T/H probe source (HA00)",
     },
     # --- Probe-OK binary sensors derived from packed alarm registers ---
@@ -621,13 +624,11 @@ class MySelectEntityDescription(SelectEntityDescription):
 
 @dataclass
 class MyNumberEntityDescription(NumberEntityDescription):
-    """Describes a writable numeric register."""
+    """Describes a writable numeric register.
 
-    min_value: float | None = None
-    max_value: float | None = None
-    step: float | None = None
-    unit_of_measurement: str | None = None
-    mode: str = "box"
+    Bounds/unit live in the base class' ``native_*`` fields, which
+    ``NumberEntity`` reads directly - no per-entity copying needed.
+    """
 
 
 @dataclass
@@ -639,6 +640,8 @@ class MyClimateEntityDescription(ClimateEntityDescription):
         ClimateEntityFeature.TARGET_TEMPERATURE
         | ClimateEntityFeature.TARGET_HUMIDITY
         | ClimateEntityFeature.FAN_MODE
+        | ClimateEntityFeature.TURN_ON
+        | ClimateEntityFeature.TURN_OFF
     )
 
 
@@ -737,10 +740,8 @@ def is_entity_climate(props: Dict[str, Any]) -> bool:
 def get_entity_select_values_and_default(
     props: dict[str, Any],
 ) -> tuple[list[str], str | None]:
-    values = get_entity_select(props)
-    default_index = values.get("default")
-    select_map = {k: v for k, v in values.items() if k != "default"}
-    return list(select_map.values()), select_map.get(default_index)
+    values = get_entity_select(props) or {}
+    return list(values.values()), values.get(props.get("DEFAULT"))
 
 
 def _unit_mapping(
@@ -757,13 +758,13 @@ def _unit_mapping(
             SensorStateClass.MEASUREMENT,
         )
     if u == "%":
-        return "%", SensorDeviceClass.HUMIDITY, SensorStateClass.MEASUREMENT
+        # No device class by default: fan/compressor outputs are percentages,
+        # not humidity. Entities that really are humidity set "DC" explicitly.
+        return "%", None, SensorStateClass.MEASUREMENT
     if u == "ppm":
-        return (
-            "ppm",
-            SensorDeviceClass.AQI,
-            SensorStateClass.MEASUREMENT,
-        )
+        # SensorDeviceClass.AQI only permits a None unit, so pairing it with
+        # ppm is rejected by HA. Leave the device class unset.
+        return "ppm", None, SensorStateClass.MEASUREMENT
     if u == "rpm":
         return "rpm", None, SensorStateClass.MEASUREMENT
     if u == UnitOfVolumeFlowRate.CUBIC_METERS_PER_HOUR:
@@ -827,6 +828,7 @@ def init() -> None:
                 )
             else:
                 unit, device_class, state_class = _unit_mapping(get_entity_unit(props))
+                device_class = props.get("DC", device_class)
                 SENSOR_TYPES[key] = MySensorEntityDescription(
                     key=key,
                     name=name,
@@ -861,10 +863,11 @@ def init() -> None:
                 key=key,
                 name=name,
                 translation_key=key,
-                min_value=get_entity_min(props),
-                max_value=get_entity_max(props),
-                step=get_entity_step(props),
-                unit_of_measurement=get_entity_unit(props),
+                native_min_value=get_entity_min(props),
+                native_max_value=get_entity_max(props),
+                native_step=get_entity_step(props),
+                native_unit_of_measurement=get_entity_unit(props),
+                mode=NumberMode.BOX,
             )
         else:
             _LOGGER.warning("Unclassified entity %s: %s", key, props)

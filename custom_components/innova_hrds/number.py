@@ -28,14 +28,6 @@ class HrdsNumber(HubBackedEntity, NumberEntity):
 
     entity_description: MyNumberEntityDescription
 
-    def __init__(self, platform_name, hub, device_info, description):
-        super().__init__(platform_name, hub, device_info, description)
-        self._attr_mode = description.mode
-        self._attr_native_unit_of_measurement = description.unit_of_measurement
-        self._attr_native_min_value = description.min_value
-        self._attr_native_max_value = description.max_value
-        self._attr_native_step = description.step
-
     def _apply_hub_payload(self, payload: Any) -> None:
         self._attr_native_value = payload
 

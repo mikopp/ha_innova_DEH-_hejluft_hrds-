@@ -60,7 +60,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle the user-driven config flow."""
 
     VERSION = 1
-    CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_POLL
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None):
         errors: dict[str, str] = {}
@@ -83,19 +82,16 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(config_entry):
-        return OptionsFlowHandler(config_entry)
+        return OptionsFlowHandler()
 
 
 class OptionsFlowHandler(config_entries.OptionsFlow):
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        self._config_entry = config_entry
-
     async def async_step_init(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
 
-        data = self._config_entry.data
-        options = self._config_entry.options
+        data = self.config_entry.data
+        options = self.config_entry.options
         model = options.get(CONF_MODEL, data.get(CONF_MODEL, DEFAULT_MODEL))
         spec = (
             MODEL_SPECS[model] if model in MODEL_SPECS else MODEL_SPECS[DEFAULT_MODEL]

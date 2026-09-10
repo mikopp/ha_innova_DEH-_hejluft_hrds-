@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Type, TypeVar
 
 from homeassistant.const import CONF_NAME
 from homeassistant.core import callback
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 
 from .const import ATTR_MANUFACTURER, DEFAULT_NAME, DOMAIN
@@ -21,6 +22,8 @@ class HubBackedEntity(Entity):
 
     entity_description: Any
     _attr_has_entity_name = True
+    # Push-only: the hub drives updates, so HA must not also poll each entity.
+    _attr_should_poll = False
 
     def __init__(self, platform_name: str, hub, device_info: dict, description: Any):
         self._platform_name = platform_name
@@ -29,11 +32,24 @@ class HubBackedEntity(Entity):
         self.entity_description = description
 
         entry_id = platform_name
-        for dom, ident in device_info.get("identifiers") or set():
+        for dom, ident in device_info.get("identifiers") or ():
             if dom == DOMAIN:
                 entry_id = ident
                 break
         self._attr_unique_id = f"{entry_id}-{description.key}"
+
+    @property
+    def available(self) -> bool:
+        """Unavailable when the last poll failed or the key was never decoded.
+
+        Home Assistant templates gate on `has_value()`, so an entity that keeps
+        reporting its last good reading after the device has gone away is worse
+        than one that reports nothing.
+        """
+        return (
+            self._hub.last_update_success
+            and self.entity_description.key in self._hub.data
+        )
 
     async def async_added_to_hass(self) -> None:
         self._hub.async_add_my_modbus_sensor(self._on_hub_update)
@@ -58,13 +74,15 @@ class HubBackedEntity(Entity):
 def get_hub_and_device_info(hass, entry) -> tuple:
     """Return (hub_name, hub, device_info) for a config entry."""
     hub_name = entry.options.get(CONF_NAME, entry.data[CONF_NAME])
-    hub = hass.data[DOMAIN][hub_name]["hub"]
-    device_info = {
-        "identifiers": {(DOMAIN, entry.entry_id)},
-        "name": entry.data.get(CONF_NAME, DEFAULT_NAME),
-        "manufacturer": ATTR_MANUFACTURER,
-        "model": "HRDS+ / DEH+",
-    }
+    # runtime_data is the modern home for this; hass.data is kept as a fallback
+    # for entries set up before the switch.
+    hub = getattr(entry, "runtime_data", None) or hass.data[DOMAIN][hub_name]["hub"]
+    device_info = DeviceInfo(
+        identifiers={(DOMAIN, entry.entry_id)},
+        name=entry.data.get(CONF_NAME, DEFAULT_NAME),
+        manufacturer=ATTR_MANUFACTURER,
+        model="HRDS+ / DEH+",
+    )
     return hub_name, hub, device_info
 
 

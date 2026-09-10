@@ -12,7 +12,6 @@ import logging
 
 from homeassistant.components.climate import (
     ClimateEntity,
-    ClimateEntityFeature,
     HVACAction,
     HVACMode,
 )
@@ -77,16 +76,11 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
     """Climate front-end for the HRDS+ dehumidifier."""
 
     entity_description: MyClimateEntityDescription
-    _enable_turn_on_off_backwards_compatibility = False
 
     def __init__(self, platform_name, hub, device_info, description):
         super().__init__(platform_name, hub, device_info, description)
         self._attr_temperature_unit = description.temperature_unit
-        self._attr_supported_features = (
-            ClimateEntityFeature.TARGET_TEMPERATURE
-            | ClimateEntityFeature.TARGET_HUMIDITY
-            | ClimateEntityFeature.FAN_MODE
-        )
+        self._attr_supported_features = description.supported_features
         self._attr_hvac_modes = [
             HVACMode.OFF,
             HVACMode.DRY,
