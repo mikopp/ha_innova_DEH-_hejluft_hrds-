@@ -251,6 +251,23 @@ def main() -> int:
     )
     check("default" not in const.PROBE_SOURCE, "PROBE_SOURCE map has no sentinel key")
 
+    print("== composite entities resolve availability correctly ==")
+    # Regression guard: HubBackedEntity.available gates register-backed entities
+    # on their key being in hub.data, which is populated only from
+    # ENTITIES_DICT. climate/fan are composite and have no such key, so gating
+    # them the same way made them permanently unavailable.
+    common = (COMP / "entity_common.py").read_text()
+    check(
+        "if key not in ENTITIES_DICT:" in common,
+        "available() special-cases keys that are not register-backed",
+    )
+    for dict_name in ("CLIMATE_TYPES", "FAN_TYPES"):
+        for key in getattr(const, dict_name):
+            check(
+                key not in const.ENTITIES_DICT,
+                f"{dict_name}['{key}'] is composite, so it must take that branch",
+            )
+
     print("== every entity is classified ==")
     classified: set[str] = set()
     for name in TYPED_DICT_PLATFORM:

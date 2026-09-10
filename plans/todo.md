@@ -20,16 +20,25 @@ verified on hardware.
       value. It sits next to the 0–100 % fan-request registers; if hardware shows
       a percentage, change it from a binary sensor to a `sensor` with
       `FAKTOR: 0.01`. (See `const.py` `C_RECIRCULATION_ACTIVE`.)
-- [ ] **Air quality (506)** unit/scale and whether the probe is even fitted;
-      device_class `AQI` + "ppm" is a guess.
+- [ ] **Air quality (506)** unit/scale and whether the probe is even fitted.
+      The device class is now left unset: `AQI` accepts only a `None` unit in
+      Home Assistant, so pairing it with "ppm" was invalid. If the probe turns
+      out to be CO₂, `SensorDeviceClass.CO2` is the right pairing for ppm.
+- [ ] **`PF01_MinTimeOnFan` (1638) / `PF03_MinTimePostFan` (1640) are in
+      seconds.** The unit is inferred from the parameter's 0–999 range and the
+      technical manual's wording ("Mindestlaufzeit" / "Nachlauf"); the Modbus
+      table does not state it. Confirm against the wired display.
 
 ## Addressing & transport
 
 - [ ] **Direct PDU addressing — no −1 offset.** Confirm `address=1105` really hits
       `Status_OnOff_byBMS` and not an off-by-one neighbour.
 - [ ] **Block-read chunking** (`C_MAX_BLOCK=120`, `C_MAX_GAP=8` in `__init__.py`).
-      Confirm the real gateway accepts these block sizes without timeouts or
-      "illegal data address" errors across the sparse map; tune if needed.
+      Confirm the real gateway accepts these block sizes without timeouts across
+      the sparse map; tune if needed. Blocks no longer span an address belonging
+      to the other function code, and a block that errors now falls back to
+      per-register reads, so a single "illegal data address" no longer blanks
+      every entity — but it is still worth knowing which addresses do that.
 - [ ] **Modbus slave id / port** defaults (1 / 502) match the deployed gateway.
 - [ ] Temp/humidity readings require a **wired display or external probes**.
       Confirm which probes the target install actually has, and which sensors
@@ -38,11 +47,18 @@ verified on hardware.
 ## BMS enables
 
 - [ ] **PH02 (1778) / PH27 (1869) / PH28 (1870) must be set before writes are
-      honoured.** Confirm the hub's once-per-connection
-      `_enable_bms_control_locked()` actually unlocks on/off, dehumidify and
-      cooling, and that the unit doesn't reset them on power-cycle.
+      honoured.** Confirm `_sync_bms_enables_locked()` actually unlocks on/off,
+      dehumidify and cooling. The hub now re-asserts these every poll from the
+      read-back, so a power-cycle that clears them should self-heal within one
+      scan interval — verify that it does, by power-cycling the unit and then
+      issuing a write.
 - [ ] Confirm an **OFF command always wins** over an ON from any source
       (display/DI/Modbus), per the manual.
+- [ ] **`PU13_MinTRoom_disableDEU` (1889) can veto a Modbus dehumidify request.**
+      The unit disables dehumidification below this room temperature. On a unit
+      with no room probe, confirm whether a Modbus request still starts the
+      compressor, and whether setting PU13 to 0 lifts the interlock. This is the
+      most likely cause of "the write was accepted but nothing happened".
 
 ## Climate entity behaviour
 
@@ -69,8 +85,14 @@ The climate entity now exposes **fan_mode** (off / low / medium / high):
 | medium | 55 % |
 | high   | 85 % |
 
-Read-back maps `outAO_SupplyFan` (639) back to the nearest preset via midpoint
-thresholds (42.5 / 70.0 %).
+Read-back maps the **commanded** speed (`PM20_SupplyFan_Manual`, 1614) to the
+nearest preset via midpoint thresholds (42.5 / 70.0 %). `fan.hrds_supply_fan`
+reads the same register, so the two entities always agree; `outAO_SupplyFan`
+(639) is the unit's *actual* modulated output and is exposed separately as a
+sensor and as the fan entity's `actual_output_percent` attribute.
+
+The gap between those two is the interesting measurement: if 639 does not track
+1614, the unit is clamping the commanded speed into its own band.
 
 - [x] **Core assumption: compressor/dehumidify can run on passive MVHR flow
       alone (no unit fan running)** — this is architecturally confirmed: the
@@ -81,6 +103,15 @@ thresholds (42.5 / 70.0 %).
       or silently clamp the fan output up to `MinSpeedFan_Dehum` (1853)?
       Verify: write 0 to 1614 while dehumidify is active, then read
       `outAO_SupplyFan` (639). Non-zero = firmware clamped.
+
+      Easiest way to run this now: `fan.hrds_supply_fan` reports the
+      **commanded** percentage and carries the unit's actual output in its
+      `actual_output_percent` attribute, so sweep `fan.set_percentage` across
+      30 / 60 / 95 % and watch the two diverge on a single entity. If the
+      firmware clamps, an external controller cannot use PM20 as its airflow
+      lever and must drive the band registers (`fan_min_speed_dehumidify` 1853 /
+      `fan_max_speed_dehumidify` 1647) instead — `fan.py` keeps the write in one
+      method so that fallback can be added there.
 - [ ] Confirm `SupplyFan_Status` (1119) reports `1` (OFF) when fan mode = off
       and a mode is active, and that `recirculation_active` (1112) goes 0.
 - [ ] Verify the Low / Medium / High percentages (30 / 55 / 85 %) are

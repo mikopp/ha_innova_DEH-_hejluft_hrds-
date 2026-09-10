@@ -136,6 +136,11 @@ figures in the technical data are the tested spec range, **not** a firmware floo
 * `last_update_success` drives `HubBackedEntity.available`. Listeners are
   notified on failure too — that is what moves entities to `unavailable`
   instead of leaving them showing stale readings.
+  **Careful:** register-backed entities are additionally gated on their key
+  being present in `hub.data`, but `hub.data` only ever holds `ENTITIES_DICT`
+  keys. Composite entities (climate, fan) have no key of their own, so
+  `available` special-cases anything not in `ENTITIES_DICT` — without that they
+  are permanently unavailable. `tests/wiring_check.py` guards this.
 * Decoded values are stored in `hub.data[entity_key]` as Python-native types
   (`str` for selects/switches → `"on"`/`"off"` or slug, `float` for numerics).
 * Write via `hub.write_entity_value(entity_key, value)` — encodes, writes, and
@@ -163,6 +168,11 @@ figures in the technical data are the tested spec range, **not** a firmware floo
 `outAO_SupplyFan` (639) — reading back the modulated output would make the
 entity chase the unit's own modulation away from the setpoint. Actual output
 and RPM are exposed as state attributes instead.
+
+The climate entity's `fan_mode` derives from the **same** register 1614, so the
+two entities cannot contradict each other about one fan. Both write 1614; that
+is fine, last writer wins. If you ever change one read-back source, change the
+other.
 
 ## Linting
 

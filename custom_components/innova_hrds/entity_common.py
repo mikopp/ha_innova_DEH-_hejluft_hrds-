@@ -10,7 +10,7 @@ from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 
-from .const import ATTR_MANUFACTURER, DEFAULT_NAME, DOMAIN
+from .const import ATTR_MANUFACTURER, DEFAULT_NAME, DOMAIN, ENTITIES_DICT
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -46,10 +46,15 @@ class HubBackedEntity(Entity):
         reporting its last good reading after the device has gone away is worse
         than one that reports nothing.
         """
-        return (
-            self._hub.last_update_success
-            and self.entity_description.key in self._hub.data
-        )
+        if not self._hub.last_update_success:
+            return False
+        key = self.entity_description.key
+        # Composite entities (climate, fan) aggregate several registers and have
+        # no key of their own in hub.data - gating them on one would make them
+        # permanently unavailable. They track the poll's health only.
+        if key not in ENTITIES_DICT:
+            return True
+        return key in self._hub.data
 
     async def async_added_to_hass(self) -> None:
         self._hub.async_add_my_modbus_sensor(self._on_hub_update)
@@ -74,9 +79,7 @@ class HubBackedEntity(Entity):
 def get_hub_and_device_info(hass, entry) -> tuple:
     """Return (hub_name, hub, device_info) for a config entry."""
     hub_name = entry.options.get(CONF_NAME, entry.data[CONF_NAME])
-    # runtime_data is the modern home for this; hass.data is kept as a fallback
-    # for entries set up before the switch.
-    hub = getattr(entry, "runtime_data", None) or hass.data[DOMAIN][hub_name]["hub"]
+    hub = entry.runtime_data
     device_info = DeviceInfo(
         identifiers={(DOMAIN, entry.entry_id)},
         name=entry.data.get(CONF_NAME, DEFAULT_NAME),

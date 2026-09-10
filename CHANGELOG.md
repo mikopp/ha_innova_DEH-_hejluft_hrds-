@@ -4,6 +4,79 @@ All notable changes to this project are documented here, newest first.
 
 ---
 
+## 2026-09-10
+
+### feat: Home Assistant 2026.9 baseline, select + fan platforms, availability
+
+**Minimum Home Assistant is now 2026.9**; `pymodbus` is pinned to `3.13.1`, the
+version HA 2026.9 ships (the code already relied on the `device_id=` kwarg,
+which needs >= 3.9). `manifest.json` gains `integration_type` and `loggers`.
+
+**Two behaviour changes worth knowing before upgrading:**
+
+- **Entities now go `unavailable`** when a poll fails, instead of reporting the
+  last good reading indefinitely. Templates and automations driving this
+  integration should gate on `has_value()`.
+- **Writes the unit rejects now raise** instead of appearing to succeed. In an
+  automation a failed service call aborts the remaining steps, so if you issue
+  several writes in sequence, put the critical one first or mark the rest
+  `continue_on_error: true`.
+
+**Fixed — the select platform was missing entirely.** `SELECT_TYPES` was built
+and translations existed, but there was no `select.py` and no `Platform.SELECT`,
+so `select.probe_source` was never created and the documented headless-setup
+workflow could not be performed.
+
+**New `fan.hrds_supply_fan`** — the supply/recirculation fan as a percentage
+(`fan.set_percentage`, turn on/off), with actual output %, RPM and fan status as
+attributes. It reports the *commanded* speed (register 1614), not
+`outAO_SupplyFan` (639); reading back the modulated output would make the entity
+chase the unit's own modulation away from the setpoint. The climate entity's
+`fan_mode` now derives from the same register, so the two cannot contradict each
+other about one fan.
+
+**New registers:** exhaust (502) and evaporator (511) temperatures, display
+manual fan request (1114), `PU07` dehumidify differential (1694), `PU13`/`PU14`
+minimum-room-temperature interlock (1889/1890), `PF01`/`PF03` fan min-runtime
+and post-run (1638/1640), `PH29`/`PH30` humidity clamps (1892/1893), `PU05`
+(1692), `PG02` (1798), `PG03` (1799) and `PU02` winter dehumidification (1689).
+`PU13` is the notable one: it disables dehumidification below a room
+temperature, and that interlock applies to Modbus requests too, so on a unit
+with no room probe it can silently block a dehumidify command.
+
+**Other fixes:**
+
+- Climate `turn_on`/`turn_off` were rejected outright — HA 2026.9 removed the
+  backwards-compatibility shim and the feature flags were never declared.
+- The "by BMS" enables were written once per hub lifetime and marked as enabled
+  even when the device rejected them, so a power-cycle that cleared them left
+  every later write silently doing nothing until a restart. They are now
+  re-asserted each poll from the read-back.
+- Block reads could span a holding register and read it with FC 04, and one bad
+  address failed the whole cycle. Blocks no longer cross function codes, and a
+  failed block falls back to per-register reads.
+- Percentage sensors were reported as `device_class: humidity`; air quality
+  paired `ppm` with `AQI`, which HA only permits with no unit.
+- A write triggered an immediate full poll, so the read of the pre-write value
+  clobbered optimistic entity state. Now debounced.
+- Number descriptions used the fields HA type-overrides to `None`; the options
+  flow used the removed `config_entry` assignment; entities were push-only but
+  did not set `should_poll = False`; `close()` took a lock on the event loop.
+- Target-humidity bounds follow the unit's own PH29/PH30 clamps.
+- `hass.data` replaced by `entry.runtime_data`, so two entries sharing a name no
+  longer clobber each other's hub.
+- `strings.json` carried only `config`/`options` while `translations/en.json`
+  had the whole `entity` block; regenerating would have dropped every entity
+  name and enum state.
+
+**New `tests/wiring_check.py`** — consistency checks that run without Home
+Assistant installed: every entity classified, every declared platform has a
+module, translations complete, every register documented, no input block
+spanning a holding address, and composite entities resolving availability
+correctly.
+
+---
+
 ## 2026-06-28 (2)
 
 ### feat: alarm sensors and min-airflow doc corrections

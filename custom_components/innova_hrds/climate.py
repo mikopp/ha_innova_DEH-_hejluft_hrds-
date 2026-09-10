@@ -25,7 +25,6 @@ from .const import (
     C_DEHUMIDIFY,
     C_FAN_MANUAL,
     C_HUMIDITY_PROBE_OK,
-    C_SUPPLY_FAN_OUTPUT,
     C_SUPPLY_FAN_STATUS,
     C_TEMP_PROBE_OK,
     C_UNIT_ON_OFF,
@@ -152,9 +151,15 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
         status = data.get(C_SUPPLY_FAN_STATUS)
         if status in ("off", "disabled", "wait_off"):
             return _FAN_OFF
-        pct = data.get(C_SUPPLY_FAN_OUTPUT)  # float 0–100
+        # Read back the *commanded* speed (register 1614), the same source
+        # fan.py uses. Deriving this from outAO_SupplyFan (639) instead would
+        # report the unit's modulated output - clamped into its dehumidify band
+        # - so the climate entity and the fan entity would contradict each
+        # other about the same fan. Actual output stays on the sensor and on
+        # the fan entity's attributes.
+        pct = data.get(C_FAN_MANUAL)  # float 0-100
         if pct is None:
-            return self._attr_fan_mode or _FAN_OFF
+            return _FAN_OFF
         if pct < 5.0:
             return _FAN_OFF
         if pct < _FAN_LOW_THRESHOLD:

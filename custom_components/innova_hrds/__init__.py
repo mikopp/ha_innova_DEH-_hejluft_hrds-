@@ -43,7 +43,6 @@ from .const import (
     DEFAULT_MODEL,
     DEFAULT_PORT,
     DEFAULT_SCAN_INTERVAL,
-    DOMAIN,
     ENTITIES_DICT,
     MODEL_SPECS,
     get_entity_bitmask,
@@ -74,7 +73,6 @@ PLATFORMS = [
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up the integration from a config entry."""
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
-    hass.data.setdefault(DOMAIN, {})
 
     name = entry.data.get(CONF_NAME)
     host = entry.options.get(CONF_HOST, entry.data.get(CONF_HOST))
@@ -132,7 +130,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # runtime_data is keyed by the config entry, so two entries sharing a name
     # can no longer clobber each other's hub the way hass.data[DOMAIN][name] did.
     entry.runtime_data = hub
-    hass.data[DOMAIN][name] = {"hub": hub}
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
@@ -149,7 +146,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hub = getattr(entry, "runtime_data", None)
         if hub is not None:
             await hass.async_add_executor_job(hub.shutdown)
-        hass.data[DOMAIN].pop(entry.data[CONF_NAME], None)
     return unload_ok
 
 
