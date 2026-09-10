@@ -140,7 +140,8 @@ figures in the technical data are the tested spec range, **not** a firmware floo
   being present in `hub.data`, but `hub.data` only ever holds `ENTITIES_DICT`
   keys. Composite entities (climate, fan) have no key of their own, so
   `available` special-cases anything not in `ENTITIES_DICT` — without that they
-  are permanently unavailable. `tests/wiring_check.py` guards this.
+  are permanently unavailable. Computed sensors (`COMPUTED_SENSORS`) take the
+  same branch. `tests/wiring_check.py` guards this.
 * Decoded values are stored in `hub.data[entity_key]` as Python-native types
   (`str` for selects/switches → `"on"`/`"off"` or slug, `float` for numerics).
 * Write via `hub.write_entity_value(entity_key, value)` — encodes, writes, and

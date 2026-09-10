@@ -49,8 +49,9 @@ class HubBackedEntity(Entity):
         if not self._hub.last_update_success:
             return False
         key = self.entity_description.key
-        # Composite entities (climate, fan) aggregate several registers and have
-        # no key of their own in hub.data - gating them on one would make them
+        # Not every entity is backed by a register. Composite entities (climate,
+        # fan) aggregate several, and computed sensors are derived after the
+        # poll - gating those on a register key would make climate and fan
         # permanently unavailable. They track the poll's health only.
         if key not in ENTITIES_DICT:
             return True

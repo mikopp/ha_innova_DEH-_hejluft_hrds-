@@ -105,6 +105,7 @@ class SensorDeviceClass(enum.StrEnum):
     TEMPERATURE = "temperature"
     AQI = "aqi"
     ENUM = "enum"
+    VOLUME_FLOW_RATE = "volume_flow_rate"
 
 
 class SensorStateClass(enum.StrEnum):
@@ -123,6 +124,10 @@ class Platform(enum.StrEnum):
 
 class UnitOfTemperature(enum.StrEnum):
     CELSIUS = "°C"
+
+
+class UnitOfVolumeFlowRate(enum.StrEnum):
+    CUBIC_METERS_PER_HOUR = "m³/h"
 
 
 class _DataType(enum.Enum):
@@ -176,6 +181,7 @@ def install_stubs() -> None:
         "homeassistant.const",
         Platform=Platform,
         UnitOfTemperature=UnitOfTemperature,
+        UnitOfVolumeFlowRate=UnitOfVolumeFlowRate,
     )
     _stub("pymodbus", is_package=True)
     _stub(
