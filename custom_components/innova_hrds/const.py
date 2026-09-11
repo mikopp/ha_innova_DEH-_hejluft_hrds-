@@ -19,7 +19,8 @@ from homeassistant.components.climate import (
     ClimateEntityDescription,
     ClimateEntityFeature,
 )
-from homeassistant.components.number import NumberEntityDescription
+from homeassistant.components.fan import FanEntityDescription
+from homeassistant.components.number import NumberEntityDescription, NumberMode
 from homeassistant.components.select import SelectEntityDescription
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -49,9 +50,11 @@ MODEL_SPECS: Dict[str, Dict[str, float]] = {
     "30": {"max": 300.0},
     "50": {"max": 500.0},
 }
+# Max airflow is a *model* property with no register (see CLAUDE.md, Device
+# variants), so it stays a config option. The fan *minimum*, by contrast, is
+# per-mode and register-backed (PF27/PF28/PF07) - the device owns it, and it is
+# exposed as writable numbers rather than shadowed by a config option.
 CONF_AIRFLOW_MAX = "airflow_max_m3h"
-CONF_FAN_MIN_OUTPUT = "fan_min_output_pct"
-DEFAULT_FAN_MIN_OUTPUT = 50.0
 ATTR_MANUFACTURER = "Innova / hej.luft"
 
 # ------------------------------------------------------------------
@@ -109,6 +112,8 @@ COMPRESSOR_STATUS = {
 }
 OPERATING_MODE = {0: "summer", 1: "winter", 2: "auto"}
 RECIRCULATION_DAMPER = {0: "off", 1: "on", 2: "disabled"}
+# PU02 - dehumidification during the winter season.
+WINTER_DEHUM = {0: "disabled", 1: "with_water", 2: "without_water"}
 
 # HA00 (reg 1803) — source for room temperature and humidity probes.
 # 0 = no display sensors; external probes on AI2/AI3 are used if wired.
@@ -123,7 +128,6 @@ PROBE_SOURCE = {
     4: "epj_temp_humidity",
     5: "cnu2_temp",
     6: "cnu2_temp_humidity",
-    "default": 6,
 }
 
 # ------------------------------------------------------------------
@@ -140,6 +144,9 @@ C_ACTUAL_SETPOINT = "actual_setpoint"
 C_SUPPLY_FAN_OUTPUT = "supply_fan_output"
 C_COMPRESSOR_OUTPUT = "compressor_output"
 C_SUPPLY_FAN_RPM = "supply_fan_rpm"
+C_EXHAUST_TEMPERATURE = "exhaust_temperature"
+C_EVAPORATOR_TEMPERATURE = "evaporator_temperature"
+C_FAN_MANUAL_REQUEST = "fan_manual_request"
 # Read-only enum sensors
 C_UNIT_STATUS = "unit_status"
 C_MODE_STATUS = "mode_status"
@@ -162,8 +169,16 @@ C_WINTER_SETPOINT = "winter_setpoint"
 C_FAN_MIN_DEHUM = "fan_min_speed_dehumidify"
 C_FAN_MAX_DEHUM = "fan_max_speed_dehumidify"
 C_FAN_MIN_COOLING = "fan_min_speed_cooling"
+C_FAN_MIN_VMC = "fan_min_speed_vmc"
 C_FAN_MAX_COOLING = "fan_max_speed_cooling"
 C_FAN_MANUAL = "fan_manual_speed"
+C_DEHUM_DIFFERENTIAL = "dehumidify_differential"
+C_MIN_ROOM_TEMP_DEHUM = "min_room_temp_dehumidify"
+C_MIN_ROOM_TEMP_DIFF = "min_room_temp_diff_dehumidify"
+C_FAN_MIN_RUNTIME = "fan_min_runtime"
+C_FAN_POST_RUN_TIME = "fan_post_run_time"
+C_HUMIDITY_SETPOINT_MIN = "humidity_setpoint_min"
+C_HUMIDITY_SETPOINT_MAX = "humidity_setpoint_max"
 # Read-write switches
 C_UNIT_ON_OFF = "unit_on_off"
 C_DEHUMIDIFY = "dehumidify"
@@ -171,8 +186,12 @@ C_ACTIVE_COOLING = "active_cooling"
 C_ENABLE_ONOFF_BMS = "enable_onoff_bms"
 C_ENABLE_DEHUM_BMS = "enable_dehumidify_bms"
 C_ENABLE_COOLING_BMS = "enable_cooling_bms"
+C_FORCE_DEHUM_IN_COOLING = "force_dehumidify_in_cooling"
+C_ENABLE_INTEGRATION = "enable_integration"
+C_ENABLE_FREE_COOLING = "enable_free_cooling"
 # Read-write selects
 C_PROBE_SOURCE = "probe_source"
+C_WINTER_DEHUM = "winter_dehumidify"
 # Derived binary sensors (bit-extracted from packed alarm registers)
 C_TEMP_PROBE_OK = "temp_probe_ok"
 C_HUMIDITY_PROBE_OK = "humidity_probe_ok"
@@ -191,6 +210,10 @@ CLIMATE_CURRENT_TEMP = C_ROOM_TEMPERATURE
 CLIMATE_CURRENT_HUMIDITY = C_ROOM_HUMIDITY
 CLIMATE_TARGET_HUMIDITY = C_HUMIDITY_SETPOINT
 CLIMATE_TARGET_TEMP = C_SUMMER_SETPOINT
+# PH29/PH30 - the unit clamps PU01 to this band, so the climate entity should
+# advertise it rather than a hardcoded guess.
+CLIMATE_MIN_HUMIDITY = C_HUMIDITY_SETPOINT_MIN
+CLIMATE_MAX_HUMIDITY = C_HUMIDITY_SETPOINT_MAX
 
 # ------------------------------------------------------------------
 # ENTITIES_DICT — the single source of truth.
@@ -205,6 +228,8 @@ CLIMATE_TARGET_TEMP = C_SUMMER_SETPOINT
 #   MIN/MAX/STEP   bounds for numbers
 #   VALUES enum map {raw: slug} for selects/enum sensors
 #   SWITCH {"off": 0, "on": 1} marks a 0/1 register as a switch/binary sensor
+#   DC     explicit sensor device class (overrides the UNIT-derived default)
+#   DEFAULT  default raw value for a select
 #   PF     platform override (e.g. Platform.NUMBER to keep a temp off climate)
 #   (* = required)
 # ------------------------------------------------------------------
@@ -247,6 +272,7 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "REG": 505,
         "DT": C_DT_INT16,
         "UNIT": "%",
+        "DC": SensorDeviceClass.HUMIDITY,
         "NAME": "Room humidity",
     },
     C_AIR_QUALITY: {
@@ -420,6 +446,19 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "STEP": 1,
         "NAME": "Fan min speed (cooling)",
     },
+    # PF07 - the third per-mode minimum, for VMC (ventilation-only) operation.
+    # Completes the set alongside PF28 (dehumidify) and PF27 (integration).
+    C_FAN_MIN_VMC: {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": 1644,
+        "DT": C_DT_UINT16,
+        "FAKTOR": 0.01,
+        "UNIT": "%",
+        "MIN": 0,
+        "MAX": 100,
+        "STEP": 1,
+        "NAME": "Fan min speed (VMC)",
+    },
     C_FAN_MAX_COOLING: {
         "RT": C_REG_TYPE_HOLDING_REGISTERS,
         "REG": 1646,
@@ -514,6 +553,7 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "REG": 1803,
         "DT": C_DT_UINT16,
         "VALUES": PROBE_SOURCE,
+        "DEFAULT": 6,
         "NAME": "T/H probe source (HA00)",
     },
     # --- Probe-OK binary sensors derived from packed alarm registers ---
@@ -579,6 +619,144 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "BITMASK": 5,
         "NAME": "Alarm: dirty filter",
     },
+    # --- Additional sensors (input registers, FC 04) ---
+    C_EXHAUST_TEMPERATURE: {
+        "RT": C_REG_TYPE_INPUT_REGISTERS,
+        "REG": 502,
+        "DT": C_DT_INT16,
+        "FAKTOR": 0.1,
+        "UNIT": "\u00b0C",
+        "NAME": "Exhaust air temperature",
+    },
+    C_EVAPORATOR_TEMPERATURE: {
+        "RT": C_REG_TYPE_INPUT_REGISTERS,
+        "REG": 511,
+        "DT": C_DT_INT16,
+        "FAKTOR": 0.1,
+        "UNIT": "\u00b0C",
+        "NAME": "Evaporator temperature",
+    },
+    # Mirrors the *display's* manual fan request, not ours. Diagnostic only:
+    # the faithful read-back of our own write is holding register 1614.
+    C_FAN_MANUAL_REQUEST: {
+        "RT": C_REG_TYPE_INPUT_REGISTERS,
+        "REG": 1114,
+        "DT": C_DT_UINT16,
+        "FAKTOR": 0.01,
+        "UNIT": "%",
+        "NAME": "Manual fan request (display)",
+    },
+    # --- Additional numbers (holding registers, FC 03) ---
+    C_DEHUM_DIFFERENTIAL: {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": 1694,
+        "DT": C_DT_UINT16,
+        "UNIT": "%",
+        "MIN": 0,
+        "MAX": 100,
+        "STEP": 1,
+        "NAME": "Dehumidify differential (PU07)",
+    },
+    # PU13: the unit refuses to dehumidify below this room temperature. On a
+    # unit with no room probe this interlock can block a Modbus request.
+    C_MIN_ROOM_TEMP_DEHUM: {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": 1889,
+        "DT": C_DT_INT16,
+        "FAKTOR": 0.1,
+        "UNIT": "\u00b0C",
+        "MIN": 0.0,
+        "MAX": 30.0,
+        "STEP": 0.1,
+        "PF": Platform.NUMBER,
+        "NAME": "Min room temp for dehumidify (PU13)",
+    },
+    C_MIN_ROOM_TEMP_DIFF: {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": 1890,
+        "DT": C_DT_INT16,
+        "FAKTOR": 0.1,
+        "UNIT": "\u00b0C",
+        "MIN": 0.1,
+        "MAX": 20.0,
+        "STEP": 0.1,
+        "PF": Platform.NUMBER,
+        "NAME": "Min room temp differential (PU14)",
+    },
+    # PF01/PF03 are the device's own anti-short-cycle timers, so an external
+    # controller usually does not need a minimum-runtime timer of its own.
+    C_FAN_MIN_RUNTIME: {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": 1638,
+        "DT": C_DT_UINT16,
+        "UNIT": "s",
+        "MIN": 0,
+        "MAX": 999,
+        "STEP": 1,
+        "NAME": "Fan minimum runtime (PF01)",
+    },
+    C_FAN_POST_RUN_TIME: {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": 1640,
+        "DT": C_DT_UINT16,
+        "UNIT": "s",
+        "MIN": 0,
+        "MAX": 999,
+        "STEP": 1,
+        "NAME": "Fan post-run time (PF03)",
+    },
+    C_HUMIDITY_SETPOINT_MIN: {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": 1892,
+        "DT": C_DT_UINT16,
+        "UNIT": "%",
+        "MIN": 0,
+        "MAX": 100,
+        "STEP": 1,
+        "NAME": "Humidity setpoint min (PH29)",
+    },
+    C_HUMIDITY_SETPOINT_MAX: {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": 1893,
+        "DT": C_DT_UINT16,
+        "UNIT": "%",
+        "MIN": 0,
+        "MAX": 100,
+        "STEP": 1,
+        "NAME": "Humidity setpoint max (PH30)",
+    },
+    # --- Additional switches ---
+    C_FORCE_DEHUM_IN_COOLING: {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": 1692,
+        "DT": C_DT_UINT16,
+        "SWITCH": {"off": 0, "on": 1},
+        "NAME": "Force dehumidify when cooling (PU05)",
+    },
+    C_ENABLE_INTEGRATION: {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": 1798,
+        "DT": C_DT_UINT16,
+        "SWITCH": {"off": 0, "on": 1},
+        "NAME": "Enable integration / active cooling (PG02)",
+    },
+    # When off, outdoor temperature (reg 500) is decoration, not a control input.
+    C_ENABLE_FREE_COOLING: {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": 1799,
+        "DT": C_DT_UINT16,
+        "SWITCH": {"off": 0, "on": 1},
+        "NAME": "Enable free cooling/heating (PG03)",
+    },
+    # --- Additional selects ---
+    C_WINTER_DEHUM: {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": 1689,
+        "DT": C_DT_UINT16,
+        "VALUES": WINTER_DEHUM,
+        "DEFAULT": 0,
+        "NAME": "Winter dehumidification (PU02)",
+    },
 }
 
 # Registers written (in order) when the integration is set up, to make sure
@@ -621,13 +799,16 @@ class MySelectEntityDescription(SelectEntityDescription):
 
 @dataclass
 class MyNumberEntityDescription(NumberEntityDescription):
-    """Describes a writable numeric register."""
+    """Describes a writable numeric register.
 
-    min_value: float | None = None
-    max_value: float | None = None
-    step: float | None = None
-    unit_of_measurement: str | None = None
-    mode: str = "box"
+    Bounds/unit live in the base class' ``native_*`` fields, which
+    ``NumberEntity`` reads directly - no per-entity copying needed.
+    """
+
+
+@dataclass
+class MyFanEntityDescription(FanEntityDescription):
+    """Describes the composite supply-fan entity."""
 
 
 @dataclass
@@ -639,6 +820,8 @@ class MyClimateEntityDescription(ClimateEntityDescription):
         ClimateEntityFeature.TARGET_TEMPERATURE
         | ClimateEntityFeature.TARGET_HUMIDITY
         | ClimateEntityFeature.FAN_MODE
+        | ClimateEntityFeature.TURN_ON
+        | ClimateEntityFeature.TURN_OFF
     )
 
 
@@ -649,6 +832,7 @@ BINARY_TYPES: dict[str, MyBinaryEntityDescription] = {}
 SELECT_TYPES: dict[str, MySelectEntityDescription] = {}
 NUMBER_TYPES: dict[str, MyNumberEntityDescription] = {}
 CLIMATE_TYPES: dict[str, MyClimateEntityDescription] = {}
+FAN_TYPES: dict[str, MyFanEntityDescription] = {}
 
 
 # ------------------------------------------------------------------
@@ -737,10 +921,8 @@ def is_entity_climate(props: Dict[str, Any]) -> bool:
 def get_entity_select_values_and_default(
     props: dict[str, Any],
 ) -> tuple[list[str], str | None]:
-    values = get_entity_select(props)
-    default_index = values.get("default")
-    select_map = {k: v for k, v in values.items() if k != "default"}
-    return list(select_map.values()), select_map.get(default_index)
+    values = get_entity_select(props) or {}
+    return list(values.values()), values.get(props.get("DEFAULT"))
 
 
 def _unit_mapping(
@@ -757,13 +939,13 @@ def _unit_mapping(
             SensorStateClass.MEASUREMENT,
         )
     if u == "%":
-        return "%", SensorDeviceClass.HUMIDITY, SensorStateClass.MEASUREMENT
+        # No device class by default: fan/compressor outputs are percentages,
+        # not humidity. Entities that really are humidity set "DC" explicitly.
+        return "%", None, SensorStateClass.MEASUREMENT
     if u == "ppm":
-        return (
-            "ppm",
-            SensorDeviceClass.AQI,
-            SensorStateClass.MEASUREMENT,
-        )
+        # SensorDeviceClass.AQI only permits a None unit, so pairing it with
+        # ppm is rejected by HA. Leave the device class unset.
+        return "ppm", None, SensorStateClass.MEASUREMENT
     if u == "rpm":
         return "rpm", None, SensorStateClass.MEASUREMENT
     if u == UnitOfVolumeFlowRate.CUBIC_METERS_PER_HOUR:
@@ -809,6 +991,12 @@ def init() -> None:
         name="Climate",
         translation_key="hrds_climate",
     )
+    # Also composite: backed by the manual-speed register plus status readings.
+    FAN_TYPES["hrds_supply_fan"] = MyFanEntityDescription(
+        key="hrds_supply_fan",
+        name="Supply fan",
+        translation_key="hrds_supply_fan",
+    )
 
     for key, props in ENTITIES_DICT.items():
         name = get_entity_name(props, key)
@@ -827,6 +1015,7 @@ def init() -> None:
                 )
             else:
                 unit, device_class, state_class = _unit_mapping(get_entity_unit(props))
+                device_class = props.get("DC", device_class)
                 SENSOR_TYPES[key] = MySensorEntityDescription(
                     key=key,
                     name=name,
@@ -861,10 +1050,11 @@ def init() -> None:
                 key=key,
                 name=name,
                 translation_key=key,
-                min_value=get_entity_min(props),
-                max_value=get_entity_max(props),
-                step=get_entity_step(props),
-                unit_of_measurement=get_entity_unit(props),
+                native_min_value=get_entity_min(props),
+                native_max_value=get_entity_max(props),
+                native_step=get_entity_step(props),
+                native_unit_of_measurement=get_entity_unit(props),
+                mode=NumberMode.BOX,
             )
         else:
             _LOGGER.warning("Unclassified entity %s: %s", key, props)

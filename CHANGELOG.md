@@ -4,6 +4,118 @@ All notable changes to this project are documented here, newest first.
 
 ---
 
+## 2026-09-10 (2)
+
+### refactor: fan entities report actual speed; drop the shadowed fan minimum
+
+**`fan.hrds_supply_fan` and the climate entity's `fan_mode` now report the
+ACTUAL fan output** (`outAO_SupplyFan`, reg 639) rather than the commanded
+setpoint. Writing still goes to `PM20_SupplyFan_Manual` (1614) via
+`fan.set_percentage`, `climate.set_fan_mode` or `number.fan_manual_speed`, so
+read and write are cleanly separated: sensors and entity state tell you what the
+fan is doing, the number tells you what was asked of it.
+
+Neither entity updates optimistically on write any more — the state means
+*actual*, which the unit decides. The commanded value is visible on
+`number.fan_manual_speed` and the fan entity's `commanded_percent` attribute.
+
+**Removed the `fan_min_output_pct` config option.** It duplicated device state:
+the fan minimum is per-mode and register-backed (PF28 dehumidify 1853, PF27
+integration 1852, PF07 VMC 1644), all writable and all exposed as `number`
+entities. The integration should mirror the device, not shadow it. The m³/h
+estimate now treats the fan as stopped when the device's own
+`supply_fan_status` says so, instead of when output falls below a percentage of
+our choosing — which previously reported 0 m³/h while the fan was really running
+below 50 %.
+
+`airflow_max_m3h` stays a config option: maximum airflow is a model property
+with no register.
+
+**New `number.fan_min_speed_vmc`** — PF07 (reg 1644), the third per-mode
+minimum, completing the set.
+
+**Documented in `references/MODBUS_REGISTERS.md` §6.1:** the technical handbook
+states the manual fan request is *scaled linearly between the active mode's min
+and max*, so it is a position within the band rather than an absolute
+percentage. If that applies to PM20, a request of 30 at the factory 50–85 %
+band yields ≈60.5 % output and a request of 0 does not stop the fan. This is
+recorded as the key open hardware question in `plans/todo.md`, with a sweep that
+distinguishes rescaling from clamping — it decides whether an external airflow
+controller can command percent directly or must open the band first.
+
+---
+
+## 2026-09-10
+
+### feat: Home Assistant 2026.9 baseline, select + fan platforms, availability
+
+**Minimum Home Assistant is now 2026.9**; `pymodbus` is pinned to `3.13.1`, the
+version HA 2026.9 ships (the code already relied on the `device_id=` kwarg,
+which needs >= 3.9). `manifest.json` gains `integration_type` and `loggers`.
+
+**Two behaviour changes worth knowing before upgrading:**
+
+- **Entities now go `unavailable`** when a poll fails, instead of reporting the
+  last good reading indefinitely. Templates and automations driving this
+  integration should gate on `has_value()`.
+- **Writes the unit rejects now raise** instead of appearing to succeed. In an
+  automation a failed service call aborts the remaining steps, so if you issue
+  several writes in sequence, put the critical one first or mark the rest
+  `continue_on_error: true`.
+
+**Fixed — the select platform was missing entirely.** `SELECT_TYPES` was built
+and translations existed, but there was no `select.py` and no `Platform.SELECT`,
+so `select.probe_source` was never created and the documented headless-setup
+workflow could not be performed.
+
+**New `fan.hrds_supply_fan`** — the supply/recirculation fan as a percentage
+(`fan.set_percentage`, turn on/off), with actual output %, RPM and fan status as
+attributes. (Superseded the same day — see the entry above: both it and the
+climate `fan_mode` now report the *actual* output rather than the commanded
+setpoint.)
+
+**New registers:** exhaust (502) and evaporator (511) temperatures, display
+manual fan request (1114), `PU07` dehumidify differential (1694), `PU13`/`PU14`
+minimum-room-temperature interlock (1889/1890), `PF01`/`PF03` fan min-runtime
+and post-run (1638/1640), `PH29`/`PH30` humidity clamps (1892/1893), `PU05`
+(1692), `PG02` (1798), `PG03` (1799) and `PU02` winter dehumidification (1689).
+`PU13` is the notable one: it disables dehumidification below a room
+temperature, and that interlock applies to Modbus requests too, so on a unit
+with no room probe it can silently block a dehumidify command.
+
+**Other fixes:**
+
+- Climate `turn_on`/`turn_off` were rejected outright — HA 2026.9 removed the
+  backwards-compatibility shim and the feature flags were never declared.
+- The "by BMS" enables were written once per hub lifetime and marked as enabled
+  even when the device rejected them, so a power-cycle that cleared them left
+  every later write silently doing nothing until a restart. They are now
+  re-asserted each poll from the read-back.
+- Block reads could span a holding register and read it with FC 04, and one bad
+  address failed the whole cycle. Blocks no longer cross function codes, and a
+  failed block falls back to per-register reads.
+- Percentage sensors were reported as `device_class: humidity`; air quality
+  paired `ppm` with `AQI`, which HA only permits with no unit.
+- A write triggered an immediate full poll, so the read of the pre-write value
+  clobbered optimistic entity state. Now debounced.
+- Number descriptions used the fields HA type-overrides to `None`; the options
+  flow used the removed `config_entry` assignment; entities were push-only but
+  did not set `should_poll = False`; `close()` took a lock on the event loop.
+- Target-humidity bounds follow the unit's own PH29/PH30 clamps.
+- `hass.data` replaced by `entry.runtime_data`, so two entries sharing a name no
+  longer clobber each other's hub.
+- `strings.json` carried only `config`/`options` while `translations/en.json`
+  had the whole `entity` block; regenerating would have dropped every entity
+  name and enum state.
+
+**New `tests/wiring_check.py`** — consistency checks that run without Home
+Assistant installed: every entity classified, every declared platform has a
+module, translations complete, every register documented, no input block
+spanning a holding address, and composite entities resolving availability
+correctly.
+
+---
+
 ## 2026-06-28 (2)
 
 ### feat: alarm sensors and min-airflow doc corrections

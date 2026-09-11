@@ -27,8 +27,7 @@
           "hostid": "Modbus slave ID",
           "scan_interval": "Scan interval",
           "model": "Model (30 = HRDS+30, 50 = HRDS+50)",
-          "airflow_max_m3h": "Supply fan max airflow (m³/h)",
-          "fan_min_output_pct": "Fan output % below which fan is treated as off (%)"
+          "airflow_max_m3h": "Supply fan max airflow (m³/h)"
         }
       }
     }
@@ -48,6 +47,9 @@
       "supply_fan_output": { "name": "Supply fan output" },
       "compressor_output": { "name": "Compressor output" },
       "supply_fan_rpm": { "name": "Supply fan speed" },
+      "exhaust_temperature": { "name": "Exhaust air temperature" },
+      "evaporator_temperature": { "name": "Evaporator temperature" },
+      "fan_manual_request": { "name": "Manual fan request (display)" },
       "max_total_airflow": { "name": "Max total airflow" },
       "supply_fan_max_airflow": { "name": "Supply fan max airflow" },
       "supply_fan_airflow": { "name": "Supply fan airflow" },
@@ -132,7 +134,10 @@
       "active_cooling": { "name": "Active cooling (Modbus)" },
       "enable_onoff_bms": { "name": "Enable on/off via Modbus" },
       "enable_dehumidify_bms": { "name": "Enable dehumidify via Modbus" },
-      "enable_cooling_bms": { "name": "Enable cooling via Modbus" }
+      "enable_cooling_bms": { "name": "Enable cooling via Modbus" },
+      "force_dehumidify_in_cooling": { "name": "Force dehumidify when cooling" },
+      "enable_integration": { "name": "Enable integration (active cooling)" },
+      "enable_free_cooling": { "name": "Enable free cooling/heating" }
     },
     "select": {
       "probe_source": {
@@ -146,7 +151,18 @@
           "cnu2_temp": "CNU2 display (temperature only)",
           "cnu2_temp_humidity": "CNU2 display (temperature + humidity)"
         }
+      },
+      "winter_dehumidify": {
+        "name": "Winter dehumidification",
+        "state": {
+          "disabled": "Disabled",
+          "with_water": "With water",
+          "without_water": "Without water"
+        }
       }
+    },
+    "fan": {
+      "hrds_supply_fan": { "name": "Supply fan" }
     },
     "number": {
       "humidity_setpoint": { "name": "Humidity setpoint" },
@@ -155,8 +171,16 @@
       "fan_min_speed_dehumidify": { "name": "Fan min speed (dehumidify)" },
       "fan_max_speed_dehumidify": { "name": "Fan max speed (dehumidify)" },
       "fan_min_speed_cooling": { "name": "Fan min speed (cooling)" },
+      "fan_min_speed_vmc": { "name": "Fan min speed (VMC)" },
       "fan_max_speed_cooling": { "name": "Fan max speed (cooling)" },
-      "fan_manual_speed": { "name": "Manual fan speed" }
+      "fan_manual_speed": { "name": "Manual fan speed" },
+      "dehumidify_differential": { "name": "Dehumidify differential" },
+      "min_room_temp_dehumidify": { "name": "Min room temp for dehumidify" },
+      "min_room_temp_diff_dehumidify": { "name": "Min room temp differential" },
+      "fan_min_runtime": { "name": "Fan minimum runtime" },
+      "fan_post_run_time": { "name": "Fan post-run time" },
+      "humidity_setpoint_min": { "name": "Humidity setpoint minimum" },
+      "humidity_setpoint_max": { "name": "Humidity setpoint maximum" }
     }
   }
 }

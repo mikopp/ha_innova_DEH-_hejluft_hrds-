@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import threading
 from datetime import timedelta
@@ -17,7 +16,12 @@ from homeassistant.const import (
     Platform,
 )
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.exceptions import (
+    ConfigEntryNotReady,
+    HomeAssistantError,
+    ServiceValidationError,
+)
+from homeassistant.helpers.event import async_call_later, async_track_time_interval
 from pymodbus.client import ModbusTcpClient
 
 from .const import (
@@ -30,16 +34,14 @@ from .const import (
     C_SUPPLY_FAN_AIRFLOW,
     C_SUPPLY_FAN_MAX_AIRFLOW,
     C_SUPPLY_FAN_OUTPUT,
+    C_SUPPLY_FAN_STATUS,
     CONF_AIRFLOW_MAX,
-    CONF_FAN_MIN_OUTPUT,
     CONF_HOSTID,
     CONF_MODEL,
-    DEFAULT_FAN_MIN_OUTPUT,
     DEFAULT_HOSTID,
     DEFAULT_MODEL,
     DEFAULT_PORT,
     DEFAULT_SCAN_INTERVAL,
-    DOMAIN,
     ENTITIES_DICT,
     MODEL_SPECS,
     get_entity_bitmask,
@@ -61,14 +63,15 @@ PLATFORMS = [
     Platform.BINARY_SENSOR,
     Platform.SWITCH,
     Platform.NUMBER,
+    Platform.SELECT,
     Platform.CLIMATE,
+    Platform.FAN,
 ]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up the integration from a config entry."""
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
-    hass.data.setdefault(DOMAIN, {})
 
     name = entry.data.get(CONF_NAME)
     host = entry.options.get(CONF_HOST, entry.data.get(CONF_HOST))
@@ -96,15 +99,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
     except (TypeError, ValueError):
         airflow_max = spec["max"]
-    try:
-        fan_min_output = float(
-            entry.options.get(
-                CONF_FAN_MIN_OUTPUT,
-                entry.data.get(CONF_FAN_MIN_OUTPUT, DEFAULT_FAN_MIN_OUTPUT),
-            )
-        )
-    except (TypeError, ValueError):
-        fan_min_output = DEFAULT_FAN_MIN_OUTPUT
 
     hub = HrdsModbusHub(
         hass,
@@ -114,9 +108,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         scan_interval,
         hostid,
         airflow_max,
-        fan_min_output,
     )
-    hass.data[DOMAIN][name] = {"hub": hub}
+
+    # Prime the cache before creating entities so they do not sit at `unknown`
+    # for a whole scan interval, and so an unreachable device is reported as
+    # such instead of setting up permanently-stale entities.
+    if not await hass.async_add_executor_job(hub._do_read_cycle):
+        raise ConfigEntryNotReady(f"Cannot reach HRDS+ Modbus gateway at {host}:{port}")
+
+    # runtime_data is keyed by the config entry, so two entries sharing a name
+    # can no longer clobber each other's hub the way hass.data[DOMAIN][name] did.
+    entry.runtime_data = hub
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
@@ -128,32 +130,35 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    unload_ok = all(
-        await asyncio.gather(
-            *[
-                hass.config_entries.async_forward_entry_unload(entry, platform)
-                for platform in PLATFORMS
-            ]
-        )
-    )
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
-        hass.data[DOMAIN].pop(entry.data[CONF_NAME], None)
+        hub = getattr(entry, "runtime_data", None)
+        if hub is not None:
+            await hass.async_add_executor_job(hub.shutdown)
     return unload_ok
 
 
-def _build_blocks(addresses: List[int]) -> List[Tuple[int, int]]:
+def _build_blocks(
+    addresses: List[int], foreign: frozenset[int] = frozenset()
+) -> List[Tuple[int, int]]:
     """Group sorted addresses into (start, count) blocks for block reads.
 
     Adjacent addresses (gap <= C_MAX_GAP) are merged; each block is capped at
     C_MAX_BLOCK registers so we never exceed the Modbus per-request limit.
+
+    ``foreign`` holds the addresses that belong to the *other* function code. A
+    block is never allowed to span one: reading e.g. holding register 1105 with
+    FC 04 can return ILLEGAL DATA ADDRESS, which would fail the whole block.
     """
+    addresses = sorted({a for a in addresses if a is not None})
     if not addresses:
         return []
-    addresses = sorted(set(addresses))
     blocks: List[Tuple[int, int]] = []
     start = prev = addresses[0]
     for addr in addresses[1:]:
-        if addr - prev <= C_MAX_GAP and addr - start + 1 <= C_MAX_BLOCK:
+        fits = addr - prev <= C_MAX_GAP and addr - start + 1 <= C_MAX_BLOCK
+        spans_foreign = any(a in foreign for a in range(prev + 1, addr))
+        if fits and not spans_foreign:
             prev = addr
         else:
             blocks.append((start, prev - start + 1))
@@ -174,7 +179,6 @@ class HrdsModbusHub:
         scan_interval: int,
         hostid: int,
         airflow_max: float,
-        fan_min_output: float,
     ) -> None:
         self._hass = hass
         self._name = name
@@ -184,26 +188,27 @@ class HrdsModbusHub:
         self._scan_interval = timedelta(seconds=scan_interval)
         self._unsub: Optional[Any] = None
         self._sensors: list = []
-        self._bms_enabled = False
         self._airflow_max = airflow_max
-        self._fan_min_output = fan_min_output
+        self._pending_refresh: Optional[Any] = None
+        # False until a full read cycle succeeds; entities key their
+        # availability off this so a dead gateway is visible in HA.
+        self.last_update_success = False
         self.data: Dict[str, Any] = {}
 
-        # Pre-compute the block reads per register type.
-        self._input_blocks = _build_blocks(
-            [
-                get_entity_reg(p)[0]
-                for p in ENTITIES_DICT.values()
-                if get_entity_type(p) == C_REG_TYPE_INPUT_REGISTERS
-            ]
-        )
-        self._holding_blocks = _build_blocks(
-            [
-                get_entity_reg(p)[0]
-                for p in ENTITIES_DICT.values()
-                if get_entity_type(p) == C_REG_TYPE_HOLDING_REGISTERS
-            ]
-        )
+        # Pre-compute the block reads per register type, keeping each function
+        # code's blocks clear of the other's addresses.
+        input_addrs = [
+            get_entity_reg(p)[0]
+            for p in ENTITIES_DICT.values()
+            if get_entity_type(p) == C_REG_TYPE_INPUT_REGISTERS
+        ]
+        holding_addrs = [
+            get_entity_reg(p)[0]
+            for p in ENTITIES_DICT.values()
+            if get_entity_type(p) == C_REG_TYPE_HOLDING_REGISTERS
+        ]
+        self._input_blocks = _build_blocks(input_addrs, frozenset(holding_addrs))
+        self._holding_blocks = _build_blocks(holding_addrs, frozenset(input_addrs))
 
     @property
     def name(self) -> str:
@@ -220,42 +225,70 @@ class HrdsModbusHub:
 
     @callback
     def async_remove_my_modbus_sensor(self, update_callback) -> None:
-        self._sensors.remove(update_callback)
+        if update_callback in self._sensors:
+            self._sensors.remove(update_callback)
         if not self._sensors and self._unsub:
             self._unsub()
             self._unsub = None
-            self.close()
+            # Hand the socket close to an executor: it acquires the same lock a
+            # poll in flight may hold, which would stall the event loop.
+            self._hass.async_add_executor_job(self.close)
 
     def close(self) -> None:
         with self._lock:
             self._client.close()
 
+    def shutdown(self) -> None:
+        """Close the socket during unload (runs in an executor, not the loop)."""
+        self.close()
+
     # ---- polling ----------------------------------------------------------
     async def async_refresh_modbus_data(self, _now=None) -> None:
         if not self._sensors:
             return
-        ok = await self._hass.async_add_executor_job(self._do_read_cycle)
-        if ok:
-            for cb in self._sensors:
-                cb()
+        await self._hass.async_add_executor_job(self._do_read_cycle)
+        # Notify on failure too - that is what moves entities to `unavailable`.
+        for cb in self._sensors:
+            cb()
+
+    @callback
+    def async_schedule_refresh(self, delay: float = 1.5) -> None:
+        """Debounced refresh after a write.
+
+        Gives the unit a moment to mirror the command into its status registers
+        and coalesces the several writes of one HVAC mode change into a single
+        poll instead of one full cycle per register.
+        """
+        if self._pending_refresh is not None:
+            self._pending_refresh()
+
+        async def _run(_now) -> None:
+            self._pending_refresh = None
+            await self.async_refresh_modbus_data()
+
+        self._pending_refresh = async_call_later(self._hass, delay, _run)
 
     def _do_read_cycle(self) -> bool:
         with self._lock:
             if not self._client.connect():
                 _LOGGER.warning("Modbus connect to HRDS+ failed")
+                self.last_update_success = False
                 return False
             try:
-                if not self._bms_enabled:
-                    self._enable_bms_control_locked()
+                # Uses the previous cycle's read-back, so on the very first
+                # cycle (empty data) all three enables are written.
+                self._sync_bms_enables_locked()
                 raw_input = self._read_blocks(self._input_blocks, fc="input")
                 raw_holding = self._read_blocks(self._holding_blocks, fc="holding")
             finally:
                 self._client.close()
 
         if raw_input is None or raw_holding is None:
+            self.last_update_success = False
             return False
         self._decode_all(raw_input, raw_holding)
         self._compute_derived()
+        self.last_update_success = True
         return True
 
     def _read_blocks(self, blocks, fc: str) -> Optional[Dict[int, int]]:
@@ -271,23 +304,81 @@ class HrdsModbusHub:
                     address=start, count=count, device_id=self._hostid
                 )
             if resp is None or resp.isError() or not getattr(resp, "registers", None):
-                _LOGGER.error("Modbus read failed (%s @ %s+%s)", fc, start, count)
-                return None
+                _LOGGER.warning(
+                    "Modbus block read failed (%s @ %s+%s); retrying individually",
+                    fc,
+                    start,
+                    count,
+                )
+                if not self._read_block_individually(values, start, count, fc):
+                    return None
+                continue
             for offset, reg in enumerate(resp.registers):
                 values[start + offset] = reg
         return values
 
-    def _enable_bms_control_locked(self) -> None:
-        """Write the PH02/PH27/PH28 enable registers so writes are honoured."""
-        try:
-            for key in BMS_ENABLE_KEYS:
-                reg, _dt = get_entity_reg(get_entity_props(key))
-                self._client.write_register(
+    def _read_block_individually(
+        self, values: Dict[int, int], start: int, count: int, fc: str
+    ) -> bool:
+        """Re-read a failed block one register at a time.
+
+        Drops only the addresses the device rejects, so a single bad address
+        cannot take out every entity in the integration. Returns False only if
+        the whole range is unreadable (a genuine comms failure).
+        """
+        any_ok = False
+        for addr in range(start, start + count):
+            try:
+                if fc == "input":
+                    resp = self._client.read_input_registers(
+                        address=addr, count=1, device_id=self._hostid
+                    )
+                else:
+                    resp = self._client.read_holding_registers(
+                        address=addr, count=1, device_id=self._hostid
+                    )
+            except Exception as exc:  # noqa: BLE001 - one bad address is not fatal
+                _LOGGER.debug("Read of %s register %s raised: %r", fc, addr, exc)
+                continue
+            if resp is None or resp.isError() or not getattr(resp, "registers", None):
+                continue
+            values[addr] = resp.registers[0]
+            any_ok = True
+        if not any_ok:
+            _LOGGER.error(
+                "Modbus read failed for every register in %s block %s", fc, start
+            )
+        return any_ok
+
+    def _sync_bms_enables_locked(self) -> None:
+        """Keep PH02/PH27/PH28 set so the unit honours our writes.
+
+        Driven by the polled read-back rather than a one-shot flag: if the unit
+        power-cycles and loses the enables, every subsequent write would
+        silently no-op until Home Assistant restarted. Re-asserting each cycle
+        self-heals that.
+
+        Note this deliberately overrides the matching switches - the enables are
+        required for the integration to control the unit at all, so turning one
+        off by hand is undone on the next poll.
+        """
+        for key in BMS_ENABLE_KEYS:
+            if self.data.get(key) == "on":
+                continue
+            reg, _dt = get_entity_reg(get_entity_props(key))
+            try:
+                resp = self._client.write_register(
                     address=reg, value=1, device_id=self._hostid
                 )
-            self._bms_enabled = True
-        except Exception as exc:  # noqa: BLE001 - best effort, retried next cycle
-            _LOGGER.warning("Could not enable BMS control: %r", exc)
+            except Exception as exc:  # noqa: BLE001 - retried next cycle
+                _LOGGER.warning("Could not enable BMS control (%s): %r", key, exc)
+                continue
+            if resp is not None and resp.isError():
+                _LOGGER.warning(
+                    "Device rejected BMS enable %s (register %s): %s", key, reg, resp
+                )
+            else:
+                _LOGGER.info("Asserted BMS enable %s (register %s)", key, reg)
 
     # ---- decoding ---------------------------------------------------------
     def _decode_all(
@@ -302,7 +393,7 @@ class HrdsModbusHub:
             )
             if reg not in source:
                 continue
-            raw = self._client.convert_from_registers(
+            raw = ModbusTcpClient.convert_from_registers(
                 registers=[source[reg]], data_type=dt
             )
             if is_entity_switch(props):
@@ -317,9 +408,14 @@ class HrdsModbusHub:
                     off_v = (get_entity_switch(props) or {}).get("off", 0)
                     self.data[key] = "off" if raw == off_v else "on"
             elif is_entity_select(props):
-                self.data[key] = (get_entity_select(props) or {}).get(
-                    raw, f"unknown_{raw}"
-                )
+                # An unmapped raw value decodes to None. Emitting "unknown_<raw>"
+                # would not be in the entity's `options` and HA raises on write.
+                decoded = (get_entity_select(props) or {}).get(raw)
+                if decoded is None:
+                    _LOGGER.warning(
+                        "Register %s (%s) returned unmapped value %s", reg, key, raw
+                    )
+                self.data[key] = decoded
             else:
                 self.data[key] = float(raw) * get_entity_factor(props)
 
@@ -331,7 +427,12 @@ class HrdsModbusHub:
         if out is None:
             self.data.setdefault(C_SUPPLY_FAN_AIRFLOW, None)
             return
-        if out <= self._fan_min_output:
+        # "Fan is not moving air" is the device's own judgement, not a
+        # percentage threshold of ours. The per-mode minimum speed lives in
+        # PF28/PF27/PF07 and is exposed as writable numbers; duplicating it as
+        # a config option here would shadow the registers and silently report
+        # 0 m3/h while the fan was actually running below that figure.
+        if self.data.get(C_SUPPLY_FAN_STATUS) in ("off", "disabled", "alarm"):
             self.data[C_SUPPLY_FAN_AIRFLOW] = 0.0
             return
         self.data[C_SUPPLY_FAN_AIRFLOW] = min(
@@ -343,7 +444,7 @@ class HrdsModbusHub:
         """Encode and write a single entity's value, then refresh."""
         props = get_entity_props(entity_key)
         if is_entity_readonly(props):
-            raise PermissionError(f"Register {entity_key} is read-only")
+            raise ServiceValidationError(f"Register {entity_key} is read-only")
         reg, dt = get_entity_reg(props)
 
         if is_entity_switch(props):
@@ -354,9 +455,16 @@ class HrdsModbusHub:
             faktor = get_entity_factor(props)
             raw = round(float(value) / faktor) if faktor else round(float(value))
 
-        words = self._client.convert_to_registers(value=int(raw), data_type=dt)
-        await self._hass.async_add_executor_job(self._write_registers, reg, words)
-        await self.async_refresh_modbus_data()
+        words = ModbusTcpClient.convert_to_registers(value=int(raw), data_type=dt)
+        ok = await self._hass.async_add_executor_job(self._write_registers, reg, words)
+        if not ok:
+            raise HomeAssistantError(
+                f"Modbus write to {entity_key} (register {reg}) failed. If this "
+                "persists, check that the PH02/PH27/PH28 enables are set."
+            )
+        # Debounced: the unit needs a moment to mirror a command into its status
+        # registers, and one HVAC mode change issues several writes.
+        self.async_schedule_refresh()
 
     async def setter_function_callback(self, entity, value) -> None:
         await self.write_entity_value(entity.entity_description.key, value)
@@ -370,26 +478,35 @@ class HrdsModbusHub:
     @staticmethod
     def _encode_select(props: Dict[str, Any], value: Any) -> int:
         values = get_entity_select(props) or {}
-        inv = {str(v): k for k, v in values.items() if k != "default"}
+        inv = {str(v): k for k, v in values.items()}
         if isinstance(value, str) and value in inv:
             return int(inv[value])
         return int(value)
 
-    def _write_registers(self, base_reg: int, words) -> None:
+    def _write_registers(self, base_reg: int, words) -> bool:
+        """Write one or more registers. Returns True only if every write took."""
         with self._lock:
             if not self._client.connect():
                 _LOGGER.warning("Modbus connect failed during write")
-                return
+                return False
             try:
                 for offset, word in enumerate(words):
-                    resp = self._client.write_register(
-                        address=base_reg + offset,
-                        value=int(word) & 0xFFFF,
-                        device_id=self._hostid,
-                    )
+                    try:
+                        resp = self._client.write_register(
+                            address=base_reg + offset,
+                            value=int(word) & 0xFFFF,
+                            device_id=self._hostid,
+                        )
+                    except Exception as exc:  # noqa: BLE001 - reported to caller
+                        _LOGGER.error(
+                            "Write to register %s raised: %r", base_reg + offset, exc
+                        )
+                        return False
                     if resp is not None and resp.isError():
                         _LOGGER.error(
                             "Write to register %s failed: %s", base_reg + offset, resp
                         )
+                        return False
             finally:
                 self._client.close()
+        return True
