@@ -199,7 +199,7 @@ From the Technisches Handbuch §10, p.77 ("Leistungsdaten Luftaufbereitung" /
 | **Nominal total airflow (supply + recirc)** | **300 m³/h** | **500 m³/h** |
 | External share (supply from the MVHR) | 0–300 m³/h | 0–500 m³/h |
 | **Recirculation share (room air via own fan)** | **130–300 m³/h** | **190–500 m³/h** |
-| Register-pack pressure drop @ nominal | 31 kPa | 38 kPa |
+| Register-pack pressure drop @ nominal | 31 Pa | 38 Pa |
 | Usable dehumidification capacity ¹ | 56 L/24h | 89 L/24h |
 | Total cooling capacity ¹ | 2.59 kW | 3.95 kW |
 | Compressor frequency range | 23–63 Hz | 23–78 Hz |
