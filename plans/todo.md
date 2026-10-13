@@ -100,6 +100,11 @@ opened to 0/100.
       alone (no unit fan running)** — this is architecturally confirmed: the
       non-`R` variant (no recirc fan installed) always operates this way. The
       compressor dehumidifies and cools with MVHR passive flow only, by design.
+      **On the `R` variant the stock controller does not allow it:** the damper
+      opens and the fan starts on every dehumidification/integration request,
+      regardless of PM20 (`references/MODBUS_REGISTERS.md` §13.5). A user
+      reports the fan would not go below 30 %, and an unofficial I/O
+      reassignment as the only way around it.
 - [ ] **Rescale or clamp? (R variant only) — the key fan question.** The technical
       handbook says manual fan control is *„linear zwischen den jeweiligen
       Minimal- und Maximalwerten (PF28/PF10 bzw. PF27/PF09) skaliert"*, i.e. the

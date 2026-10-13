@@ -309,12 +309,18 @@ expose each. Sources: `HRDS+_Technisches_Handbuch_DE.pdf` (§ Funktionsweise /
 Integration, Lüfterregelung) and `HRDS+_Benutzerhandbuch_DE.pdf` (operation
 modes); register numbers from the Modbus PDF and §§6–8 above.
 
+> **Read §13.5 first.** The three-way split below is this repository's own
+> reading, not manufacturer terminology. On the `R` variant the controller does
+> **not** treat recirculation as a separate mode: every dehumidification or
+> integration request opens the recirculation damper and starts the fan. There
+> is no documented way to dehumidify on passive MVHR flow with the damper closed.
+
 ### 13.1 Three concepts, three meanings
 
 | Concept | What physically happens | How it is exposed |
 |---------|-------------------------|-------------------|
-| **Passive airflow** | The unit's own supply fan is **off**, but the central MVHR upstream still pushes air through the unit's duct, so air keeps flowing through the inflow pipe. | **No dedicated register.** Infer it: `SupplyFan_Status` (1119) = `1` (OFF) while `sm_UnitStatus` (1104) = `5` (ON). The unit cannot measure the upstream MVHR's flow, so there is no "passive flow rate". |
-| **Fan integration** (the *fan's* job) | The unit's **own supply fan runs** to "integrate" — i.e. blend the central-MVHR inflow air with recirculated room air and drive it across the coil. | `FanIntegration_Request` (1112) = `1` when the fan-integration function is active; `SupplyFan_Status` (1119) = `3` (ON); modulation at `outAO_SupplyFan` (639, ×0.01 %) and `actRPMsupplyFan` (1117). |
+| **Passive airflow** | The unit's own supply fan is **off**, but the central MVHR upstream still pushes air through the unit's duct, so air keeps flowing through the inflow pipe. On the `R` variant this is the **OFF / ON-Standby** state („ohne Luftaufbereitung“, no air treatment, §2.7); on the non-`R` variant it is the only state. | **No dedicated register.** Infer it: `SupplyFan_Status` (1119) = `1` (OFF) while `sm_UnitStatus` (1104) = `5` (ON). The unit cannot measure the upstream MVHR's flow, so there is no "passive flow rate". |
+| **Fan integration** (the *fan's* job) | The unit's **own supply fan runs** to "integrate" — i.e. blend the central-MVHR inflow air with recirculated room air and drive it across the coil. On the `R` variant this happens on **every** dehumidification and integration request (§13.5). | `FanIntegration_Request` (1112) = `1` when the fan-integration function is active; `SupplyFan_Status` (1119) = `3` (ON); modulation at `outAO_SupplyFan` (639, ×0.01 %) and `actRPMsupplyFan` (1117). The Modbus PDF labels 1112 only "Fans integration request" (R/O); the blending interpretation is ours. |
 | **Active cooling** (the manufacturer's *"integration" register*) | The compressor / chilled-water circuit engages to **actively cool** the supply air in summer (the "Integration" function PG02). | `Status_Integ_byBMS` (1139, R/W request, requires PH27=1), feedback via `CmpStatus` (1122). **This is a different meaning of "integration" than the fan blending in row 2.** |
 
 > **Trap.** `Status_Integ_byBMS` (1139) and `FanIntegration_Request` (1112) both
@@ -339,9 +345,12 @@ Read-back uses `outAO_SupplyFan` (639, ×0.01 %) with nearest-neighbour
 thresholds at 42.5 % (low/medium) and 70.0 % (medium/high). Fan mode "off"
 is also forced when `SupplyFan_Status` (1119) = `1` or `0`.
 
-**Open question (unverified):** does writing `1614 = 0` actually stop the fan
-when a mode is active, or is it clamped up to `MinSpeedFan_Dehum` (1853) /
-`MinSpeedFan_Integ` (1852) internally? See `plans/todo.md`.
+**Fan mode "off" does not give passive-only dehumidification.** Even if
+`1614 = 0` stopped the fan, the recirculation damper still opens on every
+dehumidification/integration request (§13.5). A user report also says the fan
+could not be commanded below 30 %. Whether the remaining floor is a clamp to
+`MinSpeedFan_Dehum` (1853) / `MinSpeedFan_Integ` (1852) or a band rescale is
+still unverified on hardware — see `plans/todo.md`.
 
 ### 13.3 Detecting passive airflow
 
@@ -359,6 +368,8 @@ The unit only knows the state of *its own* fan (1119) and its integration
 request (1112). Whether the central MVHR is actually moving air is upstream of
 the HRDS+ and not visible on this bus — treat passive airflow as "fan off, unit
 on" and rely on the central system's own controls/sensors for the real rate.
+On a stock `R` unit this condition only holds while no dehumidification or
+integration request is active, i.e. while the air passes untreated.
 
 ### 13.4 Dehumidify with the fan running but active cooling off
 
@@ -389,6 +400,73 @@ To reproduce over Modbus (assuming PH02/PH28 already = 1):
    (×100 encoding: 50 % → `5000`).
 3. Read back `1121`=1, `1119`=3 (fan ON), `1112`=1 (integration/blend active),
    `1139`-derived `CmpStatus` `1122`=4, while there is no active-cooling request.
+
+### 13.5 Dehumidifying without recirculation (`R` variant)
+
+**The manufacturer documentation has no such mode.** Dehumidification and
+recirculation are coupled in the controller:
+
+* **Handbuch §2.7 Betriebsarten.** The dehumidify mode (DEU) and both
+  integration modes (INT summer, INT winter) all list „die Umluftklappe ist
+  geöffnet“ and „der Lüfter ist aktiv“. DEU says explicitly: „In diesem
+  Betriebsmodus ist die Umluftumwälzung aktiviert“. Only OFF / ON-Standby
+  („ohne Luftaufbereitung“) has the damper closed and the fan off. The mode
+  pictures match: the closed-damper picture is the untreated standby state.
+* **§6.5 Umluftklappe.** The damper opens whenever there is an integration or
+  dehumidification request. It closes only once the request has ended, the
+  compressor's safety times have elapsed and the external water valve has
+  closed after its run-on. A blocking alarm closes it immediately.
+* **§6.2 Lüfter-Regelung.** The fan starts only after the damper is fully open
+  (`PS01_PreStartTime_RecircDamper`, reg 1698, default 20 s). It then runs in
+  the PF28–PF10 band (dehumidify) or PF27–PF09 (integration).
+* **"ohne Umluft" is a hardware variant**, not an operating mode: §2.1
+  „Variante ohne Umluft“, §3.7.2 „Anschluss-Schema, Version ohne
+  Umluftumwälzung“ and the separate „ohne Umluft“ product codes. Those units
+  have no recirculation fan or damper.
+* **Modbus.** No register selects "dehumidify without recirculation".
+  `FanIntegration_Request` (1112) and `outDO_RecircDamper` (1134) are
+  read-only status.
+
+**Vendor statements** (energiesparhaus.at HRDS+ thread, user Murphy08, who
+writes for the vendor side):
+
+* #44 (4.12.2025): „Immer wenn der Kompressor läuft, ist auch der Umluftbetrieb
+  aktiv.“
+* #76 (8.5.2026): „Die Entfeuchtung ist regelungsseitig streng mit dem
+  Umluftbetrieb gekoppelt.“ Start order: water valve, recirculation damper and
+  VMC output first, then the fan after a delay, then the compressor.
+* #78 (8.5.2026): setting the fan to 0 „bringt ja nichts, weil die Klappe dann
+  trotzdem aufgeht“.
+
+**Unofficial workaround** (user manuon, #77–#79 and #93, May 2026; untested by
+this repository, at your own risk):
+
+* The fan could not be commanded below 30 %.
+* Deactivating the fan output (AO4) or the damper output (DO1) stops the
+  compressor from starting.
+* Fan: deactivate AO4 and assign the spare AO3 as "Supply Fan 0-10V", so the
+  real fan stays off while the compressor runs.
+* Damper: set `HD01` (DO1 allocation, default `10` = "Recirculation damper
+  NO") to `9` = "Recirculation damper NC". This inverts the relay: the damper
+  stays closed during operation but is open whenever it would normally be
+  closed, which presumably includes standby.
+* Reported result: an HRDS+ 50 running on KWL supply air alone at 368 m³/h,
+  about 1.7 l/h of condensate.
+
+**Consequences**
+
+* Writing `PM20_SupplyFan_Manual` (1614) = 0 does not produce passive-only
+  dehumidification. The damper opens regardless, and the fan is probably
+  floored.
+* If the recirculation inlet is not open to a room at about room pressure —
+  for example, teed into the MVHR extract duct — an open damper with a stopped
+  or slow fan short-circuits supply air into the extract. A backdraft valve in
+  the recirculation branch, opening towards the unit, prevents that without
+  parameter changes. The NC inversion is unsuitable there, because the damper
+  would then be open in standby.
+* In any fan-off configuration, the compressor's own protection (AL11
+  low-pressure / frost thermostat) remains the guard against too little
+  airflow.
 
 ---
 

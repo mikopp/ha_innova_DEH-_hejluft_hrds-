@@ -63,9 +63,18 @@ silently ignores writes.
 
 ## Airflow: passive flow, fan integration, and active cooling (technical)
 
+> **Recirculation is not a separate mode on the `R` variant.** Every
+> dehumidification or integration request opens the recirculation damper and
+> starts the fan (Handbuch §2.7, §6.2, §6.5; confirmed by the vendor in the
+> energiesparhaus.at HRDS+ thread). "Ohne Umluft" in the handbook is the
+> hardware variant without recirculation, not an operating mode. Details,
+> sources and an unofficial workaround:
+> [`MODBUS_REGISTERS.md` §13.5](./MODBUS_REGISTERS.md#135-dehumidifying-without-recirculation-r-variant).
+
 The word *integration* is overloaded in the manufacturer's documentation, which
-makes the airflow behaviour easy to misread. There are **three** distinct
-things, exposed by three different register groups. The full register-level
+makes the airflow behaviour easy to misread. This repository distinguishes
+**three** things, exposed by three different register groups. The split is our
+own reading, not manufacturer terminology. The full register-level
 treatment — with the exact addresses, the detection logic and the
 reproduce-over-Modbus recipe — lives in
 [`MODBUS_REGISTERS.md` §13](./MODBUS_REGISTERS.md#13-airflow-passive-flow-fan-integration-and-active-cooling).
@@ -78,11 +87,11 @@ A short summary:
   flow, so it cannot report a passive flow rate. Source:
   `HRDS+_Technisches_Handbuch_DE.pdf`, § Lüfterregelung / Funktionsweise.
 
-  **Architectural proof:** the non-`R` variant (no recirc fan fitted) has no
-  supply fan at all, yet the compressor runs normally for dehumidification and
-  cooling on passive MVHR flow alone. This confirms that passive airflow is
-  sufficient for compressor operation by design — it is not a special or
-  unsupported state.
+  The non-`R` variant (no recirc fan fitted) dehumidifies and cools on passive
+  MVHR flow alone, so the refrigeration circuit can work that way. On the `R`
+  variant, however, the stock controller only has passive flow in OFF /
+  ON-Standby, when the air passes untreated. During dehumidification and
+  integration it always opens the damper and runs the fan.
 * **Fan integration** — the unit's **own fan runs** to blend the central-MVHR
   inflow air with recirculated room air across the coil. Exposed by the new
   read-only `FanIntegration_Request` (1112) → `fan_integration_active` binary
@@ -111,7 +120,7 @@ The HA climate entity exposes four fan modes, all written to
 
 | HA fan mode | Raw value written | Actual fan speed | Use when |
 |-------------|-------------------|------------------|----------|
-| `off`       | 0 (0 %)           | Fan stopped       | You want passive airflow from the central MVHR only |
+| `off`       | 0 (0 %)           | Not confirmed — see below | Lowest fan request; does **not** close the damper |
 | `low`       | 3000 (30 %)       | ~30 % output     | Light supplemental airflow |
 | `medium`    | 5500 (55 %)       | ~55 % output     | Normal operation |
 | `high`      | 8500 (85 %)       | ~85 % output     | Maximum airflow / fast drying |
@@ -121,23 +130,24 @@ to the nearest preset using midpoint thresholds (42.5 % → low/medium boundary,
 70.0 % → medium/high boundary). If `SupplyFan_Status` (1119) is `1=OFF` or
 `0=Disabled`, fan mode is reported as "off" regardless of the output value.
 
-**Fan mode "off" while HVAC mode is Dry or Cool** relies on the unit honouring
-a 0 % manual setpoint while dehumidification/cooling is requested. The
-compressor continues to run, with airflow from the central MVHR passive inflow
-only.
+**Fan mode "off" while HVAC mode is Dry or Cool does not give passive-only
+operation on the `R` variant.** The controller opens the recirculation damper on
+every dehumidification or integration request, whatever the fan setpoint. The
+vendor confirms this in the forum (#78): setting the fan to 0 „bringt ja nichts,
+weil die Klappe dann trotzdem aufgeht“. One user also reports that the fan could
+not be commanded below 30 %.
 
-This pattern is **architecturally correct**: the non-`R` variant (no recirc
-fan) always operates exactly this way — compressor dehumidifies and cools on
-MVHR passive flow alone. The concept is therefore confirmed by design, not just
-by assumption.
+With the damper open and the fan stopped or slow, the recirculation inlet is
+connected straight to the supply chamber. That is harmless when the inlet draws
+from a room. If the inlet is teed into the MVHR extract duct, supply air
+short-circuits into the extract instead; fit a backdraft valve in that branch,
+opening towards the unit.
 
-**Open question for the `R` variant:** when dehumidify is active and
-`fan_manual_speed` is set to 0 %, does the firmware respect the 0 % or clamp
-up to `MinSpeedFan_Dehum` (1853 / PF28)? Verify by writing 0 to register 1614
-while dehumidify is active, then reading `outAO_SupplyFan` (639). The firmware
-is confirmed to allow PF28 = 0 (configurable minimum), but whether a manual
-override of 0 is honoured during active DEU is unverified. The compressor will
-auto-protect via AL11 if passive airflow is insufficient.
+Running the compressor without recirculation needs an unofficial I/O
+reassignment (fan output moved to AO3, damper relay `HD01` inverted to NC). See
+[`MODBUS_REGISTERS.md` §13.5](./MODBUS_REGISTERS.md#135-dehumidifying-without-recirculation-r-variant)
+for the details and caveats. Whether a 1614 setpoint of 0 is clamped or rescaled
+by PF28 is still open — see `plans/todo.md`.
 
 Fan mode is **independent of HVAC mode** — changing Dry ↔ Cool does not reset
 the fan mode; switching to Off also turns off the unit via `Status_OnOff_byBMS`
