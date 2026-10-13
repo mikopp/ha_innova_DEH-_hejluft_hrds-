@@ -100,6 +100,11 @@ opened to 0/100.
       alone (no unit fan running)** — this is architecturally confirmed: the
       non-`R` variant (no recirc fan installed) always operates this way. The
       compressor dehumidifies and cools with MVHR passive flow only, by design.
+      **On the `R` variant the stock controller does not allow it:** the damper
+      opens and the fan starts on every dehumidification/integration request,
+      regardless of PM20 (`references/MODBUS_REGISTERS.md` §13.5). A user
+      reports the fan would not go below 30 %, and an unofficial I/O
+      reassignment as the only way around it.
 - [ ] **Rescale or clamp? (R variant only) — the key fan question.** The technical
       handbook says manual fan control is *„linear zwischen den jeweiligen
       Minimal- und Maximalwerten (PF28/PF10 bzw. PF27/PF09) skaliert"*, i.e. the
@@ -126,9 +131,97 @@ opened to 0/100.
       directly or must open the band first.
 - [ ] Confirm `SupplyFan_Status` (1119) reports `1` (OFF) when fan mode = off
       and a mode is active, and that `recirculation_active` (1112) goes 0.
+      Covered by the fan = 0 test below.
 - [ ] Verify the Low / Medium / High percentages (30 / 55 / 85 %) are
       reasonable for the real unit; adjust in `climate.py` `_FAN_MODE_PCT` if
       not. These are nominal choices, not values from the PDF.
+
+## Fan = 0 during dehumidification, and keeping the damper closed (Modbus only)
+
+Background: `references/MODBUS_REGISTERS.md` §13.5. On the `R` variant the
+handbook couples dehumidification to recirculation (§2.7, §6.2, §6.5), and the
+vendor confirms it in the energiesparhaus.at HRDS+ thread. Everything below is
+**untested on hardware** and **expected not to work**, unless noted otherwise.
+It is listed so the test is run once and the result recorded, not because any
+option is recommended.
+
+- [ ] **Test: what does the unit do when the fan is set to 0 while
+      dehumidifying?**
+      Expected from the forum: the fan does not go below about 30 % output, and
+      the damper opens anyway.
+
+      Procedure, all over Modbus:
+      1. **Record the original values** of every register this section
+         touches, so they can be restored afterwards: 1614 (PM20), 1853 (PF28),
+         1647 (PF10), 1698 (PS01), 1831 (HC03), 1832 (HC04), 1838 (HD01).
+      2. **Make sure there is airflow through the coil** while the fan may be
+         off. Run the central MVHR at 150 m³/h or more (the lowest flow in the
+         handbook's capacity table for the HRDS+ 30).
+      3. **Start dehumidification:** 1105 ← 1 (on), 1140 ← 1 (dehumidify),
+         1139 ← 0 (no active cooling). The hub sets the BMS enables PH02/PH28.
+      4. **Pass 1:** write 1614 ← 0 with the factory band (PF28 = 50 %,
+         PF10 = 85 %).
+      5. **Pass 2:** write 1853 (PF28) ← 0, then 1614 ← 0 again.
+      6. **In each pass,** wait for the damper pre-start time (PS01, default
+         20 s) plus the fan and compressor start delays. Then read:
+         * `outAO_SupplyFan` (639) and `actRPMsupplyFan` (1117)
+         * `SupplyFan_Status` (1119) and `FanIntegration_Request` (1112)
+         * `outDO_RecircDamper` (1134) and `Packed_DO1` (384), bits 8–9
+         * `CmpStatus` (1122) and `DehumRequest` (1121)
+         * `PackedAlarm_1` (768), bit 10 = AL11 (low pressure / frost)
+      7. **Check physically** whether the fan is turning, and whether air is
+         drawn in at the recirculation grille, which would mean the damper is
+         open.
+      8. **Restore** the recorded values.
+
+- [ ] **Options to keep the recirculation damper closed with the fan off.**
+      Modbus only, no rewiring. Each one is **untested and likely not
+      working**.
+
+      **A. The repository's original assumption:** write PM20 (1614) ← 0,
+      optionally opening the band with PF28 (1853) ← 0 and PF10 (1647) ← 100.
+      The idea was that the fan stops and the unit dehumidifies on passive
+      MVHR flow, with the damper staying closed.
+      *Likely not working:*
+      * §6.5 opens the damper on every dehumidification or integration
+        request.
+      * The vendor (#78): fan 0 „bringt ja nichts, weil die Klappe dann
+        trotzdem aufgeht“.
+      * A user (#77) could not get the fan below 30 %.
+
+      **B. Invert the damper relay** (forum, manuon #79): HD01 (1838, DO1
+      allocation) from 10 = "Recirculation damper NO" to 9 = "Recirculation
+      damper NC".
+      *Likely not working as wanted:*
+      * The damper would be closed during operation but open whenever it
+        should be closed, which presumably includes standby. That only moves
+        the open-damper period.
+      * Whether it takes effect without a restart is unknown.
+
+      **C. Disable the damper output** (vendor suggestion, Murphy08 #78): set
+      HD01 (1838) ← 0.
+      *Likely not working:*
+      * The vendor was unsure it works without a restart.
+      * The user reports (#79) that the compressor does not start with DO1
+        disabled.
+
+      **D. Fan side, needed alongside B** (forum, manuon #79):
+      * HC04 (1832, AO4 allocation) from 1 = "0-10 V supply fan" to 0 =
+        disabled, which takes the real fan's signal away.
+      * HC03 (1831, AO3 allocation) from 0 to 1 = "0-10 V supply fan", so the
+        controller drives a "fan" on the empty AO3 and the compressor is
+        allowed to start.
+      * HC04 ← 0 on its own stops the compressor from starting (#79).
+      *Untested here.* manuon reports B + D working on an HRDS+ 50 (#93, KWL
+      supply only, 368 m³/h). Treat it as unconfirmed for this integration.
+
+      **Side effects to record if any option is tried:**
+      * After D, the controller believes its fan is running. 639, 1119, 1112
+        and `sensor.supply_fan_airflow` then report a fan that is not
+        turning. 1117 (RPM) is the honest reading, if the fan reports RPM.
+      * It is unknown whether HC/HD writes go to memory with limited write
+        cycles. Do not toggle them per dehumidification run.
+      * Restore the original values afterwards.
 
 ## Entities documented but not yet exposed
 
