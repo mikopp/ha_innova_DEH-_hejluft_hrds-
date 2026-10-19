@@ -81,11 +81,15 @@ def get_hub_and_device_info(hass, entry) -> tuple:
     """Return (hub_name, hub, device_info) for a config entry."""
     hub_name = entry.options.get(CONF_NAME, entry.data[CONF_NAME])
     hub = entry.runtime_data
+    identity = hub.identity
     device_info = DeviceInfo(
         identifiers={(DOMAIN, entry.entry_id)},
         name=entry.data.get(CONF_NAME, DEFAULT_NAME),
         manufacturer=ATTR_MANUFACTURER,
         model="HRDS+ / DEH+",
+        # The controller's own identification, as read by the identity check.
+        model_id=identity.product_code,
+        sw_version=identity.revision,
     )
     return hub_name, hub, device_info
 

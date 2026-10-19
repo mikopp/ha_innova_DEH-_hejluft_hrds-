@@ -257,6 +257,52 @@ def main() -> int:
     )
     check("default" not in const.PROBE_SOURCE, "PROBE_SOURCE map has no sentinel key")
 
+    print("== headless / identity / probe sentinel ==")
+    # PG01 is the fan arrangement, not "has recirculation"; reading it as the
+    # latter made an `R` unit report "no recirculation".
+    check(
+        "has_recirculation" not in const.ENTITIES_DICT,
+        "no entity claims PG01 means 'has recirculation'",
+    )
+    check("machine_type" in const.SENSOR_TYPES, "PG01 is a read-only enum sensor")
+    for key, (decoded, raw) in const.HEADLESS_SETTINGS.items():
+        props = const.ENTITIES_DICT[key]
+        if const.is_entity_select(props):
+            actual = const.get_entity_select(props).get(raw)
+        else:
+            actual = "on" if raw else "off"
+        check(
+            actual == decoded,
+            f"HEADLESS_SETTINGS[{key}] raw {raw} decodes to '{decoded}'",
+        )
+        check(
+            not const.is_entity_readonly(props),
+            f"headless setting {key} is writable",
+        )
+    check(
+        {"enable_onoff_display", "probe_source"} <= set(const.HEADLESS_SETTINGS),
+        "headless mode asserts PH01 and HA00",
+    )
+    check(
+        const.is_probe_sentinel(0x8004) and const.is_probe_sentinel(0x7FFA),
+        "observed unwired-probe words (0x8004, 0x7FFA) are sentinels",
+    )
+    check(
+        not const.is_probe_sentinel(0xFFF6) and not const.is_probe_sentinel(215),
+        "a real reading (-1.0 degC, 21.5 degC) is not a sentinel",
+    )
+    for lang in ("en", "de"):
+        tr = json.loads((COMP / f"translations/{lang}.json").read_text())
+        for section in (tr["config"], tr["options"]):
+            check(
+                {"cannot_connect", "wrong_device"} <= set(section["error"]),
+                f"{lang}.json has the identity-check form errors",
+            )
+        check(
+            "has_display" in tr["config"]["step"]["user"]["data"],
+            f"{lang}.json labels the has_display option",
+        )
+
     print("== composite entities resolve availability correctly ==")
     # Regression guard: HubBackedEntity.available gates register-backed entities
     # on their key being in hub.data, which is populated only from

@@ -27,15 +27,17 @@ The integration talks to the unit's control board via Modbus TCP and exposes:
   * **Dry** — dehumidification (fan runs, compressor condenses moisture)
   * **Cool** — active cooling (the unit's "integration" function, summer only)
   * Target humidity and target temperature are settable.
-  * Fan mode is selectable: **off** (passive airflow from central MVHR only) /
-    **low** / **medium** / **high** — controls the unit's own supply fan via
-    the manual fan speed register. Fan mode persists across HVAC mode changes.
+  * Fan mode is selectable: **off** / **low** / **medium** / **high** — writes
+    the manual fan speed register. The shown mode is what the fan is *actually*
+    doing. **"off" does not make Dry/Cool run on passive airflow**: on an `R`
+    unit every dehumidify or cooling request opens the recirculation damper and
+    starts the fan (see [Fan mode and recirculation](#fan-mode-and-recirculation)).
 * **Sensors** — see entity table below, including four computed airflow
   sensors derived from your model's calibration data.
 * **Binary sensors** — dehumidify requested, recirculation active, probe
   health, overall alarm active, four individual alarm sensors (compressor
-  low/high pressure, antifreeze, dirty filter), and two variant-detection
-  sensors (has recirculation fan, active cooling available).
+  low/high pressure, antifreeze, dirty filter), and a variant-detection sensor
+  (active cooling available).
 * **Switches** — unit on/off, dehumidify, active cooling, plus the three
   "enable control via Modbus" registers.
 * **Numbers** — humidity setpoint, summer/winter temperature setpoints, and the
@@ -104,13 +106,17 @@ for full detail.
 
 #### Variant detection
 
-These two sensors reflect hardware capability flags written by the installer
-(or the factory) to holding registers. They are read-only from the integration.
+These reflect configuration written by the installer (or the factory) to
+holding registers. They are read-only from the integration.
 
-| Entity | What ON means |
+| Entity | What it means |
 |--------|--------------|
-| `binary_sensor.has_recirculation` | Unit has a recirculation fan + motorised damper (R-variant, PG01 = 1) |
-| `binary_sensor.active_cooling_available` | Active cooling is enabled on this unit (PG02 = 1) |
+| `sensor.machine_type` | PG01 fan arrangement: *supply fan only* or *supply and exhaust fan*. **Not** a recirculation flag: an `R` unit reads *supply fan only*. |
+| `binary_sensor.active_cooling_available` | ON: active cooling is enabled on this unit (PG02 = 1) |
+
+Whether the unit has a recirculation fan (`R`) is shown by
+`sensor.recirculation_damper`: *Disabled* means no damper is wired (non-`R`),
+*Off*/*On* means it is an `R` unit.
 
 #### Individual alarms
 
@@ -130,6 +136,7 @@ Each sensor maps to a single bit of a packed alarm register. **ON = alarm is act
 | `switch.unit_on_off` | 1105 | BMS on/off request (requires PH02 = 1) |
 | `switch.dehumidify` | 1140 | BMS dehumidify request (requires PH28 = 1) |
 | `switch.active_cooling` | 1139 | BMS active-cooling request (requires PH27 = 1, summer season) |
+| `switch.enable_onoff_display` | 1777 | PH01 — on/off by wired display. Forced **off** while `has_display` is off (the default); turning it on by hand is undone on the next poll |
 | `switch.enable_onoff_bms` | 1778 | PH02 — auto-set on startup; expose to inspect/reset |
 | `switch.enable_dehumidify_bms` | 1870 | PH28 — auto-set on startup |
 | `switch.enable_cooling_bms` | 1869 | PH27 — auto-set on startup |
@@ -197,10 +204,20 @@ Innova HRDS+**, then provide:
 | Modbus slave ID | `1` | Factory default unit address |
 | Scan interval | `30 s` | Polling period (min 5 s) |
 | Model | `30`    | Device size: `30` = HRDS+30 (max 300 m³/h), `50` = HRDS+50 (max 500 m³/h). Sets airflow defaults. |
+| A wired CNU2 display is connected | off | Leave **off** for a unit driven only from Home Assistant. See below. |
 
-On first connection the integration enables Modbus control on the unit
-(PH02/PH27/PH28) so on/off, dehumidify and cooling commands are honoured. These
-are also exposed as switches if you prefer to manage them yourself.
+Before anything is written, the integration checks that the address really is an
+HRDS+: the controller must identify itself as EVCO `EPB9…` over Modbus (FC 43)
+and its status registers must make sense. Anything else is refused with
+*"not an HRDS+"*, so a wrong IP or slave ID cannot have settings written into it.
+
+On connection the integration sets the registers the unit needs in order to obey
+Modbus: the "by BMS" enables **PH02/PH27/PH28**, and, unless a display is
+connected, **PH01 = 0** (no on/off from a display; with PH01 = 1 and no display
+the unit stays *Off (display)* and ignores Modbus) and **HA00 = 0** (no display
+sensors). It re-checks them every poll, so a power cycle that resets them heals
+itself, and a manual change to one of them is undone on the next poll. If you
+*do* have a display, tick the option and the integration leaves PH01/HA00 alone.
 
 ### Airflow calibration (Options)
 
@@ -212,7 +229,6 @@ computed `m³/h` sensors:
 |-------|-----------------|-------|
 | Model | `30` | Change here too if you need to switch model |
 | Supply fan max airflow (m³/h) | `300` / `500` | Fan airflow at 100 % output — adjust if your duct or filter raises back-pressure |
-| Fan output % below which fan is treated as off (%) | `50` | Matches the `PF28`/`PF27` firmware gate (default 50 %). Set to 0 if you set PF28/PF27 to 0. |
 
 These values feed the live `sensor.supply_fan_airflow` calculation (proportional:
 `output% / 100 × Q_max`). The two static sensors (`supply_fan_max_airflow`,
@@ -241,34 +257,34 @@ So in short: set **target humidity** in **Dry** or **Cool**; **target
 temperature** matters in **Cool** (summer). Both require a wired display or
 external probes to be present, otherwise the unit ignores them.
 
-### Passive airflow vs. fan mode
+### Fan mode and recirculation
 
-The HRDS+ sits on the supply branch of your central MVHR ("inflow pipe"), and
-the word *integration* is used by the manufacturer for two different things, so
-it's worth being precise:
+The HRDS+ sits on the supply branch of your central MVHR ("inflow pipe"). The
+word *integration* is used by the manufacturer for two different things, so it's
+worth being precise:
 
-* **Passive airflow** — the unit's **own fan is off**, but your central MVHR is
-  still pushing air through the duct, so air keeps flowing. Set the **climate
-  fan mode to "off"** to stop the unit's own fan; the central MVHR continues
-  to push air through passively. There is no dedicated sensor for this state —
-  watch **Supply fan status = Off** while **Unit status = On** (and **Recirculation
-  active = off**). The unit cannot measure the upstream MVHR's
-  flow, so rely on your central system for the actual rate.
-* **Fan integration** — the unit runs **its own fan** to blend (integrate) the
-  central inflow air with room air across its coil. Set the climate fan mode to
-  **low / medium / high** to drive the fan at a fixed speed. The **Recirculation
-  active** binary sensor tells you when the fan is running; **Supply
-  fan output %** and **Supply fan speed (RPM)** show the actual speed. Fine-grained
-  modulation bands (per mode) are available via the standalone `number` entities.
+* **Passive airflow** — the unit's own fan is off, but your central MVHR still
+  pushes air through the duct. On an **`R` unit this only happens while the
+  unit is idle** (Off / On-standby, no dehumidify or cooling request). There is
+  no dedicated sensor: watch **Supply fan status = Off** while **Unit status =
+  On**. The unit cannot measure the upstream MVHR's flow.
+* **Fan integration** — the unit runs **its own fan** to blend central inflow
+  air with room air across its coil. **On an `R` unit every Dry or Cool request
+  does this:** the controller opens the recirculation damper, starts the fan
+  after the damper is open, then starts the compressor. **Recirculation active**
+  tells you the fan is running; **Supply fan output %** and **Supply fan speed
+  (RPM)** show the actual speed.
 
-**Fan mode is independent of HVAC mode.** You can set fan mode to "off" while
-the HVAC mode is Dry or Cool — the unit will still dehumidify or cool using
-the passive airflow from the inflow pipe, without running its own fan. This is
-the expected use case when the central MVHR provides sufficient airflow.
-
-> **Note (unverified):** the "fan off during Dry/Cool" behaviour is based on
-> the unit's ducted architecture and user confirmation, but has not yet been
-> tested on real hardware. See `plans/todo.md`.
+**Dehumidifying on passive airflow alone is not possible on an `R` unit with
+stock settings.** Fan mode "off" (a write of 0 to `PM20`) neither stops the fan
+during Dry/Cool nor keeps the damper closed, and the unit may floor the fan at
+its dehumidify minimum. Only a **non-`R`** unit (no damper, no fan) dehumidifies
+on passive flow. For an `R` unit, an unofficial I/O reassignment exists; it is
+untested here and carries a short-circuit risk if the recirculation inlet is
+teed into the extract duct. See
+[`references/MODBUS_REGISTERS.md` §13.5](references/MODBUS_REGISTERS.md).
+Use the per-mode fan minimum/maximum `number` entities to choose how hard the fan
+runs while it does.
 
 ### Drying with the fan on, but active cooling off
 
@@ -305,18 +321,18 @@ above):
 | `sensor.max_total_airflow` | Same as max airflow (provided for convenience) |
 
 The formula is proportional: `Q = (output% / 100) × Q_max`, using the live
-`supply_fan_output` register. Below the configured "fan min output %" threshold
-the fan is treated as off (0 m³/h) — this threshold matches the `PF28`/`PF27`
-firmware gate (default 50 %, configurable to 0 %). Default Q_max per model:
+`supply_fan_output` register. The fan counts as stopped (0 m³/h) when the
+unit's own `supply_fan_status` says so, not at a percentage of ours. Default
+Q_max per model:
 
-| Variant | Q_max | Fan gate default |
-|---------|------:|-----------------:|
-| HRDS+ 30 | 300 m³/h | 50 % (PF28/PF27) |
-| HRDS+ 50 | 500 m³/h | 50 % (PF28/PF27) |
+| Variant | Q_max |
+|---------|------:|
+| HRDS+ 30 | 300 m³/h |
+| HRDS+ 50 | 500 m³/h |
 
-Note: the unit has **no minimum fan speed** — PF28 and PF27 are configurable
-from 0 to 100 %, so the 130/190 m³/h figures from the performance table are the
-tested operating range, not a hardware or firmware floor.
+Note: PF28 and PF27 (the per-mode fan minimums, exposed as `number` entities)
+are configurable from 0 to 100 %, so the 130/190 m³/h figures from the
+performance table are the tested operating range, not a firmware floor.
 
 This is an open-loop estimate — it assumes constant duct resistance, so loaded
 filters or restrictive ducts will make the real flow lower than estimated. If
@@ -359,13 +375,17 @@ probes must be **installed by the installer** — they do not come built-in.
 | Outdoor temperature | NTC 10 kΩ B3435, IP65-rated | Only needed for Free-Cooling/Heating (PG03); otherwise optional |
 | Exhaust / supply air temperature | NTC 10 kΩ B3435 | Optional; display/monitoring only |
 
-**If you have no display and no external probes**, set the `probe_source` select
-entity to **"None / external probes"** (HA00 = 0) and disable the display input
-(PH01 = 0, via the installer menu once). The unit then responds only to
-explicit Modbus commands — dehumidify, cooling and fan control all work
-normally; only the _automatic_ setpoint-based triggers are inactive. The
-`temp_probe_ok` and `humidity_probe_ok` binary sensors will read **OFF** — this
-is expected, not an error.
+**If you have no display and no external probes** (the default, with *A wired
+CNU2 display is connected* left off), the integration sets HA00 = 0 and PH01 = 0
+for you. The unit then responds only to explicit Modbus commands — dehumidify,
+cooling and fan control work normally; only the _automatic_ setpoint-based
+triggers are inactive. Probe inputs that are not wired report no value: room
+temperature, room humidity, outdoor, exhaust, supply air temperature and air
+quality show **unknown**, and the climate entity shows no current temperature or
+humidity. That is expected, not an error. The factory-wired water and evaporator
+temperatures keep working. (The `temp_probe_ok` / `humidity_probe_ok` sensors
+follow alarms AL28/AL34, which a headless unit did not necessarily raise, so
+judge by the sensors above rather than by those two.)
 
 See [`references/README.md` — Probes](references/README.md#probes-built-in-display-and-external-sensors)
 and [`references/MODBUS_REGISTERS.md` §14](references/MODBUS_REGISTERS.md#14-probes-built-in-display-and-external-sensors)

@@ -35,10 +35,28 @@ not backed by a single register, and are declared directly in `init()`
   chunks** (`_build_blocks` in `__init__.py`, capped at `C_MAX_BLOCK`, merging
   gaps up to `C_MAX_GAP`).
 * **"by BMS" enables are mandatory.** Writes are ignored unless PH02/PH27/PH28
-  are set. `_sync_bms_enables_locked` re-asserts them **every poll**, driven by
-  the polled read-back rather than a one-shot flag, so a device power-cycle that
-  clears them self-heals. They are also exposed as switches — and because the
-  hub re-asserts them, turning one off by hand is undone on the next poll.
+  are set. `_sync_required_settings_locked` re-asserts them **every poll**, driven
+  by the polled read-back rather than a one-shot flag, so a device power-cycle
+  that clears them self-heals. They are also exposed as switches — and because
+  the hub re-asserts them, turning one off by hand is undone on the next poll.
+* **Headless by default (`has_display` option, default off).** With no CNU2
+  display the unit must have **PH01 (1777) = 0** and **HA00 (1803) = 0**, else
+  it sits in `off_by_display` forever (an OFF from any source beats a Modbus ON)
+  and waits for room T/H from a display that is not there. In headless mode the
+  same `_sync_required_settings_locked` asserts both (`HEADLESS_SETTINGS` in
+  `const.py`). With `has_display` on, they are left alone.
+* **Device identity is verified before anything is written** (`identity.py`,
+  called from `async_setup_entry` and from the config/options flow). FC 43/14
+  must report vendor `EVCO` and a product code starting `EPB9` (a real unit
+  reports `EVCO` / `EPB9ORSINDEU` / `V01.00.09.02`), and the four status
+  registers must hold documented enum values. If the gateway does not forward
+  FC 43 the register fingerprint alone decides. Wrong device → `ConfigEntryError`
+  / form error `wrong_device`; no answer → `ConfigEntryNotReady` / `cannot_connect`.
+  The identity also feeds the device registry (`model_id`, `sw_version`).
+* **Unwired analog inputs read a sentinel** (`0x8004`, window
+  `PROBE_SENTINEL_LOW..HIGH`), not 0. `_decode_all` stores `None` for those
+  INT16 words, so the entity is `unknown` instead of -3276.4 °C. The climate
+  entity must then report no current temperature/humidity (never a stale value).
 * **Scaling:** temperatures/setpoints ×0.1 (`FAKTOR`), fan/percent registers
   ×0.01, humidity ×1.
 
@@ -52,7 +70,7 @@ from the manufacturer PDFs in `references/`.
 |------|---------|
 | `references/MODBUS_REGISTERS.md` | **Start here.** Register addresses, alarm bit map, alarm code table, cookbook for common operations. |
 | `references/README.md` | Implementation notes: airflow / passive flow / fan-integration / active-cooling distinction; variant detection (30/50, R/non-R, DC); fan-speed-to-airflow formula; probe wiring; alarm interpretation. |
-| `references/HRDS+_Technisches_Handbuch_DE.txt` | Full text of the 87-page German technical handbook (searchable). Firmware parameters (PF27/PF28 fan min %, PG01 machine type, BMS enable, etc.), performance tables, wiring diagrams. |
+| `references/HRDS+_Technisches_Handbuch_DE.txt` | Full text of the 87-page German technical handbook (searchable). Firmware parameters (PF27/PF28 fan min %, PG01 fan arrangement, BMS enable, etc.), performance tables, wiring diagrams. |
 | `references/Innova_DEH+_H_Installation_Manual_EN.txt` | Innova DEH+ H installation manual EN — the Italian OEM original of the HRDS+. Alarm table (with effect descriptions), microswitch DIP settings, VMC wiring. |
 | `references/HRDS+_Modbus_RTU_RS485_DE.pdf` | Modbus RTU/RS-485 connection manual — original source of the register table in MODBUS_REGISTERS.md. |
 | `references/HRDS+_Technisches_Handbuch_DE.pdf` | Original German technical handbook PDF (87 pp). |
@@ -113,7 +131,7 @@ The product code on the type plate encodes the variant: `HRDS+ 30 H R K DC`.
 | Field | Values | Meaning |
 |-------|--------|---------|
 | `30`/`50` | size | Max airflow 300 / 500 m³/h. **No register** — set `model` in config. |
-| `R` | optional | Has recirculation fan + motorised damper + air filter. `PG01_MachineType` (1797) = `1` (VMC). Non-R = `0`. |
+| `R` | optional | Has recirculation fan + motorised damper + air filter. **No dedicated register**: detect it from the damper output `outDO_RecircDamper` (1134): `disabled` = no damper (non-R), `off`/`on` = R. `PG01_MachineType` (1797) is **not** this flag — it is the fan arrangement (0 = supply fan only, 1 = supply + exhaust) and reads `0` on an R unit (verified on an HRDS+ 30 R). |
 | `DC` | optional | Has active cooling. `PG02_EnableIntegration` (1798) = `1`. |
 
 **Non-R variant always runs on passive MVHR airflow** — no recirculation fan at all.

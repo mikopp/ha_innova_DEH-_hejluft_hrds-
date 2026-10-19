@@ -17,6 +17,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import (
+    ConfigEntryError,
     ConfigEntryNotReady,
     HomeAssistantError,
     ServiceValidationError,
@@ -26,6 +27,7 @@ from pymodbus.client import ModbusTcpClient
 
 from .const import (
     BMS_ENABLE_KEYS,
+    C_DT_INT16,
     C_MAX_BLOCK,
     C_MAX_GAP,
     C_MAX_TOTAL_AIRFLOW,
@@ -36,13 +38,16 @@ from .const import (
     C_SUPPLY_FAN_OUTPUT,
     C_SUPPLY_FAN_STATUS,
     CONF_AIRFLOW_MAX,
+    CONF_HAS_DISPLAY,
     CONF_HOSTID,
     CONF_MODEL,
+    DEFAULT_HAS_DISPLAY,
     DEFAULT_HOSTID,
     DEFAULT_MODEL,
     DEFAULT_PORT,
     DEFAULT_SCAN_INTERVAL,
     ENTITIES_DICT,
+    HEADLESS_SETTINGS,
     MODEL_SPECS,
     get_entity_bitmask,
     get_entity_factor,
@@ -54,7 +59,9 @@ from .const import (
     is_entity_readonly,
     is_entity_select,
     is_entity_switch,
+    is_probe_sentinel,
 )
+from .identity import CannotConnect, DeviceIdentity, WrongDevice, verify_device
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -100,6 +107,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except (TypeError, ValueError):
         airflow_max = spec["max"]
 
+    has_display = bool(
+        entry.options.get(
+            CONF_HAS_DISPLAY, entry.data.get(CONF_HAS_DISPLAY, DEFAULT_HAS_DISPLAY)
+        )
+    )
+
+    # Refuse to write configuration registers into something that is not an
+    # HRDS+ (wrong IP, wrong slave id behind a shared gateway).
+    try:
+        identity = await hass.async_add_executor_job(verify_device, host, port, hostid)
+    except CannotConnect as exc:
+        raise ConfigEntryNotReady(
+            f"Cannot reach HRDS+ at {host}:{port}: {exc}"
+        ) from exc
+    except WrongDevice as exc:
+        raise ConfigEntryError(
+            f"{host}:{port} (unit id {hostid}) is not an HRDS+: {exc}"
+        ) from exc
+
     hub = HrdsModbusHub(
         hass,
         name,
@@ -108,6 +134,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         scan_interval,
         hostid,
         airflow_max,
+        has_display,
+        identity,
     )
 
     # Prime the cache before creating entities so they do not sit at `unknown`
@@ -179,9 +207,13 @@ class HrdsModbusHub:
         scan_interval: int,
         hostid: int,
         airflow_max: float,
+        has_display: bool = DEFAULT_HAS_DISPLAY,
+        identity: Optional[DeviceIdentity] = None,
     ) -> None:
         self._hass = hass
         self._name = name
+        self._has_display = has_display
+        self.identity = identity or DeviceIdentity()
         self._client = ModbusTcpClient(host=host, port=port, timeout=3, retries=3)
         self._lock = threading.Lock()
         self._hostid = hostid
@@ -276,8 +308,8 @@ class HrdsModbusHub:
                 return False
             try:
                 # Uses the previous cycle's read-back, so on the very first
-                # cycle (empty data) all three enables are written.
-                self._sync_bms_enables_locked()
+                # cycle (empty data) every required setting is written.
+                self._sync_required_settings_locked()
                 raw_input = self._read_blocks(self._input_blocks, fc="input")
                 raw_holding = self._read_blocks(self._holding_blocks, fc="holding")
             finally:
@@ -350,35 +382,51 @@ class HrdsModbusHub:
             )
         return any_ok
 
-    def _sync_bms_enables_locked(self) -> None:
-        """Keep PH02/PH27/PH28 set so the unit honours our writes.
+    def _required_settings(self) -> list[tuple[str, str, int]]:
+        """(entity key, decoded value, raw value) the unit must hold for us."""
+        required = [(key, "on", 1) for key in BMS_ENABLE_KEYS]
+        if not self._has_display:
+            required += [
+                (key, decoded, raw) for key, (decoded, raw) in HEADLESS_SETTINGS.items()
+            ]
+        return required
+
+    def _sync_required_settings_locked(self) -> None:
+        """Keep PH02/PH27/PH28 (and, headless, PH01/HA00) at the values we need.
 
         Driven by the polled read-back rather than a one-shot flag: if the unit
-        power-cycles and loses the enables, every subsequent write would
-        silently no-op until Home Assistant restarted. Re-asserting each cycle
-        self-heals that.
+        power-cycles and loses a setting, every subsequent write would silently
+        no-op until Home Assistant restarted. Re-asserting each cycle self-heals
+        that, and only writes when the read-back differs.
 
-        Note this deliberately overrides the matching switches - the enables are
-        required for the integration to control the unit at all, so turning one
-        off by hand is undone on the next poll.
+        Note this deliberately overrides the matching switches/select - these are
+        required for the integration to control the unit at all, so changing one
+        by hand is undone on the next poll. Without a display, PH01 must be 0
+        (else the unit stays OFF-by-display) and HA00 must be 0 (else it waits
+        for room T/H from a display that is not there).
         """
-        for key in BMS_ENABLE_KEYS:
-            if self.data.get(key) == "on":
+        for key, expected, raw in self._required_settings():
+            if self.data.get(key) == expected:
                 continue
             reg, _dt = get_entity_reg(get_entity_props(key))
             try:
                 resp = self._client.write_register(
-                    address=reg, value=1, device_id=self._hostid
+                    address=reg, value=raw, device_id=self._hostid
                 )
             except Exception as exc:  # noqa: BLE001 - retried next cycle
-                _LOGGER.warning("Could not enable BMS control (%s): %r", key, exc)
+                _LOGGER.warning("Could not set required setting %s: %r", key, exc)
                 continue
             if resp is not None and resp.isError():
                 _LOGGER.warning(
-                    "Device rejected BMS enable %s (register %s): %s", key, reg, resp
+                    "Device rejected required setting %s (register %s): %s",
+                    key,
+                    reg,
+                    resp,
                 )
             else:
-                _LOGGER.info("Asserted BMS enable %s (register %s)", key, reg)
+                _LOGGER.info(
+                    "Set required setting %s (register %s) to %s", key, reg, raw
+                )
 
     # ---- decoding ---------------------------------------------------------
     def _decode_all(
@@ -416,6 +464,11 @@ class HrdsModbusHub:
                         "Register %s (%s) returned unmapped value %s", reg, key, raw
                     )
                 self.data[key] = decoded
+            elif dt == C_DT_INT16 and is_probe_sentinel(source[reg]):
+                # An unwired/failed analog input: not a reading. Keep the key so
+                # the entity is available but has no value (unknown), rather
+                # than reporting about -3276 degC.
+                self.data[key] = None
             else:
                 self.data[key] = float(raw) * get_entity_factor(props)
 

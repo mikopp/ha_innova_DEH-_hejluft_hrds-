@@ -44,6 +44,9 @@ DEFAULT_PORT = 502
 DEFAULT_HOSTID = 1
 CONF_HOSTID = "hostid"
 CONF_MODEL = "model"
+CONF_HAS_DISPLAY = "has_display"
+# The unit is driven over Modbus; a wired CNU2 display is the exception.
+DEFAULT_HAS_DISPLAY = False
 DEFAULT_MODEL = "30"
 MODELS = ["30", "50"]
 MODEL_SPECS: Dict[str, Dict[str, float]] = {
@@ -56,6 +59,20 @@ MODEL_SPECS: Dict[str, Dict[str, float]] = {
 # exposed as writable numbers rather than shadowed by a config option.
 CONF_AIRFLOW_MAX = "airflow_max_m3h"
 ATTR_MANUFACTURER = "Innova / hej.luft"
+
+# FC 43/14 (Read Device Identification) as reported by a real HRDS+ 30:
+# vendor "EVCO", product code "EPB9ORSINDEU", revision "V01.00.09.02". The
+# controller is an EVCO board, so the vendor is a hard requirement. The product
+# code is matched on its family prefix only; it was seen on a single unit.
+EXPECTED_VENDOR = "EVCO"
+EXPECTED_PRODUCT_PREFIX = "EPB9"
+
+# An unwired or failed analog input reads as a value in this raw (unsigned)
+# window instead of a temperature: 0x8004 was observed on every missing probe
+# and 0x7FFA next to them. Decoded as INT16 these are about -3276 degC, which
+# is never a real reading, so they mean "no value".
+PROBE_SENTINEL_LOW = 0x7FF0
+PROBE_SENTINEL_HIGH = 0x800F
 
 # ------------------------------------------------------------------
 # Register-type / data-type constants
@@ -111,6 +128,10 @@ COMPRESSOR_STATUS = {
     6: "off",
 }
 OPERATING_MODE = {0: "summer", 1: "winter", 2: "auto"}
+# PG01 - fan arrangement, NOT whether a recirculation fan exists. Handbook:
+# "0: dehumidifier with supply fan only, 1: with supply and exhaust fan". An `R`
+# unit reads 0 (its single fan is the recirculation fan).
+MACHINE_TYPE = {0: "supply_fan_only", 1: "supply_and_exhaust_fan"}
 RECIRCULATION_DAMPER = {0: "off", 1: "on", 2: "disabled"}
 # PU02 - dehumidification during the winter season.
 WINTER_DEHUM = {0: "disabled", 1: "with_water", 2: "without_water"}
@@ -157,8 +178,8 @@ C_OPERATING_MODE = "operating_mode"
 C_DEHUM_REQUEST = "dehumidify_request"
 C_RECIRCULATION_ACTIVE = "recirculation_active"
 C_ALARM_ACTIVE = "alarm_active"
-# Read-only binary sensors derived from holding registers (RW=0)
-C_HAS_RECIRCULATION = "has_recirculation"
+# Read-only sensors derived from holding registers (RW=0)
+C_MACHINE_TYPE = "machine_type"
 C_ACTIVE_COOLING_AVAILABLE = "active_cooling_available"
 # Read-only enum sensor from digital output register
 C_RECIRCULATION_DAMPER = "recirculation_damper"
@@ -183,6 +204,7 @@ C_HUMIDITY_SETPOINT_MAX = "humidity_setpoint_max"
 C_UNIT_ON_OFF = "unit_on_off"
 C_DEHUMIDIFY = "dehumidify"
 C_ACTIVE_COOLING = "active_cooling"
+C_ENABLE_ONOFF_DISPLAY = "enable_onoff_display"
 C_ENABLE_ONOFF_BMS = "enable_onoff_bms"
 C_ENABLE_DEHUM_BMS = "enable_dehumidify_bms"
 C_ENABLE_COOLING_BMS = "enable_cooling_bms"
@@ -503,6 +525,16 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "SWITCH": {"off": 0, "on": 1},
         "NAME": "Active cooling (BMS)",
     },
+    # PH01: let a wired display switch the unit on/off. With no display the unit
+    # stays OFF-by-display forever while this is 1, and an OFF from any source
+    # beats a Modbus ON.
+    C_ENABLE_ONOFF_DISPLAY: {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": 1777,
+        "DT": C_DT_UINT16,
+        "SWITCH": {"off": 0, "on": 1},
+        "NAME": "Enable on/off via display (PH01)",
+    },
     C_ENABLE_ONOFF_BMS: {
         "RT": C_REG_TYPE_HOLDING_REGISTERS,
         "REG": 1778,
@@ -525,16 +557,18 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "NAME": "Enable cooling via Modbus",
     },
     # --- Hardware-variant read-only sensors (holding registers, RW=0) ---
-    # PG01_MachineType (1797): 0=dehumidifier only, 1=dehumidifier+VMC (has recirc fan).
+    # PG01_MachineType (1797): fan arrangement (supply only / supply + exhaust).
+    # It does NOT say whether a recirculation fan is fitted: use the damper
+    # output (1134, `disabled` = no damper wired) for that.
     # PG02_EnableIntegration (1798): 0=cooling disabled, 1=cooling enabled on this unit.
-    # RW=0 forces classification as binary sensor even though RT is HOLDING.
-    C_HAS_RECIRCULATION: {
+    # RW=0 forces read-only classification even though RT is HOLDING.
+    C_MACHINE_TYPE: {
         "RT": C_REG_TYPE_HOLDING_REGISTERS,
         "REG": 1797,
         "DT": C_DT_UINT16,
-        "SWITCH": {"off": 0, "on": 1},
+        "VALUES": MACHINE_TYPE,
         "RW": 0,
-        "NAME": "Has recirculation fan",
+        "NAME": "Machine type (PG01)",
     },
     C_ACTIVE_COOLING_AVAILABLE: {
         "RT": C_REG_TYPE_HOLDING_REGISTERS,
@@ -763,6 +797,14 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
 # Modbus control is actually permitted by the unit.
 BMS_ENABLE_KEYS = (C_ENABLE_ONOFF_BMS, C_ENABLE_DEHUM_BMS, C_ENABLE_COOLING_BMS)
 
+# Settings that must hold when no CNU2 display is fitted: {key: (decoded, raw)}.
+# Without them the unit sits OFF-by-display and expects room T/H from a display
+# that is not there (handbook section 5.1). Asserted like the BMS enables.
+HEADLESS_SETTINGS: Dict[str, tuple[str, int]] = {
+    C_ENABLE_ONOFF_DISPLAY: ("off", 0),
+    C_PROBE_SOURCE: ("none_or_external", 0),
+}
+
 # Computed sensors: not backed by Modbus registers; values are written by the
 # hub after each decode cycle using model calibration parameters.
 COMPUTED_SENSORS: Dict[str, Dict[str, str]] = {
@@ -909,6 +951,11 @@ def is_entity_select(props: Dict[str, Any]) -> bool:
 
 def get_entity_bitmask(props: Dict[str, Any]) -> int | None:
     return props.get("BITMASK")
+
+
+def is_probe_sentinel(raw_word: int) -> bool:
+    """True if an unsigned register word is the "no probe / failed" marker."""
+    return PROBE_SENTINEL_LOW <= raw_word <= PROBE_SENTINEL_HIGH
 
 
 def is_entity_climate(props: Dict[str, Any]) -> bool:

@@ -8,13 +8,16 @@
           "port": "Port",
           "hostid": "Modbus-Slave-ID",
           "scan_interval": "Abfrageintervall",
-          "model": "Modell (30 = HRDS+30, 50 = HRDS+50)"
+          "model": "Modell (30 = HRDS+30, 50 = HRDS+50)",
+          "has_display": "Ein verdrahtetes CNU2-Display ist angeschlossen"
         }
       }
     },
     "error": {
       "already_configured": "Dieser Host ist bereits konfiguriert",
-      "invalid_host": "Ungültiger Host oder ungültige IP-Adresse"
+      "invalid_host": "Ungültiger Host oder ungültige IP-Adresse",
+      "cannot_connect": "Gerät nicht erreichbar. Host, Port und Modbus-Slave-ID prüfen",
+      "wrong_device": "Das Gerät unter dieser Adresse ist kein HRDS+ (EVCO-EPB9-Regler)"
     }
   },
   "options": {
@@ -27,9 +30,14 @@
           "hostid": "Modbus-Slave-ID",
           "scan_interval": "Abfrageintervall",
           "model": "Modell (30 = HRDS+30, 50 = HRDS+50)",
+          "has_display": "Ein verdrahtetes CNU2-Display ist angeschlossen",
           "airflow_max_m3h": "Zuluftventilator max. Volumenstrom (m³/h)"
         }
       }
+    },
+    "error": {
+      "cannot_connect": "Gerät nicht erreichbar. Host, Port und Modbus-Slave-ID prüfen",
+      "wrong_device": "Das Gerät unter dieser Adresse ist kein HRDS+ (EVCO-EPB9-Regler)"
     }
   },
   "entity": {
@@ -53,6 +61,13 @@
       "max_total_airflow": { "name": "Max. Gesamt-Volumenstrom" },
       "supply_fan_max_airflow": { "name": "Zuluftventilator max. Volumenstrom" },
       "supply_fan_airflow": { "name": "Zuluftventilator Volumenstrom" },
+      "machine_type": {
+        "name": "Maschinentyp (PG01)",
+        "state": {
+          "supply_fan_only": "Nur Zuluftventilator",
+          "supply_and_exhaust_fan": "Zuluft- und Abluftventilator"
+        }
+      },
       "recirculation_damper": {
         "name": "Umluft-Klappe",
         "state": {
@@ -121,7 +136,6 @@
       "alarm_active": { "name": "Alarm aktiv" },
       "temp_probe_ok": { "name": "Raumtemperaturfühler OK" },
       "humidity_probe_ok": { "name": "Raumfeuchtesensor OK" },
-      "has_recirculation": { "name": "Umluftventilator vorhanden" },
       "active_cooling_available": { "name": "Aktive Kühlung verfügbar" },
       "alarm_compressor_lowpressure": { "name": "Alarm: Kompressor Niederdruck / Frostschutz" },
       "alarm_compressor_highpressure": { "name": "Alarm: Kompressor Hochdruck" },
@@ -132,6 +146,7 @@
       "unit_on_off": { "name": "Gerät ein/aus (Modbus)" },
       "dehumidify": { "name": "Entfeuchtung (Modbus)" },
       "active_cooling": { "name": "Aktive Kühlung (Modbus)" },
+      "enable_onoff_display": { "name": "Ein/Aus über Display freigeben (PH01)" },
       "enable_onoff_bms": { "name": "Ein/Aus über Modbus freigeben" },
       "enable_dehumidify_bms": { "name": "Entfeuchtung über Modbus freigeben" },
       "enable_cooling_bms": { "name": "Kühlung über Modbus freigeben" },

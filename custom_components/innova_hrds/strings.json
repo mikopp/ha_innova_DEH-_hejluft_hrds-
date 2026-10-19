@@ -8,13 +8,16 @@
           "port": "Port",
           "hostid": "Modbus slave ID",
           "scan_interval": "Scan interval",
-          "model": "Model (30 = HRDS+30, 50 = HRDS+50)"
+          "model": "Model (30 = HRDS+30, 50 = HRDS+50)",
+          "has_display": "A wired CNU2 display is connected"
         }
       }
     },
     "error": {
       "already_configured": "This host is already configured",
-      "invalid_host": "Invalid host or IP address"
+      "invalid_host": "Invalid host or IP address",
+      "cannot_connect": "Cannot reach the unit. Check host, port and Modbus slave ID",
+      "wrong_device": "The device at this address is not an HRDS+ (EVCO EPB9 controller)"
     }
   },
   "options": {
@@ -27,9 +30,14 @@
           "hostid": "Modbus slave ID",
           "scan_interval": "Scan interval",
           "model": "Model (30 = HRDS+30, 50 = HRDS+50)",
+          "has_display": "A wired CNU2 display is connected",
           "airflow_max_m3h": "Supply fan max airflow (m³/h)"
         }
       }
+    },
+    "error": {
+      "cannot_connect": "Cannot reach the unit. Check host, port and Modbus slave ID",
+      "wrong_device": "The device at this address is not an HRDS+ (EVCO EPB9 controller)"
     }
   },
   "entity": {
@@ -86,6 +94,13 @@
       },
       "supply_fan_airflow": {
         "name": "Supply fan airflow"
+      },
+      "machine_type": {
+        "name": "Machine type (PG01)",
+        "state": {
+          "supply_fan_only": "Supply fan only",
+          "supply_and_exhaust_fan": "Supply and exhaust fan"
+        }
       },
       "recirculation_damper": {
         "name": "Recirculation damper",
@@ -165,9 +180,6 @@
       "humidity_probe_ok": {
         "name": "Room humidity probe OK"
       },
-      "has_recirculation": {
-        "name": "Has recirculation fan"
-      },
       "active_cooling_available": {
         "name": "Active cooling available"
       },
@@ -193,6 +205,9 @@
       },
       "active_cooling": {
         "name": "Active cooling (Modbus)"
+      },
+      "enable_onoff_display": {
+        "name": "Enable on/off via display (PH01)"
       },
       "enable_onoff_bms": {
         "name": "Enable on/off via Modbus"

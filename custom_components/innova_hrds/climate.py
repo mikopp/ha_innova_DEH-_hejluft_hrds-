@@ -107,24 +107,23 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
     def _on_hub_update(self) -> None:
         data = self._hub.data
 
-        # Suppress temperature/humidity readings when the unit reports a probe
-        # fault (AL28 / AL34). probe_ok == "off" means the alarm is active.
-        # probe_ok == None means no alarm data yet — show reading if available.
-        temp_ok = data.get(C_TEMP_PROBE_OK)
-        if temp_ok == "off":
+        # No reading when the unit reports a probe fault (AL28 / AL34;
+        # probe_ok == "off" means the alarm is active) or when the input carries
+        # the unwired-probe sentinel (the hub decodes that to None). Never keep
+        # the previous value: a probe that disappears must not leave a stale
+        # temperature on the card. probe_ok == None (no alarm data yet) is
+        # treated as healthy.
+        temp = data.get(CLIMATE_CURRENT_TEMP)
+        if data.get(C_TEMP_PROBE_OK) == "off" or temp is None:
             self._attr_current_temperature = None
         else:
-            temp = data.get(CLIMATE_CURRENT_TEMP)
-            if temp is not None:
-                self._attr_current_temperature = float(temp)
+            self._attr_current_temperature = float(temp)
 
-        hum_ok = data.get(C_HUMIDITY_PROBE_OK)
-        if hum_ok == "off":
+        hum = data.get(CLIMATE_CURRENT_HUMIDITY)
+        if data.get(C_HUMIDITY_PROBE_OK) == "off" or hum is None:
             self._attr_current_humidity = None
         else:
-            hum = data.get(CLIMATE_CURRENT_HUMIDITY)
-            if hum is not None:
-                self._attr_current_humidity = int(hum)
+            self._attr_current_humidity = int(hum)
 
         # Advertise the unit's own PU01 clamps (PH29/PH30) instead of a guess.
         hum_min = data.get(CLIMATE_MIN_HUMIDITY)

@@ -17,8 +17,8 @@ reference for building the Home Assistant integration in this repository.
 ## What the unit is
 
 The HRDS+ is an isothermal air dehumidifier for radiant-panel / residential
-ventilation systems. Depending on configuration (`PG01_MachineType`) it runs as
-a pure dehumidifier or as a dehumidifier with integrated ventilation (VMC). It
+ventilation systems. Its fan arrangement is set by `PG01_MachineType` (supply
+fan only, or supply plus exhaust fan; this is *not* the recirculation flag). It
 can additionally provide **active cooling** ("integration") in summer using its
 refrigerant compressor and a chilled-water circuit, and it follows a
 **Summer/Winter** season model.
@@ -180,8 +180,8 @@ The table below lists the best Modbus proxies, exposed as HA sensors:
 | Variant axis | Best Modbus indicator | Register | HA entity |
 |---|---|---|---|
 | **Airflow size (30 vs 50)** | Not readable — set manually in integration setup | — | config `model` field |
-| **Recirculation fan present (`R` / non-`R`)** | `PG01_MachineType` (1797): `1` = VMC (has recirc fan), `0` = dehumidifier only | FC 03, R/W configured as R/O | `binary_sensor.has_recirculation` |
-| **Recirculation damper state** | `outDO_RecircDamper` (1134): `off` = damper closed (room-air duct blocked, MVHR passive flow only), `on` = damper open (room air drawn in and blended), `disabled` = no damper output wired (non-`R` build, no recirculation assembly) | FC 04, R/O | `sensor.recirculation_damper` |
+| **Fan arrangement** | `PG01_MachineType` (1797): `0` = supply fan only, `1` = supply + exhaust fan. **Not** the `R` flag: an `R` unit reads `0`. | FC 03, R/W configured as R/O | `sensor.machine_type` |
+| **Recirculation fan present (`R` / non-`R`)** and **damper state** | `outDO_RecircDamper` (1134), the reliable `R` indicator: `off` = damper closed (room-air duct blocked, MVHR passive flow only), `on` = damper open (room air drawn in and blended), `disabled` = no damper output wired (non-`R` build, no recirculation assembly) | FC 04, R/O | `sensor.recirculation_damper` |
 | **Active cooling present (`DC` / `D`)** | `PG02_EnableIntegration` (1798): `1` = cooling enabled on this unit | FC 03, R/W configured as R/O | `binary_sensor.active_cooling_available` |
 
 **What the damper is:** a motorised flap in the room-air return duct. When
@@ -341,7 +341,10 @@ use for room T/H. The factory default is `6` (CNU2 display with both sensors).
 | External NTC (T) + humidity transmitter (H) on AI2/AI3 | `0` |
 | No display, no external probes (fully manual BMS mode) | `0` + set PH01 = 0 |
 
-The HA integration exposes HA00 as a `select` entity (`T/H probe source`).
+The HA integration exposes HA00 as a `select` entity (`T/H probe source`). In
+its default headless mode (`has_display` off) it also **writes HA00 = 0 and
+PH01 = 0 itself** and re-asserts them every poll. Without PH01 = 0 the unit
+sits in "OFF by display" and ignores a Modbus ON.
 
 ### Probe fault alarms
 

@@ -60,6 +60,29 @@ verified on hardware.
       compressor, and whether setting PU13 to 0 lifts the interlock. This is the
       most likely cause of "the write was accepted but nothing happened".
 
+## Headless operation, identity, sentinel (added 2026-10-19)
+
+- [ ] **PH01 = 0 clears `off_by_display`.** On a unit that reads PH01 = 1 with no
+      display, connect with `has_display` off and confirm `unit_status` goes
+      `off_by_display` → `off_by_bms`, then that `climate.turn_on` really starts
+      it. Check whether PH01 needs a unit restart to take effect.
+- [ ] **HA00 = 0 on a unit that read 2** (the manual says the factory value is
+      6). Confirm it is accepted and whether AL28/AL34 appear afterwards.
+- [ ] **PH01 / HA00 are config parameters**: confirm that re-writing them only
+      when the read-back differs (never blindly each poll) does not wear the
+      controller's memory, and that the unit does not reset them on its own.
+- [ ] **Sentinel window** `0x7FF0..0x800F`: only `0x8004` and `0x7FFA` have been
+      seen. Confirm what a *failed* (wired but broken) probe reads, and whether
+      it also raises AL28/AL34.
+- [ ] **AL28/AL34 were not set** while the unit was OFF by display with no
+      probes (PackedAlarm_2/3 = 0). Confirm they appear once the unit is ON.
+- [ ] **PU13 with no room temperature**: does the interlock veto a Modbus
+      dehumidify when the room input is the sentinel? If yes, set PU13 to 0.
+- [ ] **Identity check**: the product-code prefix `EPB9` comes from one unit
+      (`EPB9ORSINDEU`). Confirm other HRDS+ variants (30/50, non-R, non-DC)
+      report an `EPB9…` code; loosen `EXPECTED_PRODUCT_PREFIX` if not. Also
+      confirm what a gateway that does not forward FC 43 returns.
+
 ## Climate entity behaviour
 
 - [ ] **Mode writes**: DRY = on + dehumidify + active_cooling **off**;

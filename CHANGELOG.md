@@ -4,6 +4,46 @@ All notable changes to this project are documented here, newest first.
 
 ---
 
+## 2026-10-19
+
+### fix: run without a display, verify the device, stop misreading PG01 and unwired probes
+
+Driven by the first bring-up against a real HRDS+ 30 R (`tests/diagnose_hrds.py`).
+
+**Device identity is checked** (`identity.py`). Setup and the config/options
+flow now require FC 43/14 vendor `EVCO` with a product code starting `EPB9`
+(the unit reports `EVCO` / `EPB9ORSINDEU` / `V01.00.09.02`) **and** the four
+status registers holding documented enum values. A wrong device is refused
+before any register is written (`wrong_device` / `ConfigEntryError`); an
+unreachable one gives `cannot_connect` / `ConfigEntryNotReady`. Without FC 43
+the register fingerprint decides alone. The product code and firmware revision
+now appear in the device registry.
+
+**Headless operation.** New option `has_display` (default **off**). While off,
+the hub asserts **PH01 = 0** (display on/off) and **HA00 = 0** (T/H source
+none) on every poll, next to PH02/PH27/PH28. Before this the unit reported
+`off_by_display` forever, because PH01 = 1 with no display, and a Modbus ON
+cannot override it. New `switch.enable_onoff_display` exposes PH01. Set
+`has_display` if you do have a CNU2: the integration then leaves both alone.
+`_sync_bms_enables_locked` became `_sync_required_settings_locked`.
+
+**Unwired probes no longer read -3276.4 °C.** An unconnected analog input
+returns `0x8004` (and `0x7FFA` next to it), not 0. INT16 words in
+`0x7FF0..0x800F` now decode to "no value" and the entity is `unknown`. The
+climate entity also stops holding the previous temperature/humidity when the
+value disappears.
+
+**PG01 was misread.** The handbook defines it as the fan arrangement (0 =
+supply fan only, 1 = supply + exhaust fan), not "has a recirculation fan". An
+`R` unit reads 0, so `binary_sensor.has_recirculation` wrongly said "no
+recirculation". It is replaced by `sensor.machine_type`; detect `R` from the
+recirculation damper output (1134, `disabled` = no damper). Docs corrected.
+
+**Diagnostic script** now flags the sentinel instead of printing -3276.4,
+reports the identity verdict, lists the PH01/HA00 writes, and takes `--display`.
+
+---
+
 ## 2026-09-10 (2)
 
 ### refactor: fan entities report actual speed; drop the shadowed fan minimum

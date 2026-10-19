@@ -65,8 +65,8 @@ source (contact, display, Modbus).
 | `0x06F2` | 1778 | `Enable_OnOffByBMS`       | R/W | **PH02** — set `1` to allow On/Off over Modbus (`0=Disabled,1=Enabled`). |
 | `0x074D` | 1869 | `Enable_IntegByBMS`       | R/W | **PH27** — set `1` to allow the integration / active-cooling request over Modbus. |
 | `0x074E` | 1870 | `Enable_DehumByBMS`       | R/W | **PH28** — set `1` to allow the dehumidify request over Modbus. |
-| `0x06F1` | 1777 | `Enable_OnOffByDisplay`   | R/W | **PH01** — set `0` if no wired display is present. |
-| `0x070B` | 1803 | `T/H Probe Source` (HA00) | R/W | Source for temp/humidity probes: `0=None`, `6=CNU2 display`. Set `0` if no display. |
+| `0x06F1` | 1777 | `Enable_OnOffByDisplay`   | R/W | **PH01** — set `0` if no wired display is present. While `1` with no display the unit stays `sm_UnitStatus` = `0` (OFF by display) permanently, and an OFF from any source beats a Modbus ON. Factory value is `1`. The integration sets it to `0` in headless mode (the default). |
+| `0x070B` | 1803 | `T/H Probe Source` (HA00) | R/W | Source for temp/humidity probes: `0=None`, `6=CNU2 display` (factory default; a unit seen in the field read `2`). Set `0` if no display. The integration sets it to `0` in headless mode. |
 
 ## 4. Operating commands (control)
 
@@ -233,7 +233,7 @@ Write `1` to reset the corresponding alarm: `0x030B`=AL01, `0x030C`=AL02,
 
 | Addr HEX | Addr DEC | Name | Meaning |
 |----------|----------|------|---------|
-| `0x0705` | 1797 | `PG01_MachineType` | `0=Only dehumidifier`, `1=Dehumidifier + VMC (ventilation)` |
+| `0x0705` | 1797 | `PG01_MachineType` | Fan arrangement: `0=supply fan only`, `1=supply fan + exhaust fan` (handbook PG01: „Entfeuchter nur mit Zuluftventilator“ / „mit Zuluft- und Abluftventilator“). **Not** "has a recirculation fan": an `R` unit reads `0` (its one fan is the recirculation fan). Use `outDO_RecircDamper` (1134) for that — `2=Disable` means no damper wired. Verified on an HRDS+ 30 `R`: PG01 = 0 with the damper output present (1134 = 0). |
 | `0x0706` | 1798 | `PG02_EnableIntegration` | Enable the active-cooling integration function |
 | `0x0699` | 1689 | `PU02_EnableWinterDehum` | `0=No`, `1=With water`, `2=Without water` |
 | `0x069C` | 1692 | `PU05_ForceDehumInCooling` | Force dehumidify when cooling requested |
@@ -523,11 +523,14 @@ unconfigured inputs; it raises AL28/AL34 when the configured source is absent.
 | `6` | CNU2 display, T + H **(factory default)** | CNU2 built-in NTC | CNU2 built-in humidity |
 
 > **Headless setup (no display, no external probes):** set HA00 = 0 **and**
-> PH01 (1777) = 0 ("display not present"). Without this, the unit raises AL28
-> and AL34 continuously, which blocks dependent control. The HA integration
-> exposes HA00 as a `select` entity (`probe_source`) and PH01 via the
-> `enable_onoff_bms` family; set both from HA rather than requiring a
-> service-tool visit.
+> PH01 (1777) = 0 ("display not present"). Without this the unit stays OFF by
+> display and waits for room T/H from a display that is not there (AL28/AL34
+> may follow). The handbook (§5.1 and the commissioning checklist) gives the
+> same pair: with CNU2 `PH01 = 1, HA00 = 6`; without CNU2 `PH01 = 0, HA00 = 0`.
+> The HA integration does this itself unless the `has_display` option is set:
+> it re-asserts PH01 = 0 and HA00 = 0 on every poll, like the BMS enables.
+> Both are also exposed (`switch.enable_onoff_display`, `select.probe_source`),
+> but in headless mode a manual change is undone on the next poll.
 
 ### 14.4 Probe fault detection — packed alarm registers
 
@@ -566,9 +569,8 @@ The unit can be driven **entirely via Modbus** (from Home Assistant) without a
 display or any room sensors. In this mode:
 
 1. Set **HA00 = 0** (`probe_source` select → "None / external probes") and
-   **PH01 = 0** (disable display; the HA integration does not yet expose PH01
-   directly — set it once via the wired remote's installer menu or service
-   software).
+   **PH01 = 0** (disable display). The HA integration writes both itself when
+   `has_display` is off (the default).
 2. The HA integration auto-sets **PH02/PH27/PH28** = 1 on every connection,
    so on/off, dehumidify and cooling are controllable immediately.
 3. Automatic setpoint-based control (trigger dehumidify when room humidity >
@@ -576,10 +578,27 @@ display or any room sensors. In this mode:
    Issue dehumidify / cooling requests **explicitly via Modbus** (the climate
    entity or individual switches).
 4. `current_temperature` and `current_humidity` on the climate entity read
-   `None`; the `temp_probe_ok` and `humidity_probe_ok` binary sensors read OFF
-   (because AL28/AL34 are active). This is expected and not an error.
+   `None`. An unwired input does not read 0: it reads a sentinel word
+   (§14.7), which the integration decodes to "no value" (entity state
+   `unknown`). The `temp_probe_ok` / `humidity_probe_ok` binary sensors depend
+   on AL28/AL34, which were **not** raised on a real headless unit while it was
+   OFF by display, so do not rely on them alone. This is expected, not an error.
 5. The evaporator and water-circuit probes remain active (factory-wired) and
    continue to protect the unit against AL03/AL04/AL11/AL12.
+
+### 14.7 Unwired analog inputs read a sentinel, not a temperature
+
+Observed on an HRDS+ 30 with no display and no external probes (HA00 = 2,
+PH01 = 1): `AI_TreturnRoom` (499), `AI_Toutdoor` (500), `AI_Texhaust` (502),
+`AI_Tdischarge` (503), `AI_HretRoom` (505) and `AI_AirQuality` (506) all read raw
+`32772` (`0x8004`); register 507 read `32762` (`0x7FFA`). Decoded as INT16 ×0.1
+that is **-3276.4 °C** (and -32764 %RH), which is never a real reading. The
+factory-wired `AI_Twater` (501) and `AI_Tevaporation` (511) read normally.
+
+This sentinel is empirical, not in the manufacturer tables. The integration
+treats any INT16 word in `0x7FF0..0x800F` (`PROBE_SENTINEL_LOW/HIGH` in
+`const.py`) as "no value". Real readings cannot collide: that window is
+±3276 °C. Negative temperatures are fine (-1.0 °C = `0xFFF6`).
 
 ---
 
