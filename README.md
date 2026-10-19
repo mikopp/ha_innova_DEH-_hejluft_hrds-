@@ -143,13 +143,14 @@ Each sensor maps to a single bit of a packed alarm register. **ON = alarm is act
 | `binary_sensor.alarm_low_water_temperature` | AL04 | Reg 768 bit 3 | Winter: water below PC08; heating blocked |
 | `binary_sensor.alarm_water_antifreeze` | AL16 | Reg 768 bit 15 | Fan stopped (antifreeze protection) |
 | `binary_sensor.alarm_dirty_filter` | AL22 | Reg 769 bit 5 | Maintenance reminder; display only, manual reset |
+| `binary_sensor.brine_temperature_guard` | — | not a register | Only with a [brine temperature guard](#brine-temperature-guard) configured: ON = the guard refuses to start requests (brine too cold, sensor stale or unavailable) |
 
 ### Switches
 
 | Entity | Register | Notes |
 |--------|----------|-------|
 | `switch.unit_on_off` | 1105 | BMS on/off request (requires PH02 = 1) |
-| `switch.dehumidify` | 1140 | BMS dehumidify request (requires PH28 = 1) |
+| `switch.dehumidify` | 1140 | BMS dehumidify request (requires PH28 = 1). In winter on a brine circuit only with a passing brine temperature guard |
 | `switch.active_cooling` | 1139 | **Integration request** (requires PH27 = 1): dehumidify + cool in summer, **heat in winter**. Refused while not in summer unless winter heating is enabled in the options; always refused in winter on a brine circuit |
 | `switch.allow_operational_requests` | — | **Setup device.** Not a register: the integration's own gate. Off by default; while off, on/dehumidify/cooling/non-zero fan requests are refused. Restored across restarts |
 | `switch.enable_time_programs` | 1779 | **Setup device.** PH03 — time programs can switch the unit off |
@@ -267,6 +268,8 @@ Innova HRDS+**, then provide:
 | A wired CNU2 display is connected | off | Leave **off** for a unit driven only from Home Assistant. See below. |
 | Water register connected to | Heating/cooling circuit | Choose **Brine circuit** if the unit is on the brine of a ground-source heat pump. See [Water circuit](#water-circuit-and-brine). |
 | Allow winter heating | off | In winter the integration request heats with water from the heating circuit. Off: such requests are refused. Has no effect on a brine circuit. |
+| Brine temperature guard sensor | empty | Optional HA temperature sensor on the brine supply. See [Brine temperature guard](#brine-temperature-guard). |
+| Brine guard minimum temperature | 10 °C | Lowest brine temperature at which a request may start. |
 
 Before anything is written, the integration checks that the address really is an
 HRDS+: the controller must identify itself as EVCO `EPB9…` over Modbus (FC 43)
@@ -325,7 +328,7 @@ below is clean.
    | `free_cooling_without_outdoor_probe` | **Free cooling** is on but no outdoor probe delivers a value. Turn off `switch.enable_free_cooling` unless an outdoor probe is fitted. |
    | `temperature_unit_fahrenheit` | PH05 is set to °F; the integration assumes °C. |
    | `water_pump_output_not_configured` | Relay K5 (external water valve and the PM pump output) is not configured, so the unit cannot start the circulation pump. Check HD05 on the installer device (12 = water valve) and the wiring. |
-   | `winter_dehumidify_on_brine` | Brine circuit selected but PU02 allows dehumidifying in winter - the coil can freeze. Set `select.winter_dehumidify` to *Disabled*. |
+   | `winter_dehumidify_on_brine` | Brine circuit selected, no brine temperature guard, but PU02 allows dehumidifying in winter - the coil can freeze. Set `select.winter_dehumidify` to *Disabled*, or configure a [brine temperature guard](#brine-temperature-guard). |
 
 2. Read the remaining setup entities and confirm they match your installation:
    *Machine type* (supply only, or supply and exhaust fan), *Recirculation
@@ -404,14 +407,53 @@ check** (`sensor.water_check`, attribute `issues`) flags:
 | `water_below_compressor_limit` | While circulating, water is below PU08: the compressor will not start (cold-water-only dehumidify) |
 | `high_water_temperature_alarm` / `low_water_temperature_alarm` / `antifreeze_alarm` | AL03 / AL04 / AL16 active |
 | `brine_unit_on_in_winter` | Brine circuit, winter, unit on. The anti-stagnation cycle (Pb07/Pb08) pulses valve and pump and can blow short bursts of cold air; the handbook recommends switching the unit off in winter |
+| `brine_guard_blocking` | The [brine temperature guard](#brine-temperature-guard) currently refuses requests |
 
 With **Water register connected to = Brine circuit** (handbook §3.8.7), heating
 is impossible and dehumidifying in winter is forbidden because the coil can
-freeze. The integration then refuses winter integration and winter dehumidify
-requests regardless of the heating option, and flags PU02 in the setup check.
+freeze. The integration refuses winter integration requests regardless of the
+heating option. Winter dehumidify requests are refused too, unless a brine
+temperature guard is configured and passing. Without a guard, the setup check
+flags PU02 if it allows winter dehumidifying.
 In the handbook's parallel brine variants the HRDS+'s PM output switches the
 brine pump through a relay; that wiring is what `sensor.water_valve_pump`
 reflects.
+
+#### Brine temperature guard
+
+The unit cannot tell how cold the brine is before it starts: its water probe
+only sees the brine while valve and pump run (otherwise it reads the standing
+water at plant-room temperature), and its own protections react only after
+the fact (AL16 below PA43, factory 3 °C, stops the fan; AL04 and PU08 do not
+cover winter dehumidifying). The freezing risk is on the air side: below about
+0 °C brine, condensate freezes on the register fins.
+
+If Home Assistant has a temperature sensor on the brine supply, for example
+from the heat pump, set it as **Brine temperature guard sensor** in the
+options. Then:
+
+* A dehumidify or integration request, or switching the unit on while one is
+  latched, **starts only while that sensor reads at least the minimum**
+  (option **Brine guard minimum temperature**, default 10 °C) **and has
+  reported within the last 24 h**. This applies in every season and to any
+  water circuit. A sensor that is unavailable, not numeric or not a
+  temperature also blocks. Switching off is always allowed.
+* On a brine circuit a passing guard is what permits **dehumidifying in
+  winter**. Without a guard, winter dehumidifying on brine is always refused.
+  The unit itself only dehumidifies in winter if PU02
+  (`select.winter_dehumidify`) is *With water*; the factory value is
+  *Disabled*.
+* Winter heating stays impossible on brine, guard or not.
+* `binary_sensor.brine_temperature_guard` (device class *problem*) is the
+  alarm indicator: **on** while the guard blocks. Its attributes give the
+  source entity, temperature, minimum, last report and reason (`too_cold`,
+  `stale`, `unavailable`, `not_a_number`, `not_a_temperature`). It is only
+  created when a sensor is configured and stays available while the Modbus
+  link is down.
+
+The guard decides whether a request may **start**. It does not stop a request
+that is already running when the brine cools; the indicator turns on and the
+unit's own protections (AL16, AL11) remain in charge.
 
 ### Setting target humidity and target temperature
 

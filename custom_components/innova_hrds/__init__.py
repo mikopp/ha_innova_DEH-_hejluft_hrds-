@@ -4,18 +4,22 @@ from __future__ import annotations
 
 import logging
 import threading
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
+    ATTR_UNIT_OF_MEASUREMENT,
     CONF_HOST,
     CONF_NAME,
     CONF_PORT,
     CONF_SCAN_INTERVAL,
+    STATE_UNAVAILABLE,
+    STATE_UNKNOWN,
     Platform,
+    UnitOfTemperature,
 )
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import (
     ConfigEntryError,
     ConfigEntryNotReady,
@@ -23,17 +27,25 @@ from homeassistant.exceptions import (
     ServiceValidationError,
 )
 from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers.event import async_call_later, async_track_time_interval
+from homeassistant.helpers.event import (
+    async_call_later,
+    async_track_state_change_event,
+    async_track_time_interval,
+)
+from homeassistant.util import dt as dt_util
+from homeassistant.util.unit_conversion import TemperatureConverter
 from pymodbus.client import ModbusTcpClient
 
 from .const import (
     BMS_ENABLE_KEYS,
+    BRINE_GUARD_MAX_AGE_HOURS,
     C_ACTIVE_COOLING,
     C_AI2_ALLOCATION,
     C_AI3_ALLOCATION,
     C_ALARM_ANTIFREEZE,
     C_ALARM_HIGH_WATER_TEMP,
     C_ALARM_LOW_WATER_TEMP,
+    C_BRINE_GUARD,
     C_COMPRESSOR_STATUS,
     C_DEHUMIDIFY,
     C_DT_INT16,
@@ -55,6 +67,7 @@ from .const import (
     C_SUPPLY_FAN_STATUS,
     C_TEMPERATURE_UNIT,
     C_TIME_PROGRAMS,
+    C_UNIT_ON_OFF,
     C_UNIT_STATUS,
     C_WATER_CHECK,
     C_WATER_TEMPERATURE,
@@ -62,11 +75,14 @@ from .const import (
     C_WINTER_DEHUM,
     CONF_AIRFLOW_MAX,
     CONF_ALLOW_WINTER_HEATING,
+    CONF_BRINE_MIN_TEMPERATURE,
+    CONF_BRINE_TEMPERATURE_ENTITY,
     CONF_HAS_DISPLAY,
     CONF_HOSTID,
     CONF_MODEL,
     CONF_WATER_CIRCUIT,
     DEFAULT_ALLOW_WINTER_HEATING,
+    DEFAULT_BRINE_MIN_TEMPERATURE,
     DEFAULT_HAS_DISPLAY,
     DEFAULT_HOSTID,
     DEFAULT_MODEL,
@@ -157,6 +173,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     water_circuit = entry.options.get(
         CONF_WATER_CIRCUIT, entry.data.get(CONF_WATER_CIRCUIT, DEFAULT_WATER_CIRCUIT)
     )
+    # Once options exist they are authoritative: clearing the entity in the
+    # options form must not fall back to the one given at initial setup.
+    brine_source = entry.options if entry.options else entry.data
+    brine_entity = brine_source.get(CONF_BRINE_TEMPERATURE_ENTITY) or None
+    try:
+        brine_min = float(
+            brine_source.get(CONF_BRINE_MIN_TEMPERATURE, DEFAULT_BRINE_MIN_TEMPERATURE)
+        )
+    except (TypeError, ValueError):
+        brine_min = DEFAULT_BRINE_MIN_TEMPERATURE
 
     # Refuse to write configuration registers into something that is not an
     # HRDS+ (wrong IP, wrong slave id behind a shared gateway).
@@ -183,6 +209,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         identity,
         allow_winter_heating,
         water_circuit,
+        brine_entity,
+        brine_min,
     )
 
     # Prime the cache before creating entities so they do not sit at `unknown`
@@ -194,6 +222,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # runtime_data is keyed by the config entry, so two entries sharing a name
     # can no longer clobber each other's hub the way hass.data[DOMAIN][name] did.
     entry.runtime_data = hub
+    hub.update_brine_guard()
+    if brine_entity:
+        # Re-judge the guard as soon as the source sensor reports, not only on
+        # the next poll.
+        entry.async_on_unload(
+            async_track_state_change_event(
+                hass, [brine_entity], hub.async_brine_state_changed
+            )
+        )
     # Decided from the primed read-back; changing HA02/HA03 needs a reload.
     hub.update_hidden_keys()
 
@@ -266,6 +303,8 @@ class HrdsModbusHub:
         identity: Optional[DeviceIdentity] = None,
         allow_winter_heating: bool = DEFAULT_ALLOW_WINTER_HEATING,
         water_circuit: str = DEFAULT_WATER_CIRCUIT,
+        brine_entity: Optional[str] = None,
+        brine_min_temperature: float = DEFAULT_BRINE_MIN_TEMPERATURE,
     ) -> None:
         self._hass = hass
         self._name = name
@@ -275,6 +314,14 @@ class HrdsModbusHub:
         self.allow_winter_heating = (
             allow_winter_heating and water_circuit != WATER_CIRCUIT_BRINE
         )
+        # Optional brine temperature guard (a Home Assistant sensor entity).
+        # brine_guard_ok is None while no guard is configured.
+        self.brine_entity = brine_entity or None
+        self.brine_min_temperature = brine_min_temperature
+        self.brine_guard_ok: Optional[bool] = None
+        self.brine_guard_reason: Optional[str] = None
+        self.brine_temperature: Optional[float] = None
+        self.brine_last_reported: Optional[datetime] = None
         self.identity = identity or DeviceIdentity()
         self._client = ModbusTcpClient(host=host, port=port, timeout=3, retries=3)
         self._lock = threading.Lock()
@@ -368,7 +415,75 @@ class HrdsModbusHub:
             hidden |= TEMPERATURE_TARGET_KEYS
         if not self.show_humidity_target:
             hidden |= HUMIDITY_TARGET_KEYS
+        if not self.brine_entity:
+            hidden.add(C_BRINE_GUARD)
         self.hidden_keys = frozenset(hidden)
+
+    # ---- brine temperature guard -----------------------------------------
+    def _read_brine_sensor(
+        self,
+    ) -> Tuple[Optional[str], Optional[float], Optional[datetime]]:
+        """(reason the guard blocks or None, temperature in degC, last report)."""
+        state = self._hass.states.get(self.brine_entity)
+        if state is None or state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            return "unavailable", None, None
+        # last_reported moves on every report, also when the value is unchanged;
+        # last_updated would call a steady sensor stale.
+        reported = state.last_reported
+        try:
+            value = float(state.state)
+        except ValueError:
+            return "not_a_number", None, reported
+        unit = state.attributes.get(ATTR_UNIT_OF_MEASUREMENT)
+        if unit and unit != UnitOfTemperature.CELSIUS:
+            try:
+                value = TemperatureConverter.convert(
+                    value, unit, UnitOfTemperature.CELSIUS
+                )
+            except (HomeAssistantError, KeyError, ValueError):
+                return "not_a_temperature", None, reported
+        if dt_util.utcnow() - reported > timedelta(hours=BRINE_GUARD_MAX_AGE_HOURS):
+            return "stale", value, reported
+        if value < self.brine_min_temperature:
+            return "too_cold", value, reported
+        return None, value, reported
+
+    @callback
+    def update_brine_guard(self) -> None:
+        """Re-judge the brine guard from the configured sensor (event loop)."""
+        if not self.brine_entity:
+            self.brine_guard_ok = None
+            self.brine_guard_reason = None
+            return
+        reason, value, reported = self._read_brine_sensor()
+        self.brine_guard_ok = reason is None
+        self.brine_guard_reason = reason
+        self.brine_temperature = value
+        self.brine_last_reported = reported
+        # Problem indicator: on = the guard blocks requests.
+        self.data[C_BRINE_GUARD] = "off" if self.brine_guard_ok else "on"
+
+    @callback
+    def async_brine_state_changed(self, _event: Event) -> None:
+        self.update_brine_guard()
+        self._compute_derived()
+        for cb in self._sensors:
+            cb()
+
+    def _brine_guard_message(self) -> str:
+        if self.brine_guard_reason == "too_cold":
+            why = (
+                f"reads {self.brine_temperature:.1f} degC, below the safe "
+                f"{self.brine_min_temperature:.1f} degC"
+            )
+        else:
+            why = {
+                "unavailable": "is unavailable",
+                "not_a_number": "does not report a number",
+                "not_a_temperature": "does not report a temperature",
+                "stale": f"has not reported for over {BRINE_GUARD_MAX_AGE_HOURS} h",
+            }.get(self.brine_guard_reason, "blocks requests")
+        return f"Brine temperature guard: {self.brine_entity} {why}."
 
     def _check_request_allowed(self, entity_key: str, raw: int) -> None:
         """Refuse requests that would heat, or freeze a brine coil.
@@ -378,6 +493,21 @@ class HrdsModbusHub:
         Raises ServiceValidationError; switching things off always passes.
         """
         winter = self.season != "summer"
+        d = self.data
+        requests_on = d.get(C_DEHUMIDIFY) == "on" or d.get(C_ACTIVE_COOLING) == "on"
+        starts = bool(raw) and (
+            entity_key in (C_DEHUMIDIFY, C_ACTIVE_COOLING)
+            or (entity_key == C_UNIT_ON_OFF and requests_on)
+        )
+        if self.brine_entity:
+            # Judge the sensor as of now, not as of the last poll.
+            self.update_brine_guard()
+        if starts and self.brine_entity and not self.brine_guard_ok:
+            # A configured guard is checked in every season.
+            raise ServiceValidationError(self._brine_guard_message())
+        # On brine, winter dehumidifying needs a passing guard: the unit only
+        # dehumidifies with brine flowing, and cold brine freezes the register.
+        brine_winter_ok = self.brine_guard_ok is True
         if entity_key == C_ACTIVE_COOLING and raw and winter:
             if self.is_brine:
                 raise ServiceValidationError(
@@ -390,10 +520,17 @@ class HrdsModbusHub:
                     "request heats. Enable 'Allow winter heating' in the "
                     "integration options to permit it."
                 )
-        if entity_key == C_DEHUMIDIFY and raw and winter and self.is_brine:
+        if (
+            entity_key == C_DEHUMIDIFY
+            and raw
+            and winter
+            and self.is_brine
+            and not brine_winter_ok
+        ):
             raise ServiceValidationError(
-                "Dehumidifying in winter on a brine circuit is not allowed "
-                "(the water register can freeze)."
+                "Dehumidifying in winter on a brine circuit needs a brine "
+                "temperature guard (the water register can freeze). Configure "
+                "one in the integration options."
             )
         if entity_key == C_SEASON and raw == 3:  # 3 = winter
             if (
@@ -404,10 +541,15 @@ class HrdsModbusHub:
                     "An integration request is active and would turn into "
                     "heating in winter. Turn it off first."
                 )
-            if self.data.get(C_DEHUMIDIFY) == "on" and self.is_brine:
+            if (
+                self.data.get(C_DEHUMIDIFY) == "on"
+                and self.is_brine
+                and not brine_winter_ok
+            ):
                 raise ServiceValidationError(
                     "A dehumidify request is active; on a brine circuit it must "
-                    "not run in winter. Turn it off first."
+                    "not run in winter without a brine temperature guard. Turn "
+                    "it off first."
                 )
 
     @callback
@@ -430,6 +572,9 @@ class HrdsModbusHub:
     async def async_refresh_modbus_data(self, _now=None) -> None:
         if not self._sensors:
             return
+        # Before the read cycle, so the water check it computes is current
+        # (also catches a sensor that went silent: no event marks it stale).
+        self.update_brine_guard()
         await self._hass.async_add_executor_job(self._do_read_cycle)
         # Notify on failure too - that is what moves entities to `unavailable`.
         for cb in self._sensors:
@@ -667,7 +812,13 @@ class HrdsModbusHub:
         # it is not configured the unit cannot start the circulation pump.
         if d.get(C_WATER_VALVE_PUMP) == "disabled":
             issues.append("water_pump_output_not_configured")
-        if self.is_brine and d.get(C_WINTER_DEHUM) not in (None, "disabled"):
+        # With a brine temperature guard, winter dehumidifying is a deliberate
+        # choice (the guard refuses it on cold brine); without one it is not.
+        if (
+            self.is_brine
+            and not self.brine_entity
+            and d.get(C_WINTER_DEHUM) not in (None, "disabled")
+        ):
             issues.append("winter_dehumidify_on_brine")
         return issues
 
@@ -699,6 +850,8 @@ class HrdsModbusHub:
         if self.is_brine and self.season == "winter" and d.get(C_UNIT_STATUS) == "on":
             # Anti-stagnation pulses run the pump and send cold air puffs.
             issues.append("brine_unit_on_in_winter")
+        if self.brine_guard_ok is False:
+            issues.append("brine_guard_blocking")
         return issues
 
     def _compute_derived(self) -> None:

@@ -158,6 +158,7 @@ def install_stubs() -> None:
     _stub("homeassistant.components", is_package=True)
     _stub(
         "homeassistant.components.binary_sensor",
+        BinarySensorDeviceClass=types.SimpleNamespace(PROBLEM="problem"),
         BinarySensorEntityDescription=BinarySensorEntityDescription,
     )
     _stub(
@@ -429,6 +430,7 @@ def main() -> int:
     known = (
         set(const.ENTITIES_DICT)
         | set(const.COMPUTED_SENSORS)
+        | set(const.COMPUTED_BINARY_SENSORS)
         | set(const.OPERATION_TYPES)
     )
     for label in ("SETUP_KEYS", "CONFIG_KEYS", "DIAGNOSTIC_KEYS"):
@@ -499,6 +501,34 @@ def main() -> int:
         "self._check_request_allowed(entity_key, raw)" in hub_src,
         "every write passes the winter-heating / brine guard",
     )
+
+    print("== brine temperature guard ==")
+    guard = const.C_BRINE_GUARD
+    check(
+        guard in const.BINARYSENSOR_TYPES and guard not in const.ENTITIES_DICT,
+        "the brine guard is a computed binary sensor (no register)",
+    )
+    check(
+        const.BINARYSENSOR_TYPES[guard].device_class == "problem",
+        "the brine guard is a problem indicator (on = blocking)",
+    )
+    # Its availability must not hinge on hub.data/poll health alone.
+    check(
+        "C_BRINE_GUARD" in (COMP / "binary_sensor.py").read_text(encoding="utf-8"),
+        "binary_sensor.py special-cases the brine guard",
+    )
+    check(
+        "self.update_brine_guard()" in hub_src and "brine_guard_ok is True" in hub_src,
+        "requests re-judge the guard, and winter brine DEU needs it passing",
+    )
+    for lang in ("en", "de"):
+        tr = json.loads((COMP / f"translations/{lang}.json").read_text("utf-8"))
+        for section, step in ((tr["config"], "user"), (tr["options"], "init")):
+            check(
+                {"brine_temperature_entity", "brine_min_temperature"}
+                <= set(section["step"][step]["data"]),
+                f"{lang}.json labels the brine guard options ({step})",
+            )
 
     print()
     print("RESULT:", "ALL PASS" if not FAILURES else f"{len(FAILURES)} FAILURE(S)")

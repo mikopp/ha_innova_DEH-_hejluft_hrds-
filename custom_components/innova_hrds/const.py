@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 from homeassistant.components.binary_sensor import (
+    BinarySensorDeviceClass,
     BinarySensorEntityDescription,
 )
 from homeassistant.components.climate import (
@@ -59,6 +60,15 @@ WATER_CIRCUIT_HEATING_COOLING = "heating_cooling"
 WATER_CIRCUIT_BRINE = "brine"
 WATER_CIRCUITS = [WATER_CIRCUIT_HEATING_COOLING, WATER_CIRCUIT_BRINE]
 DEFAULT_WATER_CIRCUIT = WATER_CIRCUIT_HEATING_COOLING
+# Optional guard: a Home Assistant temperature sensor on the brine supply (e.g.
+# from the heat pump). When set, no DEU/INT request starts unless it reports at
+# least the minimum and was reported within BRINE_GUARD_MAX_AGE. On a brine
+# circuit it is also what permits dehumidifying in winter; without it, winter
+# dehumidifying on brine is always refused.
+CONF_BRINE_TEMPERATURE_ENTITY = "brine_temperature_entity"
+CONF_BRINE_MIN_TEMPERATURE = "brine_min_temperature"
+DEFAULT_BRINE_MIN_TEMPERATURE = 10.0
+BRINE_GUARD_MAX_AGE_HOURS = 24
 # The unit is driven over Modbus; a wired CNU2 display is the exception.
 DEFAULT_HAS_DISPLAY = False
 DEFAULT_MODEL = "30"
@@ -244,6 +254,7 @@ C_ALARM_HIGH_WATER_TEMP = "alarm_high_water_temperature"
 C_ALARM_LOW_WATER_TEMP = "alarm_low_water_temperature"
 # Computed: water-circuit health (pump/valve, water temperature limits).
 C_WATER_CHECK = "water_check"
+C_BRINE_GUARD = "brine_temperature_guard"
 C_SEASON_OWNER = "season_owner"
 C_TEMPERATURE_UNIT = "temperature_unit"
 C_FAN_OUTPUT_ALLOCATION = "fan_output_allocation"
@@ -1145,6 +1156,15 @@ COMPUTED_SENSORS: Dict[str, Dict[str, Any]] = {
     C_SETUP_CHECK: {"NAME": "Setup check", "OPTIONS": ["ok", "attention"]},
     C_WATER_CHECK: {"NAME": "Water circuit check", "OPTIONS": ["ok", "attention"]},
 }
+# Computed binary sensors, written by the hub like COMPUTED_SENSORS. The brine
+# guard is a problem indicator: on = the guard blocks requests. It is only
+# created when a brine temperature entity is configured.
+COMPUTED_BINARY_SENSORS: Dict[str, Dict[str, Any]] = {
+    C_BRINE_GUARD: {
+        "NAME": "Brine temperature guard",
+        "DC": BinarySensorDeviceClass.PROBLEM,
+    },
+}
 
 # Requests that make the unit do something. They are refused until the user
 # turns on "Allow operational requests"; switching things OFF and all
@@ -1485,6 +1505,15 @@ def init() -> None:
             native_unit_of_measurement=unit,
             device_class=device_class,
             state_class=state_class,
+        )
+
+    for key, props in COMPUTED_BINARY_SENSORS.items():
+        BINARYSENSOR_TYPES[key] = MyBinarySensorEntityDescription(
+            key=key,
+            name=props["NAME"],
+            translation_key=key,
+            entity_category=entity_category_for(key),
+            device_class=props.get("DC"),
         )
 
     _initialized = True

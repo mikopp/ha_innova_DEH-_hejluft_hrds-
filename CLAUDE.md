@@ -165,9 +165,20 @@ Classification rules (`_classify` in `const.py`):
 * `_check_request_allowed` runs on every `write_entity_value`: INT is refused
   unless the read-back season (`operating_mode`, 1583) is summer, unless the
   `allow_winter_heating` option is on; with `water_circuit = brine` winter INT
-  and winter DEU are always refused (handbook 3.8.7: no heating, coil freezing),
-  and a season change to winter is refused while a request it would turn
-  unsafe is active. Keep request writes going through `write_entity_value`.
+  is always refused and winter DEU is refused unless the brine guard passes
+  (handbook 3.8.7: no heating, coil freezing), and a season change to winter
+  is refused while a request it would turn unsafe is active. Keep request
+  writes going through `write_entity_value`.
+* **Brine temperature guard** (options `brine_temperature_entity`,
+  `brine_min_temperature`, default 10 °C): an HA sensor, judged by
+  `update_brine_guard()` on the event loop (before each poll, on its state
+  events, and inside `_check_request_allowed`). When configured, any start
+  (DEU/INT on, or unit on with one latched) needs value ≥ minimum and
+  `last_reported` within `BRINE_GUARD_MAX_AGE_HOURS` (24), in every season.
+  It only gates starts; it never stops a running request. The indicator is
+  `binary_sensor.brine_temperature_guard` (`COMPUTED_BINARY_SENSORS`,
+  problem class, hidden when no sensor is set, always available). Options
+  override data for these keys as a whole, so clearing the entity sticks.
 * Season without a display: `select.season` writes HB04 (1825): 4 = summer,
   3 = winter (Modbus manual). Anything else raises AL25.
 * Water valve/pump (1126, relay K5) and condenser valve (1124, K4) are

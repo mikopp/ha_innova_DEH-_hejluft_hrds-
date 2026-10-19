@@ -6,6 +6,21 @@ All notable changes to this project are documented here, newest first.
 
 ## 2026-10-19
 
+### feat: brine temperature guard
+
+* New options *Brine temperature guard sensor* (any HA temperature sensor,
+  e.g. the heat pump's brine reading) and *Brine guard minimum temperature*
+  (default 10 °C). When set, a dehumidify / integration request (or unit on
+  with one latched) only starts while the sensor reads at least the minimum
+  and has reported within 24 h, in every season. Unavailable, non-numeric or
+  non-temperature readings block too.
+* On brine, a passing guard permits winter dehumidifying; without a guard it
+  stays refused. Winter heating on brine stays refused. The PU02 setup issue
+  is only raised without a guard.
+* `binary_sensor.brine_temperature_guard` (problem class) is on while the
+  guard blocks, with source, temperature, minimum, last report and reason as
+  attributes; the water check gains `brine_guard_blocking`.
+
 ### feat: installer device, season control, winter-heating and brine guards
 
 From the technical handbook (§2.7, §3.8, §5.1, §5.3, §6) and the Modbus

@@ -12,6 +12,11 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PORT, CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.selector import (
+    EntitySelector,
+    EntitySelectorConfig,
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
@@ -20,11 +25,14 @@ from homeassistant.helpers.selector import (
 from .const import (
     CONF_AIRFLOW_MAX,
     CONF_ALLOW_WINTER_HEATING,
+    CONF_BRINE_MIN_TEMPERATURE,
+    CONF_BRINE_TEMPERATURE_ENTITY,
     CONF_HAS_DISPLAY,
     CONF_HOSTID,
     CONF_MODEL,
     CONF_WATER_CIRCUIT,
     DEFAULT_ALLOW_WINTER_HEATING,
+    DEFAULT_BRINE_MIN_TEMPERATURE,
     DEFAULT_HAS_DISPLAY,
     DEFAULT_HOSTID,
     DEFAULT_MODEL,
@@ -48,6 +56,21 @@ WATER_CIRCUIT_SELECTOR = SelectSelector(
     )
 )
 
+# Optional brine temperature guard: any temperature sensor in Home Assistant,
+# typically the heat pump's brine supply reading.
+BRINE_ENTITY_SELECTOR = EntitySelector(
+    EntitySelectorConfig(domain="sensor", device_class="temperature")
+)
+BRINE_MIN_SELECTOR = NumberSelector(
+    NumberSelectorConfig(
+        min=0,
+        max=30,
+        step=0.5,
+        unit_of_measurement="°C",
+        mode=NumberSelectorMode.BOX,
+    )
+)
+
 DATA_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_NAME, default=DEFAULT_NAME): cv.string,
@@ -63,6 +86,10 @@ DATA_SCHEMA = vol.Schema(
         vol.Optional(
             CONF_ALLOW_WINTER_HEATING, default=DEFAULT_ALLOW_WINTER_HEATING
         ): cv.boolean,
+        vol.Optional(CONF_BRINE_TEMPERATURE_ENTITY): BRINE_ENTITY_SELECTOR,
+        vol.Optional(
+            CONF_BRINE_MIN_TEMPERATURE, default=DEFAULT_BRINE_MIN_TEMPERATURE
+        ): BRINE_MIN_SELECTOR,
     }
 )
 
@@ -163,6 +190,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         spec = (
             MODEL_SPECS[model] if model in MODEL_SPECS else MODEL_SPECS[DEFAULT_MODEL]
         )
+        # Same rule as the hub: once options exist they replace the setup data.
+        brine_source = options if options else data
         return self.async_show_form(
             step_id="init",
             errors=errors,
@@ -218,6 +247,22 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                             ),
                         ),
                     ): cv.boolean,
+                    # suggested_value, not default: a default would refill the
+                    # field and make the guard impossible to remove again.
+                    vol.Optional(
+                        CONF_BRINE_TEMPERATURE_ENTITY,
+                        description={
+                            "suggested_value": brine_source.get(
+                                CONF_BRINE_TEMPERATURE_ENTITY
+                            )
+                        },
+                    ): BRINE_ENTITY_SELECTOR,
+                    vol.Optional(
+                        CONF_BRINE_MIN_TEMPERATURE,
+                        default=brine_source.get(
+                            CONF_BRINE_MIN_TEMPERATURE, DEFAULT_BRINE_MIN_TEMPERATURE
+                        ),
+                    ): BRINE_MIN_SELECTOR,
                     vol.Optional(
                         CONF_AIRFLOW_MAX,
                         default=options.get(
