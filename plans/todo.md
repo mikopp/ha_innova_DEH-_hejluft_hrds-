@@ -267,3 +267,16 @@ option is recommended.
       contact.
 - [ ] Decide whether the gate should also refuse climate `hvac_mode` writes with
       a friendlier message (currently surfaces the `ServiceValidationError`).
+
+## Installer device / season / water circuit (added 2026-10-19)
+
+- [ ] Confirm on hardware that writing HB04 = 3 switches `operating_mode` to
+      winter and 4 back to summer (no contact wired to DI4).
+- [ ] Watch `water_valve_pump` (1126) during a dehumidify request on the brine
+      installation: expect On with the request, Off after Pb01.
+- [ ] Verify the enum meaning of 1124 / 1126 (0/1/2 inferred from the
+      misaligned PDF table).
+- [ ] Spot-check installer scaling for rows not covered by the snapshot
+      (PM81 1617) and the PA20 address (1736 is not in the PDF table).
+- [ ] Check whether registers above 1900 (PT05-PT11, PH31-PH35, PA61/PA62)
+      are readable; add them to the installer device if they are.

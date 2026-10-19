@@ -93,10 +93,9 @@ EXTRA_REGISTERS: list[tuple[str, int, int, str]] = [
     ("PM01 SupplyFan_Hours", HOLD, 1604, "fan hours counter"),
 ]
 
-# Configuration parameters from the technical handbook's parameter table, with
-# the factory default. Most are NOT in the Modbus PDF: their addresses follow the
-# handbook's parameter order, which matches every address the PDF does give
-# (PH05=1781, HA00=1803, HB04=1825, HD01=1838), so treat the rest as inferred.
+# Configuration parameters with the handbook's factory default. Addresses are
+# from the Modbus manual's full parameter table (0x0640-0x077A); the
+# integration's installer device exposes the rest (installer_params.py).
 # (address, code, description, handbook default or None)
 PARAMS: list[tuple[int, str, str, int | None]] = [
     (1698, "PS01", "Recirculation damper pre-start time (s)", 20),
@@ -124,7 +123,8 @@ PARAMS: list[tuple[int, str, str, int | None]] = [
     (1838, "HD01", "DO1 allocation (K1 recirculation damper NO)", 10),
     (1839, "HD02", "DO2 allocation (K2 serious alarm NO)", 26),
     (1878, "PC11", "Season change owner (0=display 1=DI)", None),
-    # 1879 read 2 on a real unit but PC12 only allows 0/1: address not PC12, dropped
+    # PC12 is 1894 per the Modbus manual's parameter table (1879 is PE24).
+    (1894, "PC12", "Unit on by DI request despite open OFF contact", 0),
     (1889, "PU13", "Min room temp for dehumidify (x0.1 C)", 220),
     (1890, "PU14", "Room temp differential to re-enable (x0.1 C)", 5),
 ]

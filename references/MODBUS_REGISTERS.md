@@ -77,6 +77,7 @@ source (contact, display, Modbus).
 | `0x0473` | 1139 | `Status_Integ_byBMS`     | R/W | Integration / **active-cooling** request: `0=No`, `1=Yes`. (Requires PH27=1.) |
 | `0x062F` | 1583 | `Mode_OperatingMode`     | R/O | Season: `0=Summer`, `1=Winter`, `2=Auto`. Use as feedback. |
 | `0x0721` | 1825 | `DI4_Configuration`(HB04)| R/W | Season change w/o display: `4=Summer (DI4 N/O)`, `3=Winter (DI4 N/C)`. **Only 3 or 4 are valid — other values raise alarm AL25.** |
+| `0x0766` | 1894 | `PC12_Enable_OnOFF_by_INT_DEU` | R/W | `1` = a DEU/INT request on the **digital inputs** starts the unit even with the OFF/OFF contact open. (Earlier docs guessed 1879; that is PE24.) |
 | `0x0756` | 1878 | `PriorityChangeMode_Display` (PC11) | R/W | Who owns season change: `0=Display`, `1=DI/Digital-IN`. |
 
 > **Active cooling** in this product = the *integration* function (`0x0473`),
@@ -172,6 +173,8 @@ which would shadow them.
 | `0x045F` | 1119 | `SupplyFan_Status`   | `0=Disable`, `1=OFF`, `2=Wait ON`, `3=ON`, `4=Wait OFF`, `5=Alarm` |
 | `0x0461` | 1121 | `DehumRequest`       | `0=No`, `1=Yes` — dehumidification currently requested |
 | `0x0462` | 1122 | `CmpStatus`          | `0=Disable`, `1=Alarm`, `2=Manual`, `3=Wait ON`, `4=ON`, `5=Wait OFF`, `6=OFF` — compressor (active cooling/dehum) |
+| `0x0464` | 1124 | `outDO_WaterCond` | Internal water condenser valve (relay K4): `0=OFF`, `1=ON`, `2=Disable`. ON = closed, all compressor heat to the water (summer integration). |
+| `0x0466` | 1126 | `outDO_WaterFlow` | External water valve V3V (relay K5) — the PM pump output is switched together with it: `0=OFF`, `1=ON`, `2=Disable` (not configured: the unit cannot start the pump). |
 | `0x046E` | 1134 | `outDO_RecircDamper` | `0=OFF` (damper closed — room-air duct sealed, MVHR passive flow only), `1=ON` (damper open — room air blended with MVHR inflow), `2=Disable` (no damper wired, non-`R` variant) |
 | `0x027F` | 639  | `outAO_SupplyFan`    | Supply-fan output % (×0.01) |
 | `0x0281` | 641  | `outAO_Cmp`          | Compressor output % (×0.01) |
@@ -642,3 +645,256 @@ what the unit will do on its own, rather than fighting it.
 * **`PG03` decides whether outdoor temperature is a control input.** Leave it
   at `0` if the central MVHR owns free cooling, as is the case when the HRDS+
   sits on that system's supply branch.
+
+---
+
+## 16. Installer-menu parameters (installer device)
+
+Every handbook parameter (§5.3) that has a Modbus address in the RTU
+manual's parameter table and is not already listed above. The integration
+exposes them on the **installer** child device (`installer_params.py`).
+Scaling was checked against a real unit's raw read-back. "shown R/O"
+means the integration deliberately does not write it (link settings,
+manufacturer I/O allocation, refrigerant, safety bypass, test mode).
+Passwords (`PSd*`), `PH15` (restore defaults) and `PH18` (clear alarm
+history) are not exposed. Addresses above 1900 are not polled.
+
+| Addr HEX | Addr DEC | Code | Meaning | Scale | Range | Access |
+|----------|----------|------|---------|-------|-------|--------|
+| `0x0642` | 1602 | PM00 | Fan hours alarm limit | x1 | 0…65535 h | R/W |
+| `0x0644` | 1604 | PM01 | Supply fan hours (0 resets AL22) | x1 | 0…65535 h | R/W |
+| `0x0646` | 1606 | PM02 | Return fan hours | x1 | 0…65535 h | shown R/O, disabled by default |
+| `0x0648` | 1608 | PM03 | Compressor hours alarm limit | x1 | 0…65535 h | R/W |
+| `0x064A` | 1610 | PM04 | Compressor hours | x1 | 0…65535 h | shown R/O |
+| `0x064F` | 1615 | PM21 | Compressor forced | x1 | 0…1  | shown R/O |
+| `0x0650` | 1616 | PM80 | Room temperature probe offset | x0.1 | -10…10 °C | R/W |
+| `0x0651` | 1617 | PM81 | Outdoor temperature probe offset | x0.1 | -10…10 °C | R/W |
+| `0x0652` | 1618 | PM82 | Water temperature probe offset | x0.1 | -10…10 °C | R/W |
+| `0x0653` | 1619 | PM83 | Exhaust temperature probe offset | x0.1 | -10…10 °C | R/W, disabled by default |
+| `0x0654` | 1620 | PM84 | Discharge temperature probe offset | x0.1 | -10…10 °C | R/W |
+| `0x0655` | 1621 | PM85 | Defrost probe offset | x0.1 | -10…10 °C | R/W, disabled by default |
+| `0x0656` | 1622 | PM86 | Room humidity probe offset | x1 | -10…10 % | R/W |
+| `0x0657` | 1623 | PM87 | Air quality probe offset | x1 | -100…100 ppm | R/W, disabled by default |
+| `0x0658` | 1624 | PM88 | Fan potentiometer offset | x1 | -10…10 % | R/W, disabled by default |
+| `0x0659` | 1625 | PM89 | Pressure probe offset | x0.1 | -20…20 bar | shown R/O, disabled by default |
+| `0x065B` | 1627 | PC01 | Room temperature sniffing cycles | x1 | 0…1  | R/W 0/1, disabled by default |
+| `0x065C` | 1628 | PC02 | Sniffing wait time | x1 | 0…999 min | R/W, disabled by default |
+| `0x065D` | 1629 | PC03 | Sniffing active time | x1 | 1…30 min | R/W, disabled by default |
+| `0x065E` | 1630 | PC04 | Both fans in sniffing cycle | x1 | 0…1  | R/W 0/1, disabled by default |
+| `0x065F` | 1631 | PC05 | Season change (0 manual, 1 manual+auto, 2 auto) | x1 | 0…2  | R/W |
+| `0x0660` | 1632 | PC06 | Auto season probe (0 water, 1 room) | x1 | 0…1  | R/W |
+| `0x0661` | 1633 | PC07 | Max water temperature for dehumidify / summer integration | x0.1 | 0…70 °C | R/W |
+| `0x0662` | 1634 | PC08 | Min water temperature for winter integration | x0.1 | 0…70 °C | R/W |
+| `0x0663` | 1635 | PC09 | Auto summer above room temperature | x0.1 | 0…70 °C | R/W |
+| `0x0664` | 1636 | PC10 | Auto winter below room temperature | x0.1 | 0…70 °C | R/W |
+| `0x0665` | 1637 | PF26 | Supply fan post-run speed | x0.01 | 0…100 % | R/W |
+| `0x0667` | 1639 | PF02 | Delay between the two fans | x1 | 0…999 s | R/W, disabled by default |
+| `0x0669` | 1641 | PF04 | Stop supply fan during defrost | x1 | 0…1  | R/W 0/1, disabled by default |
+| `0x066A` | 1642 | PF05 | Supply fan speed on air quality probe fault | x0.01 | 0…100 % | R/W, disabled by default |
+| `0x066D` | 1645 | PF08 | Supply fan max speed (VMC) | x0.01 | 0…100 % | R/W |
+| `0x0670` | 1648 | PF11 | Fan speed step | x1 | 1…100 % | R/W |
+| `0x0671` | 1649 | PF12 | Room temperature dead band | x0.1 | 0…20 °C | R/W |
+| `0x0672` | 1650 | PF13 | Fan speed step interval (integration) | x1 | 1…100 s | R/W |
+| `0x0674` | 1652 | PF15 | Air quality setpoint min | x1 | 1…9999 ppm | R/W, disabled by default |
+| `0x0675` | 1653 | PF16 | Air quality setpoint max | x1 | 1…9999 ppm | R/W, disabled by default |
+| `0x0676` | 1654 | PF17 | Air quality setpoint | x1 | 1…9999 ppm | R/W, disabled by default |
+| `0x0677` | 1655 | PF18 | Air quality dead band | x1 | 0…1000 ppm | R/W, disabled by default |
+| `0x0678` | 1656 | PF19 | Air quality fan step interval | x1 | 1…100 s | R/W, disabled by default |
+| `0x0679` | 1657 | PF20 | Defrost fan speed step | x0.01 | 0…100 % | R/W, disabled by default |
+| `0x067A` | 1658 | PF21 | Defrost fan step interval | x1 | 1…100 s | R/W, disabled by default |
+| `0x067C` | 1660 | PF23 | Supply fan speed forced by DI | x0.01 | 0…100 % | R/W |
+| `0x067F` | 1663 | PE01 | Compressor minimum off time | x1 | 0…999 s | R/W |
+| `0x0680` | 1664 | PE02 | Compressor minimum on time | x1 | 0…999 s | R/W |
+| `0x0681` | 1665 | PE03 | Minimum time between compressor starts | x1 | 0…999 s | R/W |
+| `0x0682` | 1666 | PE04 | Delay fan start to compressor start | x1 | 0…999 s | R/W |
+| `0x0683` | 1667 | PE05 | Compressor safety-time bypass | x1 | 0…1  | shown R/O |
+| `0x0684` | 1668 | PE06 | Compressor min output (dehumidify) | x0.01 | 0…100 % | R/W |
+| `0x0685` | 1669 | PE07 | Compressor max output (dehumidify) | x0.01 | 0…100 % | R/W |
+| `0x0686` | 1670 | PE08 | Compressor output step | x0.01 | 1…100 % | R/W |
+| `0x0687` | 1671 | PE09 | Compressor output step interval | x1 | 1…100 s | R/W |
+| `0x0688` | 1672 | PE10 | Defrost interval | x1 | 1…99 h | R/W, disabled by default |
+| `0x0689` | 1673 | PE11 | End of defrost setpoint | x0.1 | -15…70 °C | R/W, disabled by default |
+| `0x068A` | 1674 | PE12 | Maximum defrost time | x1 | 1…99 min | R/W, disabled by default |
+| `0x068B` | 1675 | PE13 | Dripping time | x1 | 0…15 min | R/W, disabled by default |
+| `0x068C` | 1676 | PE14 | Defrost interval counting | x1 | 0…2  | R/W, disabled by default |
+| `0x068D` | 1677 | PE15 | Defrost counting setpoint | x0.1 | -15…70 °C | R/W, disabled by default |
+| `0x068E` | 1678 | PE16 | Condenser valve switch time | x1 | 0…999 s | R/W |
+| `0x068F` | 1679 | PE17 | High-pressure pre-alarm setpoint | x0.1 | 16…42 bar | R/W |
+| `0x0690` | 1680 | PE18 | High-pressure pre-alarm differential | x0.1 | 0.1…10 bar | R/W |
+| `0x0691` | 1681 | PE19 | Compressor step at high-pressure pre-alarm | x0.01 | 0…100 % | R/W |
+| `0x0692` | 1682 | PE20 | Step interval at high-pressure pre-alarm | x1 | 1…999 s | R/W |
+| `0x0693` | 1683 | Pb01 | Water valve close delay | x1 | 0…999 s | R/W |
+| `0x0694` | 1684 | Pb02 | Valve sniffing active time (temperature alarm) | x1 | 1…999 s | R/W |
+| `0x0695` | 1685 | Pb03 | Valve sniffing wait time (temperature alarm) | x1 | 1…99 min | R/W |
+| `0x0696` | 1686 | Pb04 | Preheating setpoint | x0.1 | 0…30 °C | R/W, disabled by default |
+| `0x0697` | 1687 | Pb05 | Preheating differential | x0.1 | 0.1…20 °C | R/W, disabled by default |
+| `0x0698` | 1688 | Pb06 | Preheating maximum time | x1 | 0…60 min | R/W, disabled by default |
+| `0x069A` | 1690 | PU03 | Dehumidify during high-temperature alarm | x1 | 0…1  | R/W 0/1 |
+| `0x069B` | 1691 | PU04 | Dehumidify during water-flow alarm | x1 | 0…1  | R/W 0/1 |
+| `0x069F` | 1695 | PU08 | Cold-water-only dehumidify below water temperature | x0.1 | 0…30 °C | R/W |
+| `0x06A0` | 1696 | PU09 | Compressor as second step | x1 | 0…1  | R/W 0/1 |
+| `0x06A1` | 1697 | PU10 | Delay before compressor second step | x1 | 0…240 min | R/W |
+| `0x06A3` | 1699 | PS02 | Outdoor damper pre-start time | x1 | 0…9999 s | R/W, disabled by default |
+| `0x06A5` | 1701 | PS04 | External damper min opening | x0.01 | 0…100 % | R/W, disabled by default |
+| `0x06A6` | 1702 | PS05 | External damper max opening | x0.01 | 0…100 % | R/W, disabled by default |
+| `0x06A7` | 1703 | PS06 | Free-cooling/heating activation setpoint | x0.1 | 0…20 °C | R/W, disabled by default |
+| `0x06A8` | 1704 | PS07 | Free-cooling/heating differential | x0.1 | 0…20 °C | R/W, disabled by default |
+| `0x06A9` | 1705 | PS08 | External damper step at high humidity | x0.01 | 1…100 % | R/W, disabled by default |
+| `0x06AA` | 1706 | PS09 | External damper step interval | x1 | 1…100 s | R/W, disabled by default |
+| `0x06AB` | 1707 | Pr01 | Rotary exchanger setpoint differential | x0.1 | 0…20 °C | R/W, disabled by default |
+| `0x06AC` | 1708 | Pr02 | Rotary exchanger differential | x0.1 | 0…20 °C | R/W, disabled by default |
+| `0x06AD` | 1709 | Pr03 | Exchanger defrost setpoint | x0.1 | -15…70 °C | R/W, disabled by default |
+| `0x06AE` | 1710 | Pr04 | Exchanger defrost dead band | x0.1 | 0…20 °C | R/W, disabled by default |
+| `0x06AF` | 1711 | Pr05 | Cross-flow bypass cycle time | x1 | 1…99 s | R/W, disabled by default |
+| `0x06B0` | 1712 | Pr06 | Exchanger stop setpoint | x0.1 | -15…70 °C | R/W, disabled by default |
+| `0x06B1` | 1713 | Pr07 | Exchanger stop differential | x0.1 | 0…20 °C | R/W, disabled by default |
+| `0x06B2` | 1714 | Pr08 | Rotary exchanger defrost step | x0.01 | 0…100 % | R/W, disabled by default |
+| `0x06B3` | 1715 | Pr09 | Rotary exchanger defrost interval | x1 | 1…100 s | R/W, disabled by default |
+| `0x06B4` | 1716 | Pr10 | Rotary exchanger PWM frequency | x1 | 1…2000 Hz | R/W, disabled by default |
+| `0x06B5` | 1717 | PA01 | Fan hours alarm | x1 | 0…1  | R/W 0/1 |
+| `0x06B6` | 1718 | PA02 | Compressor hours alarm | x1 | 0…1  | R/W 0/1 |
+| `0x06B7` | 1719 | PA03 | Hours alarm relay (0 none, 1 light, 2 serious) | x1 | 0…2  | R/W |
+| `0x06B8` | 1720 | PA04 | Probe alarm delay | x1 | 0…240 s | R/W |
+| `0x06B9` | 1721 | PA05 | Probe alarm relay | x1 | 0…2  | R/W |
+| `0x06BA` | 1722 | PA06 | Air-flow alarm delay after reset | x1 | 0…999 s | R/W |
+| `0x06BB` | 1723 | PA07 | Air-flow alarm delay | x1 | 0…999 s | R/W |
+| `0x06BC` | 1724 | PA08 | Air-flow alarm relay | x1 | 0…2  | R/W |
+| `0x06BD` | 1725 | PA09 | Water-flow alarm delay after reset | x1 | 0…999 s | R/W |
+| `0x06BE` | 1726 | PA10 | Water-flow alarm delay | x1 | 0…999 s | R/W |
+| `0x06BF` | 1727 | PA11 | Water-flow alarms per hour before manual reset | x1 | 0…5  | R/W |
+| `0x06C0` | 1728 | PA12 | Water-flow alarm relay | x1 | 0…2  | R/W |
+| `0x06C1` | 1729 | PA13 | Filter alarm delay | x1 | 0…999 s | R/W |
+| `0x06C2` | 1730 | PA14 | Filter alarm reset type | x1 | 0…2  | R/W |
+| `0x06C3` | 1731 | PA15 | Filter alarm relay | x1 | 0…2  | R/W |
+| `0x06C4` | 1732 | PA16 | High/low water temperature alarm delay | x1 | 1…999 s | R/W |
+| `0x06C5` | 1733 | PA17 | High/low water temperature alarm differential | x0.1 | 0.1…10 °C | R/W |
+| `0x06C6` | 1734 | PA18 | High/low water temperature alarm relay | x1 | 0…2  | R/W |
+| `0x06C7` | 1735 | PA19 | High humidity warning setpoint | x1 | 0…100 % | R/W |
+| `0x06C9` | 1737 | PA21 | High humidity time before alarm | x1 | 0…60 min | R/W |
+| `0x06CA` | 1738 | PA22 | High humidity events | x1 | 0…99  | R/W |
+| `0x06CB` | 1739 | PA23 | Fan speed sensor alarm delay after reset | x1 | 0…999 s | R/W |
+| `0x06CC` | 1740 | PA24 | Fan speed sensor alarm delay | x1 | 0…999 s | R/W |
+| `0x06CD` | 1741 | PA25 | Fan max speed for speed sensor alarm | x1 | 0…9999 rpm | R/W |
+| `0x06CE` | 1742 | PA26 | Fan alarm relay | x1 | 0…2  | R/W |
+| `0x06CF` | 1743 | PA27 | Compressor thermal switch alarm delay | x1 | 0…999 s | R/W |
+| `0x06D0` | 1744 | PA28 | Compressor thermal switch reset type | x1 | 0…2  | R/W |
+| `0x06D1` | 1745 | PA29 | Compressor thermal switch relay | x1 | 0…2  | R/W |
+| `0x06D2` | 1746 | PA30 | Low-pressure alarm bypass time | x1 | 0…999 s | R/W |
+| `0x06D3` | 1747 | PA31 | Low-pressure alarm delay | x1 | 0…999 s | R/W |
+| `0x06D4` | 1748 | PA32 | Low-pressure alarms per hour before manual reset | x1 | 0…5  | R/W |
+| `0x06D5` | 1749 | PA33 | High-pressure alarm setpoint | x0.1 | 16…45 bar | R/W |
+| `0x06D6` | 1750 | PA34 | High-pressure alarm differential | x0.1 | 0.1…10 bar | R/W |
+| `0x06D7` | 1751 | PA35 | High-pressure alarms per hour before manual reset | x1 | 0…5  | R/W |
+| `0x06D8` | 1752 | PA36 | Pressure alarm relay | x1 | 0…2  | R/W |
+| `0x06D9` | 1753 | PA37 | Discharge temperature alarm delay | x1 | 0…999 s | R/W |
+| `0x06DA` | 1754 | PA38 | Discharge temperature alarm setpoint | x0.1 | 70…140 °C | R/W |
+| `0x06DB` | 1755 | PA39 | Discharge temperature alarm differential | x0.1 | 10…30 °C | R/W |
+| `0x06DC` | 1756 | PA40 | Discharge temperature alarms per hour | x1 | 0…5  | R/W |
+| `0x06DD` | 1757 | PA41 | Discharge temperature alarm relay | x1 | 0…2  | R/W |
+| `0x06DE` | 1758 | PA42 | Antifreeze alarm delay | x1 | 0…999 s | R/W |
+| `0x06DF` | 1759 | PA43 | Antifreeze water temperature setpoint | x0.1 | 0…20 °C | R/W |
+| `0x06E0` | 1760 | PA44 | Antifreeze differential | x0.1 | 0.1…10 °C | R/W |
+| `0x06E1` | 1761 | PA45 | Antifreeze alarm relay | x1 | 0…2  | R/W |
+| `0x06E2` | 1762 | PA46 | Fire/smoke alarm type | x1 | 0…1  | R/W, disabled by default |
+| `0x06E3` | 1763 | PA47 | Fire/smoke alarm relay | x1 | 0…2  | R/W, disabled by default |
+| `0x06E4` | 1764 | PA48 | Generic warning delay | x1 | 0…999 s | R/W |
+| `0x06E5` | 1765 | PA49 | Generic warning reset type | x1 | 0…2  | R/W |
+| `0x06E6` | 1766 | PA50 | Generic alarm delay | x1 | 0…999 s | R/W |
+| `0x06E7` | 1767 | PA51 | Generic alarm reset type | x1 | 0…2  | R/W |
+| `0x06E8` | 1768 | PA52 | Clock (RTC) alarm | x1 | 0…1  | R/W 0/1 |
+| `0x06E9` | 1769 | PA53 | Clock alarm reset type | x1 | 0…2  | R/W |
+| `0x06EB` | 1771 | PA55 | Phase sequence alarm relay | x1 | 0…2  | R/W, disabled by default |
+| `0x06EC` | 1772 | PA56 | Expansion alarm relay | x1 | 0…2  | R/W, disabled by default |
+| `0x06ED` | 1773 | PH11 | Modbus address | x1 | 1…247  | shown R/O |
+| `0x06EE` | 1774 | PH12 | Modbus baud rate code | x1 | 0…7  | shown R/O |
+| `0x06EF` | 1775 | PH13 | Modbus parity code | x1 | 0…2  | shown R/O |
+| `0x06F0` | 1776 | PH14 | Modbus stop bits code | x1 | 0…1  | shown R/O |
+| `0x06F4` | 1780 | PH04 | Unit state on holiday (0 off, 1 on) | x1 | 0…1  | R/W |
+| `0x06F6` | 1782 | PH06 | Pressure unit (0 bar, 1 psi) | x1 | 0…1  | shown R/O |
+| `0x06F7` | 1783 | PH07 | Summer setpoint min | x0.1 | -15…70 °C | R/W |
+| `0x06F8` | 1784 | PH08 | Summer setpoint max | x0.1 | -15…70 °C | R/W |
+| `0x06F9` | 1785 | PH09 | Winter setpoint min | x0.1 | -15…70 °C | R/W |
+| `0x06FA` | 1786 | PH10 | Winter setpoint max (factory 14 °C blocks auto heating) | x0.1 | -15…70 °C | R/W |
+| `0x06FC` | 1788 | PH16 | CAN baud rate code | x1 | 1…4  | shown R/O, disabled by default |
+| `0x06FD` | 1789 | PH17 | CAN node | x1 | 1…127  | shown R/O, disabled by default |
+| `0x06FF` | 1791 | PH19 | Air quality probe min | x1 | 0…9999  | shown R/O, disabled by default |
+| `0x0700` | 1792 | PH20 | Air quality probe max | x1 | 0…9999  | shown R/O, disabled by default |
+| `0x0701` | 1793 | PH21 | Pressure probe min | x0.1 | 0…87 bar | shown R/O, disabled by default |
+| `0x0702` | 1794 | PH22 | Pressure probe max | x0.1 | 0…87 bar | shown R/O, disabled by default |
+| `0x0703` | 1795 | PH23 | EVCO LED | x1 | 0…1  | R/W 0/1, disabled by default |
+| `0x0708` | 1800 | PG04 | Heat exchanger type | x1 | 0…2  | shown R/O, disabled by default |
+| `0x0709` | 1801 | PG05 | Expansion module | x1 | 0…1  | shown R/O, disabled by default |
+| `0x070C` | 1804 | HA01 | AI1 allocation (fan potentiometer) | x1 | 0…60  | shown R/O |
+| `0x070F` | 1807 | HA04 | AI4 allocation (evaporator temperature) | x1 | 0…52  | shown R/O |
+| `0x0710` | 1808 | HA05 | AI5 allocation (water temperature) | x1 | 0…52  | shown R/O |
+| `0x0711` | 1809 | HA06 | AI6 allocation (dehumidify request DI) | x1 | 0…52  | shown R/O |
+| `0x0712` | 1810 | HA07 | AI7 allocation (integration request DI) | x1 | 0…52  | shown R/O |
+| `0x0713` | 1811 | HA08 | AI1 Epj allocation | x1 | 0…52  | shown R/O, disabled by default |
+| `0x0714` | 1812 | HA09 | AI2 Epj allocation | x1 | 0…52  | shown R/O, disabled by default |
+| `0x0715` | 1813 | HA10 | AI1 expansion allocation | x1 | 0…60  | shown R/O, disabled by default |
+| `0x0716` | 1814 | HA11 | AI2 expansion allocation | x1 | 0…60  | shown R/O, disabled by default |
+| `0x0717` | 1815 | HA12 | AI3 expansion allocation | x1 | 0…52  | shown R/O, disabled by default |
+| `0x0718` | 1816 | HA13 | AI4 expansion allocation | x1 | 0…52  | shown R/O, disabled by default |
+| `0x0719` | 1817 | HA14 | AI5 expansion allocation | x1 | 0…52  | shown R/O, disabled by default |
+| `0x071A` | 1818 | HA15 | AI6 expansion allocation | x1 | 0…52  | shown R/O, disabled by default |
+| `0x071B` | 1819 | HA16 | AI7 expansion allocation | x1 | 0…52  | shown R/O, disabled by default |
+| `0x071C` | 1820 | HA17 | AI1 Evj allocation | x1 | 0…52  | shown R/O, disabled by default |
+| `0x071D` | 1821 | HA18 | AI2 Evj allocation | x1 | 0…52  | shown R/O, disabled by default |
+| `0x071E` | 1822 | HB01 | DI1 allocation (high pressure) | x1 | 0…46  | shown R/O |
+| `0x071F` | 1823 | HB02 | DI2 allocation (low pressure) | x1 | 0…46  | shown R/O |
+| `0x0722` | 1826 | HB05 | DI1 expansion allocation | x1 | 0…46  | shown R/O, disabled by default |
+| `0x0723` | 1827 | HB06 | DI2 expansion allocation | x1 | 0…46  | shown R/O, disabled by default |
+| `0x0724` | 1828 | HB07 | DI3 expansion allocation | x1 | 0…46  | shown R/O, disabled by default |
+| `0x0725` | 1829 | HC01 | AO1 allocation (compressor) | x1 | 0…7  | shown R/O |
+| `0x0726` | 1830 | HC02 | AO2 allocation | x1 | 0…7  | shown R/O |
+| `0x0727` | 1831 | HC03 | AO3 allocation | x1 | 0…7  | shown R/O |
+| `0x0729` | 1833 | HC05 | AO1 expansion allocation | x1 | 0…7  | shown R/O, disabled by default |
+| `0x072A` | 1834 | HC06 | AO2 expansion allocation | x1 | 0…7  | shown R/O, disabled by default |
+| `0x072B` | 1835 | HCF1 | Supply fan PWM frequency | x1 | 10…2000 Hz | shown R/O, disabled by default |
+| `0x072C` | 1836 | HCF2 | Return fan PWM frequency | x1 | 10…2000 Hz | shown R/O, disabled by default |
+| `0x072D` | 1837 | HCF3 | Compressor PWM frequency | x1 | 10…2000 Hz | shown R/O, disabled by default |
+| `0x072F` | 1839 | HD02 | DO2 allocation (serious alarm) | x1 | 0…30  | shown R/O |
+| `0x0730` | 1840 | HD03 | DO3 allocation (VMC contact) | x1 | 0…30  | shown R/O |
+| `0x0731` | 1841 | HD04 | DO4 allocation (water condensation valve) | x1 | 0…30  | shown R/O |
+| `0x0732` | 1842 | HD05 | DO5 allocation (external water valve / pump) | x1 | 0…30  | shown R/O |
+| `0x0733` | 1843 | HD06 | DO6 allocation (compressor) | x1 | 0…30  | shown R/O |
+| `0x0734` | 1844 | HD07 | DO1 expansion allocation | x1 | 0…30  | shown R/O, disabled by default |
+| `0x0735` | 1845 | HD08 | DO2 expansion allocation | x1 | 0…30  | shown R/O, disabled by default |
+| `0x0736` | 1846 | HD09 | DO3 expansion allocation | x1 | 0…30  | shown R/O, disabled by default |
+| `0x0737` | 1847 | HD10 | DO4 expansion allocation | x1 | 0…30  | shown R/O, disabled by default |
+| `0x0738` | 1848 | HD11 | Open-collector expansion allocation | x1 | 0…30  | shown R/O, disabled by default |
+| `0x0739` | 1849 | Pb07 | Anti-stagnation valve active time | x1 | 1…999 s | R/W |
+| `0x073A` | 1850 | Pb08 | Anti-stagnation valve wait time | x1 | 1…99 h | R/W |
+| `0x073B` | 1851 | PE21 | Compressor min output (integration) | x0.01 | 0…100 % | R/W |
+| `0x073E` | 1854 | PF29 | Return fan min speed | x0.01 | 0…100 % | R/W, disabled by default |
+| `0x073F` | 1855 | PF30 | Return fan max speed | x0.01 | 0…100 % | R/W, disabled by default |
+| `0x0740` | 1856 | PF31 | Integration fan control (0 temperature, 1 max of manual/remote, 2 max of all) | x1 | 0…2  | R/W |
+| `0x0741` | 1857 | PF32 | Return fan speed forced by DI | x0.01 | 0…100 % | R/W, disabled by default |
+| `0x0742` | 1858 | PM22 | Return fan manual setpoint | x0.01 | 0…100 % | R/W, disabled by default |
+| `0x0746` | 1862 | PF33 | Return fan speed on air quality probe fault | x0.01 | 0…100 % | R/W, disabled by default |
+| `0x0747` | 1863 | PF34 | Return fan post-run speed | x0.01 | 0…100 % | R/W, disabled by default |
+| `0x0748` | 1864 | PM91 | Free-cooling probe offset | x0.1 | -10…10 °C | R/W, disabled by default |
+| `0x0749` | 1865 | PM92 | Evaporator probe offset | x0.1 | -10…10 °C | R/W |
+| `0x074A` | 1866 | PH24 | Evaporation pressure probe min | x0.1 | 0…87 bar | shown R/O, disabled by default |
+| `0x074B` | 1867 | PH25 | Evaporation pressure probe max | x0.1 | 0…87 bar | shown R/O, disabled by default |
+| `0x074C` | 1868 | PH26 | Refrigerant code | x1 | 0…19  | shown R/O |
+| `0x074F` | 1871 | PE22 | Compressor max output (integration) | x0.01 | 0…100 % | R/W |
+| `0x0751` | 1873 | PU11 | Evaporator temperature setpoint | x0.1 | 0…68 °C | R/W |
+| `0x0752` | 1874 | PU12 | Evaporator dead band | x0.1 | 0.1…18 °C | R/W |
+| `0x0754` | 1876 | PA57 | High humidity alarm type (0 display, 1 blocking) | x1 | 0…1  | R/W |
+| `0x0755` | 1877 | PA58 | Max dehumidify time forced by DI | x1 | 0…999 min | R/W |
+| `0x0757` | 1879 | PE24 | Compressor speed ramp | x0.1 | 0…20 rps | R/W |
+| `0x0758` | 1880 | PE25 | Compressor ramp-down on alarm or off | x0.1 | 0…20 rps | R/W |
+| `0x0759` | 1881 | PE26 | Ramp to and from minimum step | x0.1 | 0…20 rps | R/W |
+| `0x075A` | 1882 | PE27 | Compressor max speed | x1 | 0…200 rps | R/W |
+| `0x075B` | 1883 | PE28 | Compressor step 1 speed | x1 | 0…200 rps | R/W |
+| `0x075D` | 1885 | PE30 | Minimum time at step 1 | x1 | 0…255 s | R/W |
+| `0x075E` | 1886 | PE31 | Minimum time at step 2 | x1 | 0…255 s | R/W |
+| `0x075F` | 1887 | PE32 | Maximum time below step 1 | x1 | 0…255 s | R/W |
+| `0x0760` | 1888 | PE33 | Compressor speed (rps) control | x1 | 0…1  | R/W 0/1 |
+| `0x0763` | 1891 | PA59 | Alarm relay (0 always, 1 summer only) | x1 | 0…1  | R/W |
+| `0x0768` | 1896 | PA60 | Auto-reset delay of high humidity block | x1 | 0…9999 s | R/W |
+| `0x0769` | 1897 | PT01 | Test mode enabled | x1 | 0…1  | shown R/O, disabled by default |
+| `0x076A` | 1898 | PT02 | Supply fan speed in test mode | x0.01 | 0…100 % | shown R/O, disabled by default |
+| `0x076B` | 1899 | PT03 | Return fan speed in test mode | x0.01 | 0…100 % | shown R/O, disabled by default |
+| `0x076C` | 1900 | PT04 | External damper in test mode | x0.01 | 0…100 % | shown R/O, disabled by default |

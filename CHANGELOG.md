@@ -6,6 +6,32 @@ All notable changes to this project are documented here, newest first.
 
 ## 2026-10-19
 
+### feat: installer device, season control, winter-heating and brine guards
+
+From the technical handbook (§2.7, §3.8, §5.1, §5.3, §6) and the Modbus
+manual's full parameter table.
+
+* **Installer device.** About 240 installer-menu parameters (PF, PE, Pb, PU,
+  PS, Pr, PA, PC, PH, PG, HA-HD, PM, PT) on a linked `<name> installer` device
+  (`installer_params.py`). Writable ones under Configuration, link settings /
+  I/O allocation / safety bypass / test mode read-only under Diagnostic, unused
+  ones disabled by default. Passwords, PH15 and PH18 are not exposed.
+* **Season select** (HB04: 4 = summer, 3 = winter), replacing the read-only
+  `sensor.season_input`.
+* **Integration request renamed** and guarded: it heats in winter, so it is
+  refused unless the unit is in summer or the new option *Allow winter
+  heating* is on. Climate offers Cool only in summer and Heat only in winter
+  with the option. New option *Water register connected to* (heating/cooling
+  circuit or brine): on brine, winter heating and winter dehumidify are always
+  refused and PU02 is flagged in the setup check.
+* **Water diagnostics:** valve/pump output (1126), condenser valve (1124),
+  AL03/AL04 alarms and a *Water circuit check* sensor. Read-only by design.
+* **Headless setpoints hidden:** without a display or room probe the unit
+  ignores PU01/SEtC/SEtH/PU07, so they are not created and the climate entity
+  offers no targets.
+* **PC12 is at 1894** (1879 is PE24), new setup switch. Winter setpoint range
+  lowered to 5 °C (factory PH10 cap is 14 °C).
+
 ### feat: setup through the integration, operation gate, grouped device page
 
 * **Setup check** sensor (`ok` / `attention`, `issues` attribute) computed from

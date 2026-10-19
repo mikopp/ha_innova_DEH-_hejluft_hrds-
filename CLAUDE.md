@@ -140,8 +140,45 @@ Classification rules (`_classify` in `const.py`):
   `DIAGNOSTIC_KEYS` become entity categories (`entity_category_for`). A new
   entity belongs in exactly one of the three groups, or none (operational).
   `unique_id` always uses the config entry id, so moving a key between devices
-  keeps its entity. Both devices are registered in `async_setup_entry`.
+  keeps its entity. All devices are registered in `async_setup_entry`.
   `wiring_check.py` guards the sets.
+* **Installer device:** the rest of the installer menu lives in
+  `installer_params.py` (one row per parameter: code, register, kind
+  n/s/r, scale, range, unit, en/de name, enabled-by-default). `const.py`
+  appends the rows to `ENTITIES_DICT` as `inst_<code>` keys (`INSTALLER_KEYS`),
+  on the `-installer` child device; writable ones are `CONFIG`, read-only
+  `DIAGNOSTIC`. Addresses come from the Modbus manual's full parameter table
+  (0x0640-0x077A). Scaling was verified against raw read-back: °C / bar / rps
+  ×0.1, fan/compressor/damper % ×0.01, the rest ×1. Never add passwords,
+  PH15 (restore defaults) or PH18 (clear history); keep link settings, I/O
+  allocation, PE05 and test mode read-only; do not poll above 1900 (unverified,
+  and one bad address forces a block onto the per-register fallback). Their
+  translations are generated from the table (names in the row), and
+  `MODBUS_REGISTERS.md` §16 lists them.
+
+## Operating modes, season, water circuit
+
+* Two requests only: **DEU** (`dehumidify`, 1140) and **INT** (`active_cooling`,
+  1139). INT is dehumidify + cool in summer and **heating** in winter (compressor
+  off, warm water through the register). There is no cooling without
+  dehumidifying.
+* `_check_request_allowed` runs on every `write_entity_value`: INT is refused
+  unless the read-back season (`operating_mode`, 1583) is summer, unless the
+  `allow_winter_heating` option is on; with `water_circuit = brine` winter INT
+  and winter DEU are always refused (handbook 3.8.7: no heating, coil freezing),
+  and a season change to winter is refused while a request it would turn
+  unsafe is active. Keep request writes going through `write_entity_value`.
+* Season without a display: `select.season` writes HB04 (1825): 4 = summer,
+  3 = winter (Modbus manual). Anything else raises AL25.
+* Water valve/pump (1126, relay K5) and condenser valve (1124, K4) are
+  read-only diagnostics: the unit drives its water circuit; the integration
+  never overrides it (no PT test-mode writes). `_compute_water_issues` feeds
+  `sensor.water_check`.
+* Headless setpoints: without a display, setpoints only act with a room probe
+  (HA02 = 45 / HA03 = 53/54). `hub.update_hidden_keys()` (from the primed
+  read-back) drops `TEMPERATURE_TARGET_KEYS` / `HUMIDITY_TARGET_KEYS` from
+  entity creation and the climate entity's target features; changing HA02/HA03
+  needs a reload.
 
 ## Device variants (30 vs 50, R vs non-R, DC)
 
@@ -193,11 +230,15 @@ figures in the technical data are the tested spec range, **not** a firmware floo
 ## Climate entity mapping
 
 * `current_temperature` ← `room_temperature`; `current_humidity` ← `room_humidity`.
-* `hvac_mode` ∈ {OFF, DRY, COOL}; setting it writes `unit_on_off` +
-  `dehumidify` + `active_cooling`.
+* `hvac_mode` ∈ {OFF, DRY, COOL (summer), HEAT (winter, only with
+  `allow_winter_heating`, never on brine)}; setting it writes the request
+  registers first (so the guard refuses before the unit starts), then
+  `unit_on_off`.
 * `hvac_action` derived from `unit_status` / `compressor_status` /
   `dehumidify_request`.
-* `target_humidity` ← `humidity_setpoint`; `target_temperature` ← `summer_setpoint`.
+* `target_humidity` ← `humidity_setpoint`; `target_temperature` ←
+  `summer_setpoint` in summer, `winter_setpoint` in winter. Both features are
+  removed when the hub hides the setpoints (headless, no probe).
 * `min_humidity` / `max_humidity` follow the unit's own PH29/PH30 clamps.
 * `current_temperature` / `current_humidity` report `None` while the matching
   probe-fault alarm is active.

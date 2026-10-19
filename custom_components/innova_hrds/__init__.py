@@ -28,18 +28,26 @@ from pymodbus.client import ModbusTcpClient
 
 from .const import (
     BMS_ENABLE_KEYS,
+    C_ACTIVE_COOLING,
     C_AI2_ALLOCATION,
     C_AI3_ALLOCATION,
+    C_ALARM_ANTIFREEZE,
+    C_ALARM_HIGH_WATER_TEMP,
+    C_ALARM_LOW_WATER_TEMP,
+    C_COMPRESSOR_STATUS,
+    C_DEHUMIDIFY,
     C_DT_INT16,
     C_ENABLE_FREE_COOLING,
     C_MAX_BLOCK,
     C_MAX_GAP,
     C_MAX_TOTAL_AIRFLOW,
+    C_OPERATING_MODE,
     C_OUTDOOR_TEMPERATURE,
     C_REG_TYPE_HOLDING_REGISTERS,
     C_REG_TYPE_INPUT_REGISTERS,
     C_ROOM_HUMIDITY,
     C_ROOM_TEMPERATURE,
+    C_SEASON,
     C_SETUP_CHECK,
     C_SUPPLY_FAN_AIRFLOW,
     C_SUPPLY_FAN_MAX_AIRFLOW,
@@ -48,19 +56,32 @@ from .const import (
     C_TEMPERATURE_UNIT,
     C_TIME_PROGRAMS,
     C_UNIT_STATUS,
+    C_WATER_CHECK,
+    C_WATER_TEMPERATURE,
+    C_WATER_VALVE_PUMP,
+    C_WINTER_DEHUM,
     CONF_AIRFLOW_MAX,
+    CONF_ALLOW_WINTER_HEATING,
     CONF_HAS_DISPLAY,
     CONF_HOSTID,
     CONF_MODEL,
+    CONF_WATER_CIRCUIT,
+    DEFAULT_ALLOW_WINTER_HEATING,
     DEFAULT_HAS_DISPLAY,
     DEFAULT_HOSTID,
     DEFAULT_MODEL,
     DEFAULT_PORT,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_WATER_CIRCUIT,
     ENTITIES_DICT,
     HEADLESS_SETTINGS,
+    HUMIDITY_TARGET_KEYS,
     MODEL_SPECS,
     OPERATIONAL_KEYS,
+    ROOM_HUMIDITY_PROBE_CODES,
+    ROOM_TEMP_PROBE_CODES,
+    TEMPERATURE_TARGET_KEYS,
+    WATER_CIRCUIT_BRINE,
     get_entity_bitmask,
     get_entity_factor,
     get_entity_props,
@@ -75,6 +96,7 @@ from .const import (
 )
 from .entity_common import build_device_infos
 from .identity import CannotConnect, DeviceIdentity, WrongDevice, verify_device
+from .installer_params import installer_key
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -126,6 +148,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
     )
 
+    allow_winter_heating = bool(
+        entry.options.get(
+            CONF_ALLOW_WINTER_HEATING,
+            entry.data.get(CONF_ALLOW_WINTER_HEATING, DEFAULT_ALLOW_WINTER_HEATING),
+        )
+    )
+    water_circuit = entry.options.get(
+        CONF_WATER_CIRCUIT, entry.data.get(CONF_WATER_CIRCUIT, DEFAULT_WATER_CIRCUIT)
+    )
+
     # Refuse to write configuration registers into something that is not an
     # HRDS+ (wrong IP, wrong slave id behind a shared gateway).
     try:
@@ -149,6 +181,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         airflow_max,
         has_display,
         identity,
+        allow_winter_heating,
+        water_circuit,
     )
 
     # Prime the cache before creating entities so they do not sit at `unknown`
@@ -160,13 +194,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # runtime_data is keyed by the config entry, so two entries sharing a name
     # can no longer clobber each other's hub the way hass.data[DOMAIN][name] did.
     entry.runtime_data = hub
+    # Decided from the primed read-back; changing HA02/HA03 needs a reload.
+    hub.update_hidden_keys()
 
-    # Register both devices up front: the setup device points at the main one
-    # via `via_device`, which must already exist when the child is created.
-    main_info, setup_info = build_device_infos(entry, hub)
+    # Register the devices up front, parent first: the setup and installer
+    # devices point at the main one via `via_device`, which must already exist.
     registry = dr.async_get(hass)
-    registry.async_get_or_create(config_entry_id=entry.entry_id, **main_info)
-    registry.async_get_or_create(config_entry_id=entry.entry_id, **setup_info)
+    for info in build_device_infos(entry, hub):
+        registry.async_get_or_create(config_entry_id=entry.entry_id, **info)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
@@ -229,10 +264,17 @@ class HrdsModbusHub:
         airflow_max: float,
         has_display: bool = DEFAULT_HAS_DISPLAY,
         identity: Optional[DeviceIdentity] = None,
+        allow_winter_heating: bool = DEFAULT_ALLOW_WINTER_HEATING,
+        water_circuit: str = DEFAULT_WATER_CIRCUIT,
     ) -> None:
         self._hass = hass
         self._name = name
         self._has_display = has_display
+        self.water_circuit = water_circuit
+        # A brine circuit cannot heat (handbook 3.8.7), whatever the option says.
+        self.allow_winter_heating = (
+            allow_winter_heating and water_circuit != WATER_CIRCUIT_BRINE
+        )
         self.identity = identity or DeviceIdentity()
         self._client = ModbusTcpClient(host=host, port=port, timeout=3, retries=3)
         self._lock = threading.Lock()
@@ -251,6 +293,11 @@ class HrdsModbusHub:
         # switch entity across restarts.
         self.operation_allowed = False
         self.setup_issues: list[str] = []
+        self.water_issues: list[str] = []
+        # Setpoint entities not created because nothing makes them act.
+        self.hidden_keys: frozenset[str] = frozenset()
+        self.show_temperature_target = True
+        self.show_humidity_target = True
 
         # Pre-compute the block reads per register type, keeping each function
         # code's blocks clear of the other's addresses.
@@ -290,6 +337,78 @@ class HrdsModbusHub:
             # Hand the socket close to an executor: it acquires the same lock a
             # poll in flight may hold, which would stall the event loop.
             self._hass.async_add_executor_job(self.close)
+
+    @property
+    def is_brine(self) -> bool:
+        return self.water_circuit == WATER_CIRCUIT_BRINE
+
+    @property
+    def season(self) -> Optional[str]:
+        """The season the unit reports (1583): summer, winter, auto or None."""
+        return self.data.get(C_OPERATING_MODE)
+
+    def update_hidden_keys(self) -> None:
+        """Hide setpoints the unit cannot act on.
+
+        Without a display the unit only regulates on its setpoints when a room
+        probe is wired and allocated (handbook 6.7; Modbus manual: "Die
+        Soll-Werte sind nur wirksam, wenn das Display vorhanden ist oder externe
+        Sensoren angeschlossen sind"). Otherwise Home Assistant decides when to
+        request, and an editable target would only mislead.
+        """
+        d = self.data
+        self.show_temperature_target = self._has_display or (
+            d.get(C_AI2_ALLOCATION) in ROOM_TEMP_PROBE_CODES
+        )
+        self.show_humidity_target = self._has_display or (
+            d.get(C_AI3_ALLOCATION) in ROOM_HUMIDITY_PROBE_CODES
+        )
+        hidden: set[str] = set()
+        if not self.show_temperature_target:
+            hidden |= TEMPERATURE_TARGET_KEYS
+        if not self.show_humidity_target:
+            hidden |= HUMIDITY_TARGET_KEYS
+        self.hidden_keys = frozenset(hidden)
+
+    def _check_request_allowed(self, entity_key: str, raw: int) -> None:
+        """Refuse requests that would heat, or freeze a brine coil.
+
+        The integration (INT) request cools in summer but HEATS in winter, and
+        dehumidifying in winter on a brine circuit risks freezing the coil.
+        Raises ServiceValidationError; switching things off always passes.
+        """
+        winter = self.season != "summer"
+        if entity_key == C_ACTIVE_COOLING and raw and winter:
+            if self.is_brine:
+                raise ServiceValidationError(
+                    "The unit is not in summer season, where an integration "
+                    "request heats - impossible on a brine circuit."
+                )
+            if not self.allow_winter_heating:
+                raise ServiceValidationError(
+                    "The unit is not in summer season, where an integration "
+                    "request heats. Enable 'Allow winter heating' in the "
+                    "integration options to permit it."
+                )
+        if entity_key == C_DEHUMIDIFY and raw and winter and self.is_brine:
+            raise ServiceValidationError(
+                "Dehumidifying in winter on a brine circuit is not allowed "
+                "(the water register can freeze)."
+            )
+        if entity_key == C_SEASON and raw == 3:  # 3 = winter
+            if (
+                self.data.get(C_ACTIVE_COOLING) == "on"
+                and not self.allow_winter_heating
+            ):
+                raise ServiceValidationError(
+                    "An integration request is active and would turn into "
+                    "heating in winter. Turn it off first."
+                )
+            if self.data.get(C_DEHUMIDIFY) == "on" and self.is_brine:
+                raise ServiceValidationError(
+                    "A dehumidify request is active; on a brine circuit it must "
+                    "not run in winter. Turn it off first."
+                )
 
     @callback
     def set_operation_allowed(self, allowed: bool) -> None:
@@ -544,12 +663,50 @@ class HrdsModbusHub:
             issues.append("free_cooling_without_outdoor_probe")
         if d.get(C_TEMPERATURE_UNIT) == "fahrenheit":
             issues.append("temperature_unit_fahrenheit")
+        # Relay K5 drives the external valve and, with it, the pump output. If
+        # it is not configured the unit cannot start the circulation pump.
+        if d.get(C_WATER_VALVE_PUMP) == "disabled":
+            issues.append("water_pump_output_not_configured")
+        if self.is_brine and d.get(C_WINTER_DEHUM) not in (None, "disabled"):
+            issues.append("winter_dehumidify_on_brine")
+        return issues
+
+    def _compute_water_issues(self) -> list[str]:
+        """Water-circuit diagnostics. Read-only: the unit runs valve and pump.
+
+        Temperature limits are only judged while the unit circulates water,
+        since a standing circuit just reads the plant-room temperature.
+        """
+        d = self.data
+        issues: list[str] = []
+        pump = d.get(C_WATER_VALVE_PUMP)
+        if d.get(C_COMPRESSOR_STATUS) == "on" and pump == "off":
+            issues.append("pump_off_while_compressor_runs")
+        water = d.get(C_WATER_TEMPERATURE)
+        if pump == "on" and water is not None:
+            max_water = d.get(installer_key("PC07"))
+            if max_water is not None and water > max_water:
+                issues.append("water_too_warm")
+            cold_only = d.get(installer_key("PU08"))
+            if cold_only is not None and water < cold_only:
+                issues.append("water_below_compressor_limit")
+        if d.get(C_ALARM_HIGH_WATER_TEMP) == "on":
+            issues.append("high_water_temperature_alarm")
+        if d.get(C_ALARM_LOW_WATER_TEMP) == "on":
+            issues.append("low_water_temperature_alarm")
+        if d.get(C_ALARM_ANTIFREEZE) == "on":
+            issues.append("antifreeze_alarm")
+        if self.is_brine and self.season == "winter" and d.get(C_UNIT_STATUS) == "on":
+            # Anti-stagnation pulses run the pump and send cold air puffs.
+            issues.append("brine_unit_on_in_winter")
         return issues
 
     def _compute_derived(self) -> None:
         """Write computed values: setup check and airflow (m³/h)."""
         self.setup_issues = self._compute_setup_issues()
         self.data[C_SETUP_CHECK] = "attention" if self.setup_issues else "ok"
+        self.water_issues = self._compute_water_issues()
+        self.data[C_WATER_CHECK] = "attention" if self.water_issues else "ok"
         self.data[C_MAX_TOTAL_AIRFLOW] = self._airflow_max
         self.data[C_SUPPLY_FAN_MAX_AIRFLOW] = self._airflow_max
         out = self.data.get(C_SUPPLY_FAN_OUTPUT)
@@ -584,6 +741,7 @@ class HrdsModbusHub:
             faktor = get_entity_factor(props)
             raw = round(float(value) / faktor) if faktor else round(float(value))
 
+        self._check_request_allowed(entity_key, raw)
         if entity_key in OPERATIONAL_KEYS and raw != 0 and not self.operation_allowed:
             raise ServiceValidationError(
                 "Operational requests are not allowed yet. Review the setup "

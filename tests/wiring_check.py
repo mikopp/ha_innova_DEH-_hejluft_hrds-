@@ -54,6 +54,7 @@ class EntityDescription:
     translation_key: str | None = None
     device_class: object = None
     entity_category: object = None
+    entity_registry_enabled_default: bool = True
 
 
 @dataclass
@@ -203,10 +204,17 @@ def load_const() -> types.ModuleType:
     Importing it as a package member would execute ``innova_hrds/__init__.py``,
     which needs far more of Home Assistant than is stubbed here.
     """
-    spec = importlib.util.spec_from_file_location("hrds_const", COMP / "const.py")
+    # An empty package stand-in lets const.py's relative imports (e.g.
+    # installer_params) resolve without running the real __init__.py.
+    package = types.ModuleType("innova_hrds")
+    package.__path__ = [str(COMP)]
+    sys.modules.setdefault("innova_hrds", package)
+    spec = importlib.util.spec_from_file_location(
+        "innova_hrds.const", COMP / "const.py"
+    )
     module = importlib.util.module_from_spec(spec)
     # const.py does sys.modules[__name__] at import time.
-    sys.modules["hrds_const"] = module
+    sys.modules["innova_hrds.const"] = module
     spec.loader.exec_module(module)
     return module
 
@@ -455,6 +463,42 @@ def main() -> int:
             set(states) == {"ok", "attention"},
             f"{lang}.json translates both setup_check states",
         )
+
+    print("== installer device, season and heating guard ==")
+    inst = const.INSTALLER_KEYS
+    check(
+        not (inst & (const.SETUP_KEYS | const.CONFIG_KEYS | const.DIAGNOSTIC_KEYS)),
+        "installer parameters live only on the installer device",
+    )
+    regs = [const.ENTITIES_DICT[k]["REG"] for k in inst]
+    others = {
+        p["REG"]
+        for k, p in const.ENTITIES_DICT.items()
+        if k not in inst and p["RT"] == const.C_REG_TYPE_HOLDING_REGISTERS
+    }
+    check(len(regs) == len(set(regs)), "no installer register is listed twice")
+    dup = sorted(set(regs) & others)
+    check(not dup, f"installer rows do not repeat an existing entity ({dup})")
+    # Passwords, PH15 restore-defaults and PH18 clear-history must never be
+    # reachable; above 1900 readability is unverified (one bad address forces
+    # the slow per-register fallback for its whole block).
+    forbidden = {1601, 1626, 1787, 1790, 1796, 1802, 1875}
+    check(not (set(regs) & forbidden), "no password / reset parameter is exposed")
+    check(max(regs) <= 1900, "no installer register above 1900 is polled")
+    season = const.ENTITIES_DICT[const.C_SEASON]
+    check(
+        season["REG"] == 1825 and set(season["VALUES"]) == {3, 4},
+        "season select writes only HB04 = 3/4 (anything else raises AL25)",
+    )
+    check(
+        const.is_entity_readonly(const.ENTITIES_DICT[const.C_WATER_VALVE_PUMP]),
+        "water valve / pump output is read-only (the unit drives it)",
+    )
+    hub_src = (COMP / "__init__.py").read_text(encoding="utf-8")
+    check(
+        "self._check_request_allowed(entity_key, raw)" in hub_src,
+        "every write passes the winter-heating / brine guard",
+    )
 
     print()
     print("RESULT:", "ALL PASS" if not FAILURES else f"{len(FAILURES)} FAILURE(S)")

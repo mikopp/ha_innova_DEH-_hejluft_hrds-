@@ -15,6 +15,8 @@ from .const import (
     DEFAULT_NAME,
     DOMAIN,
     ENTITIES_DICT,
+    INSTALLER_DEVICE_SUFFIX,
+    INSTALLER_KEYS,
     SETUP_DEVICE_SUFFIX,
     SETUP_KEYS,
 )
@@ -41,9 +43,11 @@ class HubBackedEntity(Entity):
         entry_id = platform_name
         for dom, ident in device_info.get("identifiers") or ():
             if dom == DOMAIN:
-                # The setup child device only changes where the entity is
-                # listed; its unique id stays keyed on the config entry.
-                entry_id = ident.removesuffix(SETUP_DEVICE_SUFFIX)
+                # The child devices only change where the entity is listed;
+                # its unique id stays keyed on the config entry.
+                entry_id = ident.removesuffix(SETUP_DEVICE_SUFFIX).removesuffix(
+                    INSTALLER_DEVICE_SUFFIX
+                )
                 break
         self._attr_unique_id = f"{entry_id}-{description.key}"
 
@@ -86,12 +90,13 @@ class HubBackedEntity(Entity):
         """Map the hub payload onto entity attributes (override in subclasses)."""
 
 
-def build_device_infos(entry, hub) -> tuple[DeviceInfo, DeviceInfo]:
-    """Return (main device, setup child device) for a config entry.
+def build_device_infos(entry, hub) -> tuple[DeviceInfo, DeviceInfo, DeviceInfo]:
+    """Return (main, setup, installer) device infos for a config entry.
 
-    The device page then separates three things: the operational surface and
-    post-setup configuration on the main device, and everything the user must
-    check once after connecting on the child "setup" device.
+    The device page then separates: the operational surface and post-setup
+    configuration on the main device; everything the user must check once
+    after connecting on the "setup" child; and the full installer menu, not
+    needed for setup or day-to-day use, on the "installer" child.
     """
     identity = hub.identity
     name = entry.data.get(CONF_NAME, DEFAULT_NAME)
@@ -111,15 +116,31 @@ def build_device_infos(entry, hub) -> tuple[DeviceInfo, DeviceInfo]:
         model="Setup and installer configuration",
         via_device=(DOMAIN, entry.entry_id),
     )
-    return main, setup
+    installer = DeviceInfo(
+        identifiers={(DOMAIN, entry.entry_id + INSTALLER_DEVICE_SUFFIX)},
+        name=f"{name} installer",
+        manufacturer=ATTR_MANUFACTURER,
+        model="Installer menu parameters",
+        via_device=(DOMAIN, entry.entry_id),
+    )
+    return main, setup, installer
 
 
 def get_hub_and_device_info(hass, entry) -> tuple:
-    """Return (hub_name, hub, main device info, setup device info)."""
+    """Return (hub_name, hub, {main, setup, installer} device infos)."""
     hub_name = entry.options.get(CONF_NAME, entry.data[CONF_NAME])
     hub = entry.runtime_data
-    main, setup = build_device_infos(entry, hub)
-    return hub_name, hub, main, setup
+    return hub_name, hub, build_device_infos(entry, hub)
+
+
+def device_info_for(key: str, devices: tuple) -> DeviceInfo:
+    """Pick the device an entity key is listed on."""
+    main, setup, installer = devices
+    if key in SETUP_KEYS:
+        return setup
+    if key in INSTALLER_KEYS:
+        return installer
+    return main
 
 
 async def setup_platform_from_types(
@@ -130,15 +151,12 @@ async def setup_platform_from_types(
     entity_cls: Type[T],
 ) -> bool:
     """Instantiate one entity per entry in types_dict."""
-    hub_name, hub, device_info, setup_info = get_hub_and_device_info(hass, entry)
+    hub_name, hub, devices = get_hub_and_device_info(hass, entry)
     entities: List[T] = [
-        entity_cls(
-            hub_name,
-            hub,
-            setup_info if desc.key in SETUP_KEYS else device_info,
-            desc,
-        )
+        entity_cls(hub_name, hub, device_info_for(desc.key, devices), desc)
         for desc in types_dict.values()
+        # Setpoints the unit ignores (no room probe) are not created at all.
+        if desc.key not in hub.hidden_keys
     ]
     async_add_entities(entities)
     return True

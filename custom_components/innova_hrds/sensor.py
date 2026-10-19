@@ -7,7 +7,7 @@ from typing import Any
 
 from homeassistant.components.sensor import SensorEntity
 
-from .const import C_SETUP_CHECK, SENSOR_TYPES, MySensorEntityDescription
+from .const import C_SETUP_CHECK, C_WATER_CHECK, SENSOR_TYPES, MySensorEntityDescription
 from .entity_common import HubBackedEntity, setup_platform_from_types
 
 _LOGGER = logging.getLogger(__name__)
@@ -38,9 +38,15 @@ class HrdsSensor(HubBackedEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
-        if self.entity_description.key != C_SETUP_CHECK:
-            return None
-        return {
-            "issues": list(self._hub.setup_issues),
-            "operation_allowed": self._hub.operation_allowed,
-        }
+        key = self.entity_description.key
+        if key == C_SETUP_CHECK:
+            return {
+                "issues": list(self._hub.setup_issues),
+                "operation_allowed": self._hub.operation_allowed,
+            }
+        if key == C_WATER_CHECK:
+            return {
+                "issues": list(self._hub.water_issues),
+                "water_circuit": self._hub.water_circuit,
+            }
+        return None

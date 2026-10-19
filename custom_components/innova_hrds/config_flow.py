@@ -11,23 +11,42 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PORT, CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.selector import (
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
+)
 
 from .const import (
     CONF_AIRFLOW_MAX,
+    CONF_ALLOW_WINTER_HEATING,
     CONF_HAS_DISPLAY,
     CONF_HOSTID,
     CONF_MODEL,
+    CONF_WATER_CIRCUIT,
+    DEFAULT_ALLOW_WINTER_HEATING,
     DEFAULT_HAS_DISPLAY,
     DEFAULT_HOSTID,
     DEFAULT_MODEL,
     DEFAULT_NAME,
     DEFAULT_PORT,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_WATER_CIRCUIT,
     DOMAIN,
     MODEL_SPECS,
     MODELS,
+    WATER_CIRCUITS,
 )
 from .identity import CannotConnect, WrongDevice, verify_device
+
+# Labelled choice instead of raw slugs (translations: selector.water_circuit).
+WATER_CIRCUIT_SELECTOR = SelectSelector(
+    SelectSelectorConfig(
+        options=WATER_CIRCUITS,
+        translation_key=CONF_WATER_CIRCUIT,
+        mode=SelectSelectorMode.LIST,
+    )
+)
 
 DATA_SCHEMA = vol.Schema(
     {
@@ -38,6 +57,12 @@ DATA_SCHEMA = vol.Schema(
         vol.Optional(CONF_HOSTID, default=DEFAULT_HOSTID): int,
         vol.Required(CONF_MODEL, default=DEFAULT_MODEL): vol.In(MODELS),
         vol.Optional(CONF_HAS_DISPLAY, default=DEFAULT_HAS_DISPLAY): cv.boolean,
+        vol.Required(
+            CONF_WATER_CIRCUIT, default=DEFAULT_WATER_CIRCUIT
+        ): WATER_CIRCUIT_SELECTOR,
+        vol.Optional(
+            CONF_ALLOW_WINTER_HEATING, default=DEFAULT_ALLOW_WINTER_HEATING
+        ): cv.boolean,
     }
 )
 
@@ -175,6 +200,22 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                         default=options.get(
                             CONF_HAS_DISPLAY,
                             data.get(CONF_HAS_DISPLAY, DEFAULT_HAS_DISPLAY),
+                        ),
+                    ): cv.boolean,
+                    vol.Required(
+                        CONF_WATER_CIRCUIT,
+                        default=options.get(
+                            CONF_WATER_CIRCUIT,
+                            data.get(CONF_WATER_CIRCUIT, DEFAULT_WATER_CIRCUIT),
+                        ),
+                    ): WATER_CIRCUIT_SELECTOR,
+                    vol.Optional(
+                        CONF_ALLOW_WINTER_HEATING,
+                        default=options.get(
+                            CONF_ALLOW_WINTER_HEATING,
+                            data.get(
+                                CONF_ALLOW_WINTER_HEATING, DEFAULT_ALLOW_WINTER_HEATING
+                            ),
                         ),
                     ): cv.boolean,
                     vol.Optional(

@@ -21,12 +21,16 @@ module (sold in Austria by https://www.hejluft.at/ as the **HRDS+**) over **Modb
 The integration talks to the unit's control board via Modbus TCP and exposes:
 
 * A **climate entity** showing room temperature & humidity, with the current
-  HVAC action (off / idle / drying / cooling) and an HVAC mode you can set to
-  pick the operating mode:
+  HVAC action (off / idle / drying / cooling / heating) and an HVAC mode you can
+  set to pick the operating mode (see [Operating modes](#operating-modes-dehumidify-and-integration)):
   * **Off** — turns the unit off
-  * **Dry** — dehumidification (fan runs, compressor condenses moisture)
-  * **Cool** — active cooling (the unit's "integration" function, summer only)
-  * Target humidity and target temperature are settable.
+  * **Dry** — dehumidification; supply air leaves at about room temperature
+  * **Cool** — the "integration" request in **summer**: dehumidifies *and* cools
+  * **Heat** — the "integration" request in **winter**, only offered when you
+    enable winter heating in the options (never on a brine circuit)
+  * Target humidity / temperature are only offered when a display or a room
+    probe makes the unit act on them; without one Home Assistant does the
+    regulating.
   * Fan mode is selectable: **off** / **low** / **medium** / **high** — writes
     the manual fan speed register. The shown mode is what the fan is *actually*
     doing. **"off" does not make Dry/Cool run on passive airflow**: on an `R`
@@ -38,12 +42,18 @@ The integration talks to the unit's control board via Modbus TCP and exposes:
   health, overall alarm active, four individual alarm sensors (compressor
   low/high pressure, antifreeze, dirty filter), and a variant-detection sensor
   (active cooling available).
-* **Switches** — unit on/off, dehumidify, active cooling, plus the three
+* **Switches** — unit on/off, dehumidify, integration request, plus the three
   "enable control via Modbus" registers.
 * **Numbers** — humidity setpoint, summer/winter temperature setpoints, and the
   per-mode fan speed bands.
-* **Select** — T/H probe source (HA00), winter dehumidification mode (PU02).
+* **Select** — season (summer/winter), T/H probe source (HA00), winter
+  dehumidification mode (PU02).
 * **Fan** — the supply/recirculation fan as a settable percentage.
+* **Water-circuit diagnostics** — valve/pump output, condenser valve, water
+  alarms and a *Water circuit check* summary. Read-only: the unit runs its own
+  water valve and pump.
+* An **installer** child device with the complete installer menu (about 240
+  parameters), kept off the main device page.
 
 See [`references/README.md`](references/README.md) for the full capability list
 and [`references/MODBUS_REGISTERS.md`](references/MODBUS_REGISTERS.md) for the
@@ -62,7 +72,7 @@ for full detail.
 
 | Entity | What it shows / does |
 |--------|---------------------|
-| `climate.hrds_climate` | HVAC mode (Off/Dry/Cool), action, fan mode, target T & RH. `current_temperature`¹ and `current_humidity`² are suppressed when the corresponding probe is absent. Target-humidity bounds follow the unit's own PH29/PH30 clamps. |
+| `climate.hrds_climate` | HVAC mode (Off/Dry, Cool in summer, Heat in winter if enabled), action, fan mode. Target T¹ / RH² only when a display or room probe is configured. `current_temperature`¹ and `current_humidity`² are suppressed when the corresponding probe is absent. Target-humidity bounds follow the unit's own PH29/PH30 clamps; the target temperature is SEtC in summer and SEtH in winter. |
 
 ### Sensors
 
@@ -89,6 +99,9 @@ for full detail.
 | `sensor.operating_mode` | enum | ³ Built-in | Summer/Winter/Auto season |
 | `sensor.recirculation_damper` | enum | ³ Built-in | Reg 1134; Off/On/Disabled — state of the motorised recirculation damper (R-variant only) |
 | `sensor.supply_fan_airflow` | m³/h | ³ Built-in | Computed from live fan output %; see [Airflow sensors](#airflow-sensors) |
+| `sensor.water_valve_pump` | enum | ³ Built-in | Diagnostic. Reg 1126; relay K5 — external water valve (V3V) and the pump output (PM) switched with it: Off / On / Not configured |
+| `sensor.water_condenser_valve` | enum | ³ Built-in | Diagnostic. Reg 1124; relay K4 — On while all compressor heat goes to the water (summer integration) |
+| `sensor.water_check` | enum | — | Diagnostic. `ok` / `attention`; attribute `issues`, see [Water circuit](#water-circuit-and-brine) |
 | `sensor.supply_fan_max_airflow` | m³/h | — | Computed constant; maximum fan airflow (from config) |
 | `sensor.max_total_airflow` | m³/h | — | Computed constant; same as supply_fan_max_airflow (from config) |
 
@@ -126,6 +139,8 @@ Each sensor maps to a single bit of a packed alarm register. **ON = alarm is act
 |--------|-------|-------------|--------|
 | `binary_sensor.alarm_compressor_lowpressure` | AL11 | Reg 768 bit 10 | Compressor stopped (low pressure / frost thermostat) |
 | `binary_sensor.alarm_compressor_highpressure` | AL12 | Reg 768 bit 11 | Compressor stopped (high pressure switch) |
+| `binary_sensor.alarm_high_water_temperature` | AL03 | Reg 768 bit 2 | Summer: water above PC07; cooling (and dehumidify unless PU03) blocked |
+| `binary_sensor.alarm_low_water_temperature` | AL04 | Reg 768 bit 3 | Winter: water below PC08; heating blocked |
 | `binary_sensor.alarm_water_antifreeze` | AL16 | Reg 768 bit 15 | Fan stopped (antifreeze protection) |
 | `binary_sensor.alarm_dirty_filter` | AL22 | Reg 769 bit 5 | Maintenance reminder; display only, manual reset |
 
@@ -135,9 +150,10 @@ Each sensor maps to a single bit of a packed alarm register. **ON = alarm is act
 |--------|----------|-------|
 | `switch.unit_on_off` | 1105 | BMS on/off request (requires PH02 = 1) |
 | `switch.dehumidify` | 1140 | BMS dehumidify request (requires PH28 = 1) |
-| `switch.active_cooling` | 1139 | BMS active-cooling request (requires PH27 = 1, summer season) |
+| `switch.active_cooling` | 1139 | **Integration request** (requires PH27 = 1): dehumidify + cool in summer, **heat in winter**. Refused while not in summer unless winter heating is enabled in the options; always refused in winter on a brine circuit |
 | `switch.allow_operational_requests` | — | **Setup device.** Not a register: the integration's own gate. Off by default; while off, on/dehumidify/cooling/non-zero fan requests are refused. Restored across restarts |
 | `switch.enable_time_programs` | 1779 | **Setup device.** PH03 — time programs can switch the unit off |
+| `switch.enable_onoff_by_di_request` | 1894 | **Setup device.** PC12 — a DEU/INT request on the digital inputs starts the unit even with the OFF contact open |
 | `switch.enable_onoff_display` | 1777 | PH01 — on/off by wired display. Forced **off** while `has_display` is off (the default); turning it on by hand is undone on the next poll |
 | `switch.enable_onoff_bms` | 1778 | PH02 — auto-set on startup; expose to inspect/reset |
 | `switch.enable_dehumidify_bms` | 1870 | PH28 — auto-set on startup |
@@ -150,16 +166,16 @@ Each sensor maps to a single bit of a packed alarm register. **ON = alarm is act
 
 | Entity | Register | Range | Notes |
 |--------|----------|-------|-------|
-| `number.humidity_setpoint` | 1586 | 0–100 %RH | PU01; target humidity for dehumidify |
-| `number.summer_setpoint` | 1584 | 15–35 °C | SEtC; target room temp for active cooling |
-| `number.winter_setpoint` | 1585 | 15–35 °C | SEtH; target room temp for heating |
+| `number.humidity_setpoint` | 1586 | 0–100 %RH | PU01; target humidity for automatic dehumidify. **Not created without a display or humidity probe** |
+| `number.summer_setpoint` | 1584 | 15–35 °C | SEtC; target room temp for automatic summer integration, clamped by PH07/PH08. **Not created without a display or room temperature probe** |
+| `number.winter_setpoint` | 1585 | 5–35 °C | SEtH; target room temp for automatic winter heating. The factory PH10 cap of 14 °C keeps automatic heating off. **Not created without a display or room temperature probe** |
 | `number.fan_min_speed_dehumidify` | 1853 | 0–100 % | PF28; lower fan bound in dehumidify mode |
 | `number.fan_max_speed_dehumidify` | 1647 | 0–100 % | PF10; upper fan bound in dehumidify mode |
 | `number.fan_min_speed_cooling` | 1852 | 0–100 % | PF27; lower fan bound in active cooling |
 | `number.fan_min_speed_vmc` | 1644 | 0–100 % | PF07; lower fan bound in VMC (ventilation-only) mode |
 | `number.fan_max_speed_cooling` | 1646 | 0–100 % | PF09; upper fan bound in active cooling |
 | `number.fan_manual_speed` | 1614 | 0–100 % | PM20; the fan **setpoint** — what was asked for. The fan entity and climate fan mode write here too. See the note below on the min/max band. |
-| `number.dehumidify_differential` | 1694 | 0–100 %RH | PU07; the unit's own dehumidify hysteresis |
+| `number.dehumidify_differential` | 1694 | 0–100 %RH | PU07; the unit's own dehumidify hysteresis. Not created without a display or humidity probe |
 | `number.min_room_temp_dehumidify` | 1889 | 0–30 °C | PU13; **below this the unit refuses to dehumidify, including over Modbus** |
 | `number.min_room_temp_diff_dehumidify` | 1890 | 0.1–20 °C | PU14; re-enable differential above PU13 |
 | `number.fan_min_runtime` | 1638 | 0–999 s | PF01; device-side minimum fan runtime |
@@ -171,6 +187,7 @@ Each sensor maps to a single bit of a packed alarm register. **ON = alarm is act
 
 | Entity | Register | Options | Notes |
 |--------|----------|---------|-------|
+| `select.season` | 1825 | Summer, Winter | HB04 — the season switch without a display (the Modbus manual's method: it flips how the open DI4 contact is read). Read-back is `sensor.operating_mode`. Switching to winter is refused while an integration request is on (it would turn into heating) and, on brine, while dehumidify is on. **If a contact is wired to DI4, closing it inverts the meaning.** |
 | `select.probe_source` | 1803 | None/external, CNU2 T, CNU2 T+H, CNU T, CNU T+H, EPJ T, EPJ T+H | HA00 — which sensor feeds room T/H readings. **Set to "None / external probes" when running without a display.** |
 | `select.winter_dehumidify` | 1689 | Disabled, With water, Without water | PU02; dehumidification during the heating season |
 
@@ -186,7 +203,8 @@ so you can see it without opening the display. See the
 | `sensor.machine_type` | 1797 | PG01 — supply fan only, or supply and exhaust fan (not "has recirculation") |
 | `sensor.remote_onoff_input` | 1824 | HB03 — unused / normally closed / normally open |
 | `binary_sensor.remote_contact_closed` | 257 bit 0 | State of the remote on/off contact (meaning inferred, unverified) |
-| `sensor.season_input` / `sensor.season_owner` | 1825 / 1878 | HB04 season contact type; PC11 who owns season change |
+| `sensor.season_owner` | 1878 | PC11 — who owns the season change when a display is connected |
+| `switch.enable_onoff_by_di_request` | 1894 | PC12 — DI requests start the unit despite an open OFF contact |
 | `sensor.temperature_unit` | 1781 | PH05 — Celsius or Fahrenheit |
 | `number.ai2_allocation` / `number.ai3_allocation` | 1805 / 1806 | HA02 / HA03 — what the analog inputs are allocated to (0 = unused, 45 = room temperature, 53/54 = room humidity). **Writable** - set to 0 when no such probe is wired |
 | `sensor.fan_output_allocation` | 1832 | HC04 — raw allocation of the supply fan output |
@@ -198,6 +216,27 @@ so you can see it without opening the display. See the
 | Entity | What it does |
 |--------|-------------|
 | `fan.hrds_supply_fan` | The unit's supply/recirculation fan as a percentage. Reports the **actual** output (reg 639) — what the fan is doing — while `fan.set_percentage` writes the setpoint PM20 (1614). The commanded value, RPM and fan status are state attributes. Because the unit's own fan recirculates room air *in addition* to whatever the central MVHR pushes through the duct, this is the lever for topping combined airflow up to a target. |
+
+### Installer device
+
+Everything else from the handbook's installer menu (§5.3) that has a Modbus
+address sits on a separate **`HRDS+ installer`** device, so it does not crowd
+the main page. It is not needed for setup or normal use. Entity ids carry the
+parameter code, for example `number.hrds_installer_pc07_max_water_temperature...`.
+
+* Writable parameters are under *Configuration*: fans (PF), compressor (PE),
+  water valves (Pb), dehumidification (PU), alarms (PA), season change (PC),
+  setpoint limits (PH07–PH10), probe offsets (PM8x) and hour counters (PM00–PM04).
+* Read-only, under *Diagnostic*: the Modbus/CAN link (PH11–PH17; changing them
+  would cut the connection), the I/O allocation (HA, HB, HC, HD; manufacturer
+  level), refrigerant and pressure-probe ranges, the compressor safety-time
+  bypass (PE05), forced compressor (PM21) and test mode (PT).
+* Parameters the HRDS+ does not use (return fan, air quality, heat-recovery
+  defrost, external damper, rotary exchanger, expansion I/O) exist but are
+  **disabled by default**; enable them in the entity settings if needed.
+* Never exposed: passwords, PH15 *restore factory defaults*, PH18 *clear alarm
+  history*. The full list with addresses and scaling is in
+  [`references/MODBUS_REGISTERS.md` §16](references/MODBUS_REGISTERS.md).
 
 ## Installation
 
@@ -226,6 +265,8 @@ Innova HRDS+**, then provide:
 | Scan interval | `30 s` | Polling period (min 5 s) |
 | Model | `30`    | Device size: `30` = HRDS+30 (max 300 m³/h), `50` = HRDS+50 (max 500 m³/h). Sets airflow defaults. |
 | A wired CNU2 display is connected | off | Leave **off** for a unit driven only from Home Assistant. See below. |
+| Water register connected to | Heating/cooling circuit | Choose **Brine circuit** if the unit is on the brine of a ground-source heat pump. See [Water circuit](#water-circuit-and-brine). |
+| Allow winter heating | off | In winter the integration request heats with water from the heating circuit. Off: such requests are refused. Has no effect on a brine circuit. |
 
 Before anything is written, the integration checks that the address really is an
 HRDS+: the controller must identify itself as EVCO `EPB9…` over Modbus (FC 43)
@@ -248,9 +289,10 @@ to be changed on the unit beforehand. The device page is split by purpose:
 | Where | What is there | When you touch it |
 |-------|---------------|-------------------|
 | **`HRDS+ setup`** device (linked to the main device) | Everything that decides whether the unit can run at all: the **Setup check** sensor, the **Allow operational requests** switch, the Modbus/display enables (PH01, PH02, PH27, PH28), probe allocation (HA00, HA02, HA03) and probe-OK flags, remote on/off input (HB03) and its contact state, season input (HB04, PC11), time programs (PH03), temperature unit (PH05), machine type (PG01), free-cooling/integration enables, and the fan/damper output wiring (HC04, HD01, PS01). | Once, after installing, and again if the wiring changes |
-| **`HRDS+`** device, *Configuration* section | Post-setup tuning: setpoints, per-mode fan min/max, dehumidify differential, minimum room temperature (PU13/PU14), fan run times, humidity clamps | Occasionally |
-| **`HRDS+`** device, main section | Climate, fan, the request switches (on/off, dehumidify, active cooling), live readings, status and alarms | Day to day |
-| **`HRDS+`** device, *Diagnostic* section | Calibration and the fan request echo | When troubleshooting |
+| **`HRDS+`** device, *Configuration* section | Post-setup tuning: setpoints (only with a probe), per-mode fan min/max, dehumidify differential, minimum room temperature (PU13/PU14), fan run times, humidity clamps | Occasionally |
+| **`HRDS+`** device, main section | Climate, fan, season, the request switches (on/off, dehumidify, integration), live readings, status and alarms | Day to day |
+| **`HRDS+`** device, *Diagnostic* section | Water valve/pump, condenser valve, water circuit check, airflow calibration, fan request echo | When troubleshooting |
+| **`HRDS+ installer`** device (linked to the main device) | The rest of the installer menu (see [Installer device](#installer-device)) | Rarely, by an installer |
 
 Entity ids follow the device name, so setup entities are prefixed with the setup
 device name (for example `sensor.hrds_setup_setup_check`); the tables below omit
@@ -282,6 +324,8 @@ below is clean.
    | `time_programs_enabled` | PH03 is on; the unit may switch itself off on schedule. |
    | `free_cooling_without_outdoor_probe` | **Free cooling** is on but no outdoor probe delivers a value. Turn off `switch.enable_free_cooling` unless an outdoor probe is fitted. |
    | `temperature_unit_fahrenheit` | PH05 is set to °F; the integration assumes °C. |
+   | `water_pump_output_not_configured` | Relay K5 (external water valve and the PM pump output) is not configured, so the unit cannot start the circulation pump. Check HD05 on the installer device (12 = water valve) and the wiring. |
+   | `winter_dehumidify_on_brine` | Brine circuit selected but PU02 allows dehumidifying in winter - the coil can freeze. Set `select.winter_dehumidify` to *Disabled*. |
 
 2. Read the remaining setup entities and confirm they match your installation:
    *Machine type* (supply only, or supply and exhaust fan), *Recirculation
@@ -292,7 +336,13 @@ below is clean.
    unit refuses to dehumidify below it, and what it does with no room
    temperature probe is not yet verified on hardware - see
    [`plans/todo.md`](plans/todo.md).
-4. When the setup check is `ok`, turn on **Allow operational requests**.
+4. Check the **season** (`select.season`; read-back `sensor.operating_mode`) and
+   the integration options *Water register connected to* and *Allow winter
+   heating*.
+5. On a water circuit fed by a pump the HRDS+ switches (brine in particular):
+   watch `sensor.water_valve_pump` turn *On* with the first request and the
+   **Water circuit check** stay `ok` (see [Water circuit](#water-circuit-and-brine)).
+6. When the setup check is `ok`, turn on **Allow operational requests**.
 
 ### Airflow calibration (Options)
 
@@ -311,10 +361,70 @@ These values feed the live `sensor.supply_fan_airflow` calculation (proportional
 
 ## Using the integration
 
+### Operating modes: dehumidify and integration
+
+The unit knows exactly two requests (handbook §2.7, §6.1):
+
+| Request | Summer | Winter |
+|---------|--------|--------|
+| **Dehumidify** (DEU, `switch.dehumidify`, climate **Dry**) | Compressor dehumidifies; its heat goes into the water register behind the evaporator, so the air leaves at about room temperature | Only if PU02 (`select.winter_dehumidify`) allows it; factory: disabled |
+| **Integration** (INT, `switch.active_cooling`, climate **Cool**/**Heat**) | Compressor runs and the condenser valve closes, so all heat goes into the water: air leaves **dehumidified and cold** | **Heating**: compressor off, warm water from the heating circuit through the register |
+
+There is no cooling without dehumidifying: an evaporator held at about 6 °C
+always condenses moisture. PU05 (`switch.force_dehumidify_in_cooling`, factory
+on) adds the dehumidify request to a summer integration request.
+
+### Season and winter heating
+
+Without a display the season is set with `select.season` (HB04 = 4 summer,
+3 winter). Because winter changes the integration request from cooling to
+heating, the integration guards it:
+
+* An integration request (switch or climate Cool/Heat) is **refused unless the
+  unit reports summer**, unless you enabled **Allow winter heating** in the
+  options. Season *auto* counts as not summer.
+* Switching the season to winter is refused while an integration request is on.
+* Automatic heating needs a room probe and a winter setpoint above SEtH - PF12,
+  and the factory PH10 cap (14 °C) prevents it; headless it cannot trigger.
+* Not something software controls: in OFF/standby the internal water valve is
+  open. If warm water circulates through the unit, it warms the ventilation air
+  passing through - unless an external valve on V3V closes the circuit.
+
+### Water circuit and brine
+
+The unit switches its water circuit itself: relay K5 drives the external valve
+(V3V) and, together with it, the pump output (PM). The integration only shows
+it (`sensor.water_valve_pump`) and never overrides it. The **Water circuit
+check** (`sensor.water_check`, attribute `issues`) flags:
+
+| Issue | Meaning |
+|-------|---------|
+| `pump_off_while_compressor_runs` | Compressor on but the valve/pump output off - no water through the condenser |
+| `water_too_warm` | While circulating, water is above PC07 (max water temperature for dehumidify / summer integration); AL03 follows after PA16 |
+| `water_below_compressor_limit` | While circulating, water is below PU08: the compressor will not start (cold-water-only dehumidify) |
+| `high_water_temperature_alarm` / `low_water_temperature_alarm` / `antifreeze_alarm` | AL03 / AL04 / AL16 active |
+| `brine_unit_on_in_winter` | Brine circuit, winter, unit on. The anti-stagnation cycle (Pb07/Pb08) pulses valve and pump and can blow short bursts of cold air; the handbook recommends switching the unit off in winter |
+
+With **Water register connected to = Brine circuit** (handbook §3.8.7), heating
+is impossible and dehumidifying in winter is forbidden because the coil can
+freeze. The integration then refuses winter integration and winter dehumidify
+requests regardless of the heating option, and flags PU02 in the setup check.
+In the handbook's parallel brine variants the HRDS+'s PM output switches the
+brine pump through a relay; that wiring is what `sensor.water_valve_pump`
+reflects.
+
 ### Setting target humidity and target temperature
 
-Both targets are exposed on the **climate entity** (and as standalone `number`
-entities):
+Without a display or a configured room probe the unit **ignores** its setpoints
+(Modbus manual: *„Die Soll-Werte sind nur wirksam, wenn das Display vorhanden
+ist oder externe Sensoren angeschlossen sind“*). In that case the integration
+does not create them, and the climate entity offers no targets: use Home
+Assistant (a generic hygrostat/thermostat on your own sensors) to switch
+**Dry** / **Cool** on and off. The decision is made at start-up from HA02/HA03;
+reload the integration after wiring a probe.
+
+When a display or probe is present, both targets are exposed on the **climate
+entity** (and as standalone `number` entities):
 
 * **Target humidity** (`target_humidity`, register `PU01` 1586, %RH) is the
   level the unit dehumidifies towards. It is only acted on while the unit is
@@ -373,12 +483,12 @@ This is exactly the climate entity's **Dry** mode:
 2. The compressor runs to condense moisture, so the **fan runs** — you'll see
    **Supply fan status = On**, **Recirculation active = on**, and **Compressor
    status = On**.
-3. **Active cooling (Modbus)** stays **off** — the compressor is working for
+3. **Integration request** stays **off** — the compressor is working for
    dehumidification, not cooling.
 
 If you prefer the individual switches over the climate entity, the same state is
-**Unit on/off = On**, **Dehumidify = On**, **Active cooling = Off**. Going to
-**Cool** mode instead adds the active-cooling request on top (summer only).
+**Unit on/off = On**, **Dehumidify = On**, **Integration request = Off**. Going
+to **Cool** mode instead adds the integration request on top (summer only).
 Technical details and register addresses are in
 [`references/MODBUS_REGISTERS.md` §13](references/MODBUS_REGISTERS.md#13-airflow-passive-flow-fan-integration-and-active-cooling).
 

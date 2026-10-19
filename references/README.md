@@ -366,9 +366,34 @@ sensors/numbers/switches:
 * `hvac_action` ← derived from `sm_UnitStatus` / `DehumRequest` / `CmpStatus`
   (OFF / IDLE / DRYING / COOLING / FAN).
 * `hvac_mode` ← used to drive the operating mode: OFF, DRY (dehumidify), COOL
-  (active cooling). Writing a mode toggles the on/off + dehum + integration
-  request registers.
+  (summer integration), HEAT (winter integration, opt-in). Writing a mode
+  toggles the on/off + dehum + integration request registers.
 * `target_humidity` ← `PU01` (1586); `target_temperature` ← season setpoint.
+  Neither is offered headless without a room probe: the unit ignores them.
+
+## Operating modes, season and the water circuit (handbook §2.6-2.7, §6)
+
+| State | Damper / fan | Compressor | Internal valve | V3V + pump | Supply air |
+|-------|--------------|------------|----------------|------------|------------|
+| OFF / ON-standby | closed / off | off | **open** (water may flow through condenser and reheat register) | closed (except anti-stagnation pulses Pb07/Pb08) | passes through untreated |
+| DEU (dehumidify) | open / on | on | open: heat goes to the reheat register | open / on | dry, about room temperature |
+| INT summer | open / on | on (with PU05 = 1, factory) | closed: all heat to the water | open / on | dry and cold |
+| INT winter | open / on | **off** | open | open / on | warmed by water from the heating circuit |
+
+* There is no cooling without dehumidification.
+* Without a display, season is switched with HB04 (1825): 4 = summer, 3 = winter;
+  read-back 1583. PC05 (auto season) defaults to manual.
+* Automatic winter heating needs a room probe and is capped by PH10 (factory
+  14 °C). PG02 = 0 disables both summer cooling and winter heating.
+* Winter dehumidify is PU02 (factory 0 = off). On a **brine** circuit
+  (ground-source heat pump) winter heating is impossible and winter
+  dehumidification is forbidden (coil freezing); anti-stagnation pulses can
+  blow cold air, so the handbook recommends switching the unit off in winter.
+* The unit drives V3V and the PM pump output together (relay K5, status 1126).
+  In the parallel brine variants the PM output switches the brine pump via a
+  relay. The compressor will not start below PU08 water temperature (10 °C) and
+  AL03 blocks summer operation above PC07 (30 °C).
+
 
 Two device traits matter for the implementation and are easy to get wrong:
 

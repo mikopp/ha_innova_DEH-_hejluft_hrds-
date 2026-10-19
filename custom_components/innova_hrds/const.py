@@ -35,6 +35,8 @@ from homeassistant.const import (
 )
 from pymodbus.client import ModbusTcpClient
 
+from .installer_params import INSTALLER_PARAMS, installer_key
+
 thismodule = sys.modules[__name__]
 _LOGGER = logging.getLogger(__name__)
 
@@ -46,6 +48,17 @@ DEFAULT_HOSTID = 1
 CONF_HOSTID = "hostid"
 CONF_MODEL = "model"
 CONF_HAS_DISPLAY = "has_display"
+# Opt-in: allow an integration (INT) request while the unit is in winter
+# season, which makes it heat with water from the heating circuit.
+CONF_ALLOW_WINTER_HEATING = "allow_winter_heating"
+DEFAULT_ALLOW_WINTER_HEATING = False
+# What the unit's water register is plumbed to. A brine (ground-source)
+# circuit cannot heat and must not dehumidify in winter (coil freezing).
+CONF_WATER_CIRCUIT = "water_circuit"
+WATER_CIRCUIT_HEATING_COOLING = "heating_cooling"
+WATER_CIRCUIT_BRINE = "brine"
+WATER_CIRCUITS = [WATER_CIRCUIT_HEATING_COOLING, WATER_CIRCUIT_BRINE]
+DEFAULT_WATER_CIRCUIT = WATER_CIRCUIT_HEATING_COOLING
 # The unit is driven over Modbus; a wired CNU2 display is the exception.
 DEFAULT_HAS_DISPLAY = False
 DEFAULT_MODEL = "30"
@@ -137,12 +150,17 @@ MACHINE_TYPE = {0: "supply_fan_only", 1: "supply_and_exhaust_fan"}
 # (factory), 1 = normally closed, 0 = not used.
 REMOTE_ONOFF_INPUT = {0: "unused", 1: "normally_closed", 2: "normally_open"}
 # HB04 - summer/winter digital input; only 3 and 4 are valid (others raise AL25).
-SEASON_INPUT = {3: "normally_closed", 4: "normally_open"}
+# Without a display the Modbus manual uses it as THE season switch: 4 makes
+# the open DI4 contact read as summer, 3 (normally closed) as winter. If a
+# contact is actually wired to DI4, closing it inverts the meaning.
+SEASON = {4: "summer", 3: "winter"}
 # PC11 - who owns the summer/winter change.
 SEASON_OWNER = {0: "display", 1: "digital_input"}
 # PH05
 TEMPERATURE_UNIT = {0: "celsius", 1: "fahrenheit"}
 RECIRCULATION_DAMPER = {0: "off", 1: "on", 2: "disabled"}
+# Relay outputs reported as 0 = off, 1 = on, 2 = not configured.
+OUTPUT_STATUS = {0: "off", 1: "on", 2: "disabled"}
 # PU02 - dehumidification during the winter season.
 WINTER_DEHUM = {0: "disabled", 1: "with_water", 2: "without_water"}
 
@@ -218,7 +236,14 @@ C_TIME_PROGRAMS = "enable_time_programs"
 C_AI2_ALLOCATION = "ai2_allocation"
 C_AI3_ALLOCATION = "ai3_allocation"
 C_REMOTE_ONOFF_INPUT = "remote_onoff_input"
-C_SEASON_INPUT = "season_input"
+C_SEASON = "season"
+C_ONOFF_BY_DI_REQUEST = "enable_onoff_by_di_request"
+C_WATER_VALVE_PUMP = "water_valve_pump"
+C_WATER_CONDENSER_VALVE = "water_condenser_valve"
+C_ALARM_HIGH_WATER_TEMP = "alarm_high_water_temperature"
+C_ALARM_LOW_WATER_TEMP = "alarm_low_water_temperature"
+# Computed: water-circuit health (pump/valve, water temperature limits).
+C_WATER_CHECK = "water_check"
 C_SEASON_OWNER = "season_owner"
 C_TEMPERATURE_UNIT = "temperature_unit"
 C_FAN_OUTPUT_ALLOCATION = "fan_output_allocation"
@@ -454,7 +479,7 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "DT": C_DT_INT16,
         "FAKTOR": 0.1,
         "UNIT": "°C",
-        "MIN": 15.0,
+        "MIN": 5.0,
         "MAX": 35.0,
         "STEP": 0.5,
         "PF": Platform.NUMBER,
@@ -548,7 +573,8 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "REG": 1139,
         "DT": C_DT_UINT16,
         "SWITCH": {"off": 0, "on": 1},
-        "NAME": "Active cooling (BMS)",
+        # The INT request: dehumidify + cool in summer, HEAT in winter.
+        "NAME": "Integration request (BMS)",
     },
     # PH01: let a wired display switch the unit on/off. With no display the unit
     # stays OFF-by-display forever while this is 1, and an OFF from any source
@@ -644,13 +670,39 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "RW": 0,
         "NAME": "Remote on/off input (HB03)",
     },
-    C_SEASON_INPUT: {
+    # The season switch over Modbus (HB04, see SEASON). Read-back is 1583.
+    C_SEASON: {
         "RT": C_REG_TYPE_HOLDING_REGISTERS,
         "REG": 1825,
         "DT": C_DT_UINT16,
-        "VALUES": SEASON_INPUT,
-        "RW": 0,
-        "NAME": "Season input (HB04)",
+        "VALUES": SEASON,
+        "NAME": "Season",
+    },
+    # PC12: a DI dehumidify/integration request starts the unit even with the
+    # remote OFF contact open.
+    C_ONOFF_BY_DI_REQUEST: {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": 1894,
+        "DT": C_DT_UINT16,
+        "SWITCH": {"off": 0, "on": 1},
+        "NAME": "Unit on by DI request (PC12)",
+    },
+    # Relay K5: external water valve (V3V) and, switched with it, the pump
+    # output (PM). The unit drives these itself; read-only on purpose.
+    C_WATER_VALVE_PUMP: {
+        "RT": C_REG_TYPE_INPUT_REGISTERS,
+        "REG": 1126,
+        "DT": C_DT_UINT16,
+        "VALUES": OUTPUT_STATUS,
+        "NAME": "Water valve / pump output",
+    },
+    # Relay K4: internal water condenser valve (closed = all heat to water).
+    C_WATER_CONDENSER_VALVE: {
+        "RT": C_REG_TYPE_INPUT_REGISTERS,
+        "REG": 1124,
+        "DT": C_DT_UINT16,
+        "VALUES": OUTPUT_STATUS,
+        "NAME": "Water condenser valve",
     },
     C_SEASON_OWNER: {
         "RT": C_REG_TYPE_HOLDING_REGISTERS,
@@ -758,6 +810,24 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "SWITCH": {"off": 0, "on": 1},
         "BITMASK": 11,
         "NAME": "Alarm: compressor high-pressure",
+    },
+    # AL03 (bit 2): water above PC07 in summer - blocks cooling/dehumidify.
+    C_ALARM_HIGH_WATER_TEMP: {
+        "RT": C_REG_TYPE_INPUT_REGISTERS,
+        "REG": 768,
+        "DT": C_DT_UINT16,
+        "SWITCH": {"off": 0, "on": 1},
+        "BITMASK": 2,
+        "NAME": "Alarm: high water temperature",
+    },
+    # AL04 (bit 3): water below PC08 in winter - blocks heating.
+    C_ALARM_LOW_WATER_TEMP: {
+        "RT": C_REG_TYPE_INPUT_REGISTERS,
+        "REG": 768,
+        "DT": C_DT_UINT16,
+        "SWITCH": {"off": 0, "on": 1},
+        "BITMASK": 3,
+        "NAME": "Alarm: low water temperature",
     },
     # AL16 (bit 15): water-circuit antifreeze — stops fan.
     C_ALARM_ANTIFREEZE: {
@@ -918,6 +988,39 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
     },
 }
 
+# Installer-menu parameters (installer_params.py) on their own child device.
+INSTALLER_KEYS: frozenset[str] = frozenset(
+    installer_key(row[0]) for row in INSTALLER_PARAMS
+)
+for _code, _reg, _kind, _factor, _min, _max, _unit, _en, _de, _on in INSTALLER_PARAMS:
+    _props: Dict[str, Any] = {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": _reg,
+        # Offsets and temperature limits can be negative.
+        "DT": C_DT_INT16 if _min < 0 or _unit == "°C" else C_DT_UINT16,
+        "NAME": _en,
+        "NAME_DE": _de,
+        "ENABLED": _on,
+        "INSTALLER": _code,
+    }
+    if _kind == "s":
+        _props["SWITCH"] = {"off": 0, "on": 1}
+    else:
+        _props.update(
+            {
+                "FAKTOR": _factor,
+                "MIN": _min,
+                "MAX": _max,
+                "STEP": _factor if _factor < 1 else 1,
+                "PF": Platform.NUMBER,
+            }
+        )
+        if _unit:
+            _props["UNIT"] = _unit
+    if _kind == "r":
+        _props["RW"] = 0
+    ENTITIES_DICT[installer_key(_code)] = _props
+
 # Registers written (in order) when the integration is set up, to make sure
 # Modbus control is actually permitted by the unit.
 BMS_ENABLE_KEYS = (C_ENABLE_ONOFF_BMS, C_ENABLE_DEHUM_BMS, C_ENABLE_COOLING_BMS)
@@ -959,7 +1062,7 @@ SETUP_KEYS = frozenset(
         C_ENABLE_FREE_COOLING,
         C_REMOTE_ONOFF_INPUT,
         C_REMOTE_CONTACT_CLOSED,
-        C_SEASON_INPUT,
+        C_ONOFF_BY_DI_REQUEST,
         C_SEASON_OWNER,
         C_TEMPERATURE_UNIT,
         C_MACHINE_TYPE,
@@ -993,16 +1096,38 @@ CONFIG_KEYS = frozenset(
     }
 )
 DIAGNOSTIC_KEYS = frozenset(
-    {C_FAN_MANUAL_REQUEST, C_MAX_TOTAL_AIRFLOW, C_SUPPLY_FAN_MAX_AIRFLOW}
+    {
+        C_FAN_MANUAL_REQUEST,
+        C_MAX_TOTAL_AIRFLOW,
+        C_SUPPLY_FAN_MAX_AIRFLOW,
+        C_WATER_VALVE_PUMP,
+        C_WATER_CONDENSER_VALVE,
+        C_WATER_CHECK,
+    }
 )
-# Suffix of the setup child device's identifier (parent identifier + suffix).
+# Suffixes of the child devices' identifiers (parent identifier + suffix).
 SETUP_DEVICE_SUFFIX = "-setup"
+INSTALLER_DEVICE_SUFFIX = "-installer"
+
+# Shown on the main device only when a room probe can make them act: without
+# one the unit ignores its setpoints, and Home Assistant must do the control.
+TEMPERATURE_TARGET_KEYS = frozenset({C_SUMMER_SETPOINT, C_WINTER_SETPOINT})
+HUMIDITY_TARGET_KEYS = frozenset({C_HUMIDITY_SETPOINT, C_DEHUM_DIFFERENTIAL})
+# HA02 / HA03 codes that put a room probe on AI2 / AI3.
+ROOM_TEMP_PROBE_CODES = frozenset({45})
+ROOM_HUMIDITY_PROBE_CODES = frozenset({53, 54})
 
 
 def entity_category_for(key: str) -> EntityCategory | None:
     """Entity category of a key; setup items stay uncategorised on their device."""
     if key in SETUP_KEYS:
         return None
+    if key in INSTALLER_KEYS:
+        # Writable parameters under Configuration, fixed facts under Diagnostic.
+        props = ENTITIES_DICT[key]
+        return (
+            EntityCategory.DIAGNOSTIC if props.get("RW") == 0 else EntityCategory.CONFIG
+        )
     if key in CONFIG_KEYS:
         return EntityCategory.CONFIG
     if key in DIAGNOSTIC_KEYS:
@@ -1018,6 +1143,7 @@ COMPUTED_SENSORS: Dict[str, Dict[str, Any]] = {
     C_SUPPLY_FAN_AIRFLOW: {"NAME": "Supply fan airflow", "UNIT": "m³/h"},
     # OPTIONS makes it an enum sensor; the list of open issues is an attribute.
     C_SETUP_CHECK: {"NAME": "Setup check", "OPTIONS": ["ok", "attention"]},
+    C_WATER_CHECK: {"NAME": "Water circuit check", "OPTIONS": ["ok", "attention"]},
 }
 
 # Requests that make the unit do something. They are refused until the user
@@ -1276,6 +1402,7 @@ def init() -> None:
                     name=name,
                     translation_key=key,
                     entity_category=entity_category_for(key),
+                    entity_registry_enabled_default=props.get("ENABLED", True),
                     device_class=SensorDeviceClass.ENUM,
                     options=[
                         v for k, v in get_entity_select(props).items() if k != "default"
@@ -1289,6 +1416,7 @@ def init() -> None:
                     name=name,
                     translation_key=key,
                     entity_category=entity_category_for(key),
+                    entity_registry_enabled_default=props.get("ENABLED", True),
                     native_unit_of_measurement=unit,
                     device_class=device_class,
                     state_class=state_class,
@@ -1299,6 +1427,7 @@ def init() -> None:
                 name=name,
                 translation_key=key,
                 entity_category=entity_category_for(key),
+                entity_registry_enabled_default=props.get("ENABLED", True),
             )
         elif cls is MyBinaryEntityDescription:
             BINARY_TYPES[key] = MyBinaryEntityDescription(
@@ -1306,6 +1435,7 @@ def init() -> None:
                 name=name,
                 translation_key=key,
                 entity_category=entity_category_for(key),
+                entity_registry_enabled_default=props.get("ENABLED", True),
             )
         elif cls is MySelectEntityDescription:
             values, default = get_entity_select_values_and_default(props)
@@ -1314,6 +1444,7 @@ def init() -> None:
                 name=name,
                 translation_key=key,
                 entity_category=entity_category_for(key),
+                entity_registry_enabled_default=props.get("ENABLED", True),
                 options=values,
                 default_select_option=default,
             )
@@ -1323,6 +1454,7 @@ def init() -> None:
                 name=name,
                 translation_key=key,
                 entity_category=entity_category_for(key),
+                entity_registry_enabled_default=props.get("ENABLED", True),
                 native_min_value=get_entity_min(props),
                 native_max_value=get_entity_max(props),
                 native_step=get_entity_step(props),
@@ -1339,6 +1471,7 @@ def init() -> None:
                 name=props["NAME"],
                 translation_key=key,
                 entity_category=entity_category_for(key),
+                entity_registry_enabled_default=props.get("ENABLED", True),
                 device_class=SensorDeviceClass.ENUM,
                 options=list(props["OPTIONS"]),
             )
