@@ -117,10 +117,13 @@ The product code on the type plate encodes the variant: `HRDS+ 30 H R K DC`.
 | `DC` | optional | Has active cooling. `PG02_EnableIntegration` (1798) = `1`. |
 
 **Non-R variant always runs on passive MVHR airflow** — no recirculation fan at all.
-This proves the compressor can operate without the unit's own fan running. The R
-variant can also run fan-off (passive flow only): write 0 to `PM20_SupplyFan_Manual`
-(1614). Compressor self-protects via **AL11** (low-pressure / frost-thermostat, reg
-768 bit 10) if airflow is insufficient.
+This proves the compressor can operate without the unit's own fan running.
+**The R variant cannot do this with stock settings:** every dehumidification or
+integration request opens the recirculation damper and starts the fan, and writing
+0 to `PM20_SupplyFan_Manual` (1614) does not keep the damper closed. Dehumidifying
+without recirculation needs an unofficial I/O reassignment — see
+`references/MODBUS_REGISTERS.md` §13.5. Compressor self-protects via **AL11**
+(low-pressure / frost-thermostat, reg 768 bit 10) if airflow is insufficient.
 
 Fan minimum speed during DEU/INT is configurable: **PF28** (dehumidify) and **PF27**
 (integration) default 50 % but can be set 0–PF10. The 130 m³/h (30) / 190 m³/h (50)
