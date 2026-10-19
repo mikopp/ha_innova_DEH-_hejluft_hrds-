@@ -197,6 +197,19 @@ own `supply_fan_status`, not on a percentage threshold. (`airflow_max_m3h`
 *is* legitimately a config option: max airflow is a model property with no
 register.)
 
+## Bring-up diagnostic
+
+`tests/diagnose_hrds.py <host> [--port N] [--unit N]` is a **read-only** script
+(FC03/FC04/FC43 only, it never writes) to run against a real unit before
+installing the integration. It reuses `const.py` and the integration's block
+plan, reports device identification, connected probes, settings to review, and
+exactly what the integration writes on first connect. Needs only
+`pip install pymodbus==3.13.1`. Keep its `build_blocks` in sync with
+`_build_blocks` in `__init__.py`.
+
+The port is configurable in the integration too (`port` in the config flow and
+options flow, default 502), as are the unit id (`hostid`) and model.
+
 ## Linting
 
 ```
