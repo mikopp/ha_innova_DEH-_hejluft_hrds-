@@ -258,3 +258,12 @@ option is recommended.
       and the `PriorityChangeMode` (1878) ownership flag are not implemented.
 - [ ] **Manual fan request / remote request** (1114 / 1116, R/O) are not exposed.
 - [x] Recirculation damper status (1134) — now exposed as `sensor.recirculation_damper`.
+
+## Setup check / operation gate (added 2026-10-19)
+
+- [ ] Verify on hardware that every setup-check issue clears as described in the
+      README checklist (remote contact, PH03, HA02/HA03 = 0).
+- [ ] Confirm the `remote_contact_closed` bit (257 bit 0) meaning by opening the
+      contact.
+- [ ] Decide whether the gate should also refuse climate `hvac_mode` writes with
+      a friendlier message (currently surfaces the `ServiceValidationError`).

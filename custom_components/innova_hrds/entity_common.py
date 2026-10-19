@@ -10,7 +10,14 @@ from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 
-from .const import ATTR_MANUFACTURER, DEFAULT_NAME, DOMAIN, ENTITIES_DICT
+from .const import (
+    ATTR_MANUFACTURER,
+    DEFAULT_NAME,
+    DOMAIN,
+    ENTITIES_DICT,
+    SETUP_DEVICE_SUFFIX,
+    SETUP_KEYS,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,7 +41,9 @@ class HubBackedEntity(Entity):
         entry_id = platform_name
         for dom, ident in device_info.get("identifiers") or ():
             if dom == DOMAIN:
-                entry_id = ident
+                # The setup child device only changes where the entity is
+                # listed; its unique id stays keyed on the config entry.
+                entry_id = ident.removesuffix(SETUP_DEVICE_SUFFIX)
                 break
         self._attr_unique_id = f"{entry_id}-{description.key}"
 
@@ -77,21 +86,40 @@ class HubBackedEntity(Entity):
         """Map the hub payload onto entity attributes (override in subclasses)."""
 
 
-def get_hub_and_device_info(hass, entry) -> tuple:
-    """Return (hub_name, hub, device_info) for a config entry."""
-    hub_name = entry.options.get(CONF_NAME, entry.data[CONF_NAME])
-    hub = entry.runtime_data
+def build_device_infos(entry, hub) -> tuple[DeviceInfo, DeviceInfo]:
+    """Return (main device, setup child device) for a config entry.
+
+    The device page then separates three things: the operational surface and
+    post-setup configuration on the main device, and everything the user must
+    check once after connecting on the child "setup" device.
+    """
     identity = hub.identity
-    device_info = DeviceInfo(
+    name = entry.data.get(CONF_NAME, DEFAULT_NAME)
+    main = DeviceInfo(
         identifiers={(DOMAIN, entry.entry_id)},
-        name=entry.data.get(CONF_NAME, DEFAULT_NAME),
+        name=name,
         manufacturer=ATTR_MANUFACTURER,
         model="HRDS+ / DEH+",
         # The controller's own identification, as read by the identity check.
         model_id=identity.product_code,
         sw_version=identity.revision,
     )
-    return hub_name, hub, device_info
+    setup = DeviceInfo(
+        identifiers={(DOMAIN, entry.entry_id + SETUP_DEVICE_SUFFIX)},
+        name=f"{name} setup",
+        manufacturer=ATTR_MANUFACTURER,
+        model="Setup and installer configuration",
+        via_device=(DOMAIN, entry.entry_id),
+    )
+    return main, setup
+
+
+def get_hub_and_device_info(hass, entry) -> tuple:
+    """Return (hub_name, hub, main device info, setup device info)."""
+    hub_name = entry.options.get(CONF_NAME, entry.data[CONF_NAME])
+    hub = entry.runtime_data
+    main, setup = build_device_infos(entry, hub)
+    return hub_name, hub, main, setup
 
 
 async def setup_platform_from_types(
@@ -102,9 +130,15 @@ async def setup_platform_from_types(
     entity_cls: Type[T],
 ) -> bool:
     """Instantiate one entity per entry in types_dict."""
-    hub_name, hub, device_info = get_hub_and_device_info(hass, entry)
+    hub_name, hub, device_info, setup_info = get_hub_and_device_info(hass, entry)
     entities: List[T] = [
-        entity_cls(hub_name, hub, device_info, desc) for desc in types_dict.values()
+        entity_cls(
+            hub_name,
+            hub,
+            setup_info if desc.key in SETUP_KEYS else device_info,
+            desc,
+        )
+        for desc in types_dict.values()
     ]
     async_add_entities(entities)
     return True

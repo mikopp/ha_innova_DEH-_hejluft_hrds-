@@ -124,7 +124,7 @@ PARAMS: list[tuple[int, str, str, int | None]] = [
     (1838, "HD01", "DO1 allocation (K1 recirculation damper NO)", 10),
     (1839, "HD02", "DO2 allocation (K2 serious alarm NO)", 26),
     (1878, "PC11", "Season change owner (0=display 1=DI)", None),
-    (1879, "PC12", "Start on DI dehum/integ request even if OFF contact open", 0),
+    # 1879 read 2 on a real unit but PC12 only allows 0/1: address not PC12, dropped
     (1889, "PU13", "Min room temp for dehumidify (x0.1 C)", 220),
     (1890, "PU14", "Room temp differential to re-enable (x0.1 C)", 5),
 ]
@@ -740,7 +740,7 @@ def step_inputs(dev: Dev) -> dict[str, Any]:
     register map), so every readable register in the area is classified.
     """
     head("6b. Analog input scan: which inputs carry a real value")
-    lo, hi = 480, 530
+    lo, hi = 480, 512  # 513+ are plain zero registers, not inputs
     got = read_area(dev, IN, lo, hi)
     names = doc_names()
     alloc = {}
@@ -911,9 +911,6 @@ def step_headless(dev: Dev, rows: dict, extras: dict) -> dict[str, Any]:
                 "this is inferred from the field value 1; confirm once on the "
                 "unit.",
             )
-    pc12 = c(1879)
-    if pc12 not in (None, 0):
-        say(INFO, f"PC12 = {pc12}: DI requests start the unit even if OFF is open")
     if c(1779) == 1:
         say(
             WARN,

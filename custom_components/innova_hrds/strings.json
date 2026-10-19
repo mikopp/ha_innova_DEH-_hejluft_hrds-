@@ -162,6 +162,51 @@
           "winter": "Winter",
           "auto": "Auto"
         }
+      },
+      "remote_onoff_input": {
+        "name": "Remote on/off input (HB03)",
+        "state": {
+          "unused": "Unused",
+          "normally_closed": "Normally closed",
+          "normally_open": "Normally open"
+        }
+      },
+      "season_input": {
+        "name": "Season input (HB04)",
+        "state": {
+          "normally_closed": "Winter (normally closed)",
+          "normally_open": "Summer (normally open)"
+        }
+      },
+      "season_owner": {
+        "name": "Season change owner (PC11)",
+        "state": {
+          "display": "Display",
+          "digital_input": "Digital input"
+        }
+      },
+      "temperature_unit": {
+        "name": "Temperature unit (PH05)",
+        "state": {
+          "celsius": "Celsius",
+          "fahrenheit": "Fahrenheit"
+        }
+      },
+      "fan_output_allocation": {
+        "name": "Supply fan output allocation (HC04)"
+      },
+      "damper_relay_allocation": {
+        "name": "Recirculation damper relay allocation (HD01)"
+      },
+      "damper_prestart_time": {
+        "name": "Damper pre-start time (PS01)"
+      },
+      "setup_check": {
+        "name": "Setup check",
+        "state": {
+          "ok": "OK",
+          "attention": "Needs attention"
+        }
       }
     },
     "binary_sensor": {
@@ -194,6 +239,9 @@
       },
       "alarm_dirty_filter": {
         "name": "Alarm: dirty filter"
+      },
+      "remote_contact_closed": {
+        "name": "Remote on/off contact closed"
       }
     },
     "switch": {
@@ -226,6 +274,12 @@
       },
       "enable_free_cooling": {
         "name": "Enable free cooling/heating"
+      },
+      "enable_time_programs": {
+        "name": "Time programs enabled (PH03)"
+      },
+      "operation_allowed": {
+        "name": "Allow operational requests"
       }
     },
     "select": {
@@ -303,6 +357,12 @@
       },
       "humidity_setpoint_max": {
         "name": "Humidity setpoint maximum"
+      },
+      "ai2_allocation": {
+        "name": "AI2 allocation (HA02)"
+      },
+      "ai3_allocation": {
+        "name": "AI3 allocation (HA03)"
       }
     }
   }

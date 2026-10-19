@@ -35,6 +35,11 @@ COMP = ROOT / "custom_components/innova_hrds"
 # --------------------------------------------------------------------------
 # Minimal Home Assistant stubs
 # --------------------------------------------------------------------------
+class EntityCategory:
+    CONFIG = "config"
+    DIAGNOSTIC = "diagnostic"
+
+
 @dataclass
 class EntityDescription:
     """Stand-in for HA's description base.
@@ -48,6 +53,7 @@ class EntityDescription:
     name: str | None = None
     translation_key: str | None = None
     device_class: object = None
+    entity_category: object = None
 
 
 @dataclass
@@ -180,6 +186,7 @@ def install_stubs() -> None:
     _stub(
         "homeassistant.const",
         Platform=Platform,
+        EntityCategory=EntityCategory,
         UnitOfTemperature=UnitOfTemperature,
         UnitOfVolumeFlowRate=UnitOfVolumeFlowRate,
     )
@@ -409,6 +416,45 @@ def main() -> int:
     bad = [b for b in blocks if any(a in holdings for a in range(b[0], b[0] + b[1]))]
     check(not bad, f"no input block spans a holding register (offenders: {bad})")
     print(f"   input blocks: {blocks}")
+
+    print("== setup / config / operation grouping and gate ==")
+    known = (
+        set(const.ENTITIES_DICT)
+        | set(const.COMPUTED_SENSORS)
+        | set(const.OPERATION_TYPES)
+    )
+    for label in ("SETUP_KEYS", "CONFIG_KEYS", "DIAGNOSTIC_KEYS"):
+        stray = sorted(set(getattr(const, label)) - known)
+        check(not stray, f"{label} only names existing entities (stray: {stray})")
+    check(
+        not (const.SETUP_KEYS & (const.CONFIG_KEYS | const.DIAGNOSTIC_KEYS)),
+        "a key is either setup or config/diagnostic, never both",
+    )
+    check(
+        const.C_OPERATION_ALLOWED in const.OPERATION_TYPES
+        and const.C_OPERATION_ALLOWED in const.SETUP_KEYS,
+        "the operation gate switch exists and lives on the setup device",
+    )
+    check(
+        all(k in const.ENTITIES_DICT for k in const.OPERATIONAL_KEYS),
+        "every gated key is a register-backed entity",
+    )
+    check(
+        not (set(const.OPERATIONAL_KEYS) & const.SETUP_KEYS),
+        "gated request entities stay on the main device",
+    )
+    for lang in ("en", "de"):
+        tr = json.loads((COMP / f"translations/{lang}.json").read_text("utf-8"))
+        ent = tr["entity"]
+        check(
+            "operation_allowed" in ent.get("switch", {}),
+            f"{lang}.json names the operation_allowed switch",
+        )
+        states = ent.get("sensor", {}).get("setup_check", {}).get("state", {})
+        check(
+            set(states) == {"ok", "attention"},
+            f"{lang}.json translates both setup_check states",
+        )
 
     print()
     print("RESULT:", "ALL PASS" if not FAILURES else f"{len(FAILURES)} FAILURE(S)")

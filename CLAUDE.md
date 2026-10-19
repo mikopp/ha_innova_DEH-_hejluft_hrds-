@@ -124,6 +124,25 @@ Classification rules (`_classify` in `const.py`):
 | holding (R/W) | temp unit, no `PF` | climate (avoid: set `PF=Platform.NUMBER`) |
 | holding (R/W) | otherwise     | number |
 
+## Setup, operation gate and device grouping
+
+* **Setup happens in the integration**, after connect. `_compute_setup_issues`
+  (hub) derives the `setup_check` sensor and its `issues` list from the polled
+  read-back.
+* **Operation gate:** `OPERATIONAL_KEYS` (on/off, dehumidify, active cooling,
+  manual fan) refuse non-zero writes in `write_entity_value` until
+  `hub.operation_allowed` is set via `switch.allow_operational_requests`
+  (`HrdsOperationSwitch`, `OPERATION_TYPES`, default off, `RestoreEntity`). The
+  `_sync_required_settings_locked` writes bypass the gate (they call the client
+  directly). Do not add a request-type write path that skips `write_entity_value`.
+* **Device grouping:** `SETUP_KEYS` entities go on the `-setup` child device
+  (`SETUP_DEVICE_SUFFIX`, `via_device` the main one); `CONFIG_KEYS` /
+  `DIAGNOSTIC_KEYS` become entity categories (`entity_category_for`). A new
+  entity belongs in exactly one of the three groups, or none (operational).
+  `unique_id` always uses the config entry id, so moving a key between devices
+  keeps its entity. Both devices are registered in `async_setup_entry`.
+  `wiring_check.py` guards the sets.
+
 ## Device variants (30 vs 50, R vs non-R, DC)
 
 The product code on the type plate encodes the variant: `HRDS+ 30 H R K DC`.

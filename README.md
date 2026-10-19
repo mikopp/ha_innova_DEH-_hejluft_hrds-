@@ -136,6 +136,8 @@ Each sensor maps to a single bit of a packed alarm register. **ON = alarm is act
 | `switch.unit_on_off` | 1105 | BMS on/off request (requires PH02 = 1) |
 | `switch.dehumidify` | 1140 | BMS dehumidify request (requires PH28 = 1) |
 | `switch.active_cooling` | 1139 | BMS active-cooling request (requires PH27 = 1, summer season) |
+| `switch.allow_operational_requests` | — | **Setup device.** Not a register: the integration's own gate. Off by default; while off, on/dehumidify/cooling/non-zero fan requests are refused. Restored across restarts |
+| `switch.enable_time_programs` | 1779 | **Setup device.** PH03 — time programs can switch the unit off |
 | `switch.enable_onoff_display` | 1777 | PH01 — on/off by wired display. Forced **off** while `has_display` is off (the default); turning it on by hand is undone on the next poll |
 | `switch.enable_onoff_bms` | 1778 | PH02 — auto-set on startup; expose to inspect/reset |
 | `switch.enable_dehumidify_bms` | 1870 | PH28 — auto-set on startup |
@@ -171,6 +173,25 @@ Each sensor maps to a single bit of a packed alarm register. **ON = alarm is act
 |--------|----------|---------|-------|
 | `select.probe_source` | 1803 | None/external, CNU2 T, CNU2 T+H, CNU T, CNU T+H, EPJ T, EPJ T+H | HA00 — which sensor feeds room T/H readings. **Set to "None / external probes" when running without a display.** |
 | `select.winter_dehumidify` | 1689 | Disabled, With water, Without water | PU02; dehumidification during the heating season |
+
+### Setup entities (read-only facts about the installation)
+
+These live on the **HRDS+ setup** device and show how the unit is configured,
+so you can see it without opening the display. See the
+[first-use checklist](#first-use-checklist).
+
+| Entity | Register | Shows |
+|--------|----------|-------|
+| `sensor.setup_check` | — | `ok` / `attention`; attribute `issues` lists the open items |
+| `sensor.machine_type` | 1797 | PG01 — supply fan only, or supply and exhaust fan (not "has recirculation") |
+| `sensor.remote_onoff_input` | 1824 | HB03 — unused / normally closed / normally open |
+| `binary_sensor.remote_contact_closed` | 257 bit 0 | State of the remote on/off contact (meaning inferred, unverified) |
+| `sensor.season_input` / `sensor.season_owner` | 1825 / 1878 | HB04 season contact type; PC11 who owns season change |
+| `sensor.temperature_unit` | 1781 | PH05 — Celsius or Fahrenheit |
+| `number.ai2_allocation` / `number.ai3_allocation` | 1805 / 1806 | HA02 / HA03 — what the analog inputs are allocated to (0 = unused, 45 = room temperature, 53/54 = room humidity). **Writable** - set to 0 when no such probe is wired |
+| `sensor.fan_output_allocation` | 1832 | HC04 — raw allocation of the supply fan output |
+| `sensor.damper_relay_allocation` | 1838 | HD01 — raw allocation of relay DO1 (10 = recirculation damper NO, 9 = NC) |
+| `sensor.damper_prestart_time` | 1698 | PS01 — damper pre-start time, seconds |
 
 ### Fan
 
@@ -218,6 +239,60 @@ the unit stays *Off (display)* and ignores Modbus) and **HA00 = 0** (no display
 sensors). It re-checks them every poll, so a power cycle that resets them heals
 itself, and a manual change to one of them is undone on the next poll. If you
 *do* have a display, tick the option and the integration leaves PH01/HA00 alone.
+
+## Device layout and first-use checklist
+
+All setup happens through the integration, after it has connected. Nothing needs
+to be changed on the unit beforehand. The device page is split by purpose:
+
+| Where | What is there | When you touch it |
+|-------|---------------|-------------------|
+| **`HRDS+ setup`** device (linked to the main device) | Everything that decides whether the unit can run at all: the **Setup check** sensor, the **Allow operational requests** switch, the Modbus/display enables (PH01, PH02, PH27, PH28), probe allocation (HA00, HA02, HA03) and probe-OK flags, remote on/off input (HB03) and its contact state, season input (HB04, PC11), time programs (PH03), temperature unit (PH05), machine type (PG01), free-cooling/integration enables, and the fan/damper output wiring (HC04, HD01, PS01). | Once, after installing, and again if the wiring changes |
+| **`HRDS+`** device, *Configuration* section | Post-setup tuning: setpoints, per-mode fan min/max, dehumidify differential, minimum room temperature (PU13/PU14), fan run times, humidity clamps | Occasionally |
+| **`HRDS+`** device, main section | Climate, fan, the request switches (on/off, dehumidify, active cooling), live readings, status and alarms | Day to day |
+| **`HRDS+`** device, *Diagnostic* section | Calibration and the fan request echo | When troubleshooting |
+
+Entity ids follow the device name, so setup entities are prefixed with the setup
+device name (for example `sensor.hrds_setup_setup_check`); the tables below omit
+the prefix.
+
+### Operational requests are off until you allow them
+
+A fresh install starts with **`switch.allow_operational_requests`** (on the setup
+device) **off**. While it is off, the integration refuses any request that makes the unit
+act - turning it on, dehumidify, active cooling, or a non-zero fan speed - with
+an error saying so. Turning things off, and every configuration write, always
+works. Your choice is remembered across restarts. Turn it on once the checklist
+below is clean.
+
+### First-use checklist
+
+1. Open the **HRDS+ setup** device. The **Setup check** sensor reads `ok` or
+   `attention`; its `issues` attribute lists what to look at:
+
+   | Issue | Meaning and what to do |
+   |-------|------------------------|
+   | `modbus_enables_pending` | PH02/PH27/PH28 are not set on the unit yet. The integration writes them on the next poll; if this persists, the unit rejects the write (check the log). |
+   | `headless_settings_pending` | Without a display, PH01 and HA00 must be 0. Same: written on the next poll. |
+   | `unit_off_by_digital_input` | The remote on/off contact (OFF/OFF terminals, HB03) is open, so the unit is forced off. Close it (the factory bridge) or set HB03 accordingly. |
+   | `unit_off_by_scheduler` / `unit_off_by_clock` | A time program or the internal clock holds the unit off. Check PH03 (**Time programs enabled**); switch it off for Modbus-only control. |
+   | `unit_off_by_display` | Only reported when the display option is ticked: the display has switched the unit off. |
+   | `room_temperature_probe_missing` | AI2 is allocated to a probe (HA02 non-zero) but nothing is wired. The unit will wait for a room temperature. Set `number.ai2_allocation` (HA02) to 0 or wire the probe. |
+   | `room_humidity_probe_missing` | Same for AI3 (`number.ai3_allocation`, HA03) and the humidity probe. |
+   | `time_programs_enabled` | PH03 is on; the unit may switch itself off on schedule. |
+   | `free_cooling_without_outdoor_probe` | **Free cooling** is on but no outdoor probe delivers a value. Turn off `switch.enable_free_cooling` unless an outdoor probe is fitted. |
+   | `temperature_unit_fahrenheit` | PH05 is set to °F; the integration assumes °C. |
+
+2. Read the remaining setup entities and confirm they match your installation:
+   *Machine type* (supply only, or supply and exhaust fan), *Recirculation
+   damper relay allocation* (a value other than `disabled`/unused on an `R`
+   model), *AI2/AI3 allocation* and the *probe OK* flags (which probes the unit
+   believes are connected), *Remote on/off input* and *contact closed*.
+3. Check **Minimum room temperature (PU13)** in the Configuration section. The
+   unit refuses to dehumidify below it, and what it does with no room
+   temperature probe is not yet verified on hardware - see
+   [`plans/todo.md`](plans/todo.md).
+4. When the setup check is `ok`, turn on **Allow operational requests**.
 
 ### Airflow calibration (Options)
 

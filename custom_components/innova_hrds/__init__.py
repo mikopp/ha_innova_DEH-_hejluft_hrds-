@@ -22,21 +22,32 @@ from homeassistant.exceptions import (
     HomeAssistantError,
     ServiceValidationError,
 )
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.event import async_call_later, async_track_time_interval
 from pymodbus.client import ModbusTcpClient
 
 from .const import (
     BMS_ENABLE_KEYS,
+    C_AI2_ALLOCATION,
+    C_AI3_ALLOCATION,
     C_DT_INT16,
+    C_ENABLE_FREE_COOLING,
     C_MAX_BLOCK,
     C_MAX_GAP,
     C_MAX_TOTAL_AIRFLOW,
+    C_OUTDOOR_TEMPERATURE,
     C_REG_TYPE_HOLDING_REGISTERS,
     C_REG_TYPE_INPUT_REGISTERS,
+    C_ROOM_HUMIDITY,
+    C_ROOM_TEMPERATURE,
+    C_SETUP_CHECK,
     C_SUPPLY_FAN_AIRFLOW,
     C_SUPPLY_FAN_MAX_AIRFLOW,
     C_SUPPLY_FAN_OUTPUT,
     C_SUPPLY_FAN_STATUS,
+    C_TEMPERATURE_UNIT,
+    C_TIME_PROGRAMS,
+    C_UNIT_STATUS,
     CONF_AIRFLOW_MAX,
     CONF_HAS_DISPLAY,
     CONF_HOSTID,
@@ -49,6 +60,7 @@ from .const import (
     ENTITIES_DICT,
     HEADLESS_SETTINGS,
     MODEL_SPECS,
+    OPERATIONAL_KEYS,
     get_entity_bitmask,
     get_entity_factor,
     get_entity_props,
@@ -61,6 +73,7 @@ from .const import (
     is_entity_switch,
     is_probe_sentinel,
 )
+from .entity_common import build_device_infos
 from .identity import CannotConnect, DeviceIdentity, WrongDevice, verify_device
 
 _LOGGER = logging.getLogger(__name__)
@@ -148,6 +161,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # can no longer clobber each other's hub the way hass.data[DOMAIN][name] did.
     entry.runtime_data = hub
 
+    # Register both devices up front: the setup device points at the main one
+    # via `via_device`, which must already exist when the child is created.
+    main_info, setup_info = build_device_infos(entry, hub)
+    registry = dr.async_get(hass)
+    registry.async_get_or_create(config_entry_id=entry.entry_id, **main_info)
+    registry.async_get_or_create(config_entry_id=entry.entry_id, **setup_info)
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
@@ -226,6 +246,11 @@ class HrdsModbusHub:
         # availability off this so a dead gateway is visible in HA.
         self.last_update_success = False
         self.data: Dict[str, Any] = {}
+        # Gate for requests that make the unit act. Off until the user has gone
+        # through the setup checks and turned the switch on; restored by the
+        # switch entity across restarts.
+        self.operation_allowed = False
+        self.setup_issues: list[str] = []
 
         # Pre-compute the block reads per register type, keeping each function
         # code's blocks clear of the other's addresses.
@@ -265,6 +290,14 @@ class HrdsModbusHub:
             # Hand the socket close to an executor: it acquires the same lock a
             # poll in flight may hold, which would stall the event loop.
             self._hass.async_add_executor_job(self.close)
+
+    @callback
+    def set_operation_allowed(self, allowed: bool) -> None:
+        """Open or close the operational-request gate and refresh the check."""
+        self.operation_allowed = allowed
+        self._compute_derived()
+        for cb in self._sensors:
+            cb()
 
     def close(self) -> None:
         with self._lock:
@@ -472,8 +505,51 @@ class HrdsModbusHub:
             else:
                 self.data[key] = float(raw) * get_entity_factor(props)
 
+    def _compute_setup_issues(self) -> list[str]:
+        """Slugs of things the user should look at before operating the unit.
+
+        Derived from the polled read-back only, so it reflects the unit's real
+        state rather than what we last tried to write.
+        """
+        d = self.data
+        issues: list[str] = []
+        pending = [k for k, want, _raw in self._required_settings() if d.get(k) != want]
+        if any(k in BMS_ENABLE_KEYS for k in pending):
+            issues.append("modbus_enables_pending")
+        if any(k not in BMS_ENABLE_KEYS for k in pending):
+            issues.append("headless_settings_pending")
+
+        status = d.get(C_UNIT_STATUS)
+        if status == "off_by_di":
+            issues.append("unit_off_by_digital_input")
+        elif status == "off_by_scheduler":
+            issues.append("unit_off_by_scheduler")
+        elif status == "off_by_rtc":
+            issues.append("unit_off_by_clock")
+        elif status == "off_by_display" and self._has_display:
+            issues.append("unit_off_by_display")
+
+        # An allocated analog input that reads the unwired sentinel is a probe
+        # the unit waits for but cannot get.
+        if d.get(C_AI2_ALLOCATION) and d.get(C_ROOM_TEMPERATURE) is None:
+            issues.append("room_temperature_probe_missing")
+        if d.get(C_AI3_ALLOCATION) and d.get(C_ROOM_HUMIDITY) is None:
+            issues.append("room_humidity_probe_missing")
+
+        if d.get(C_TIME_PROGRAMS) in ("on", 1, 1.0):
+            issues.append("time_programs_enabled")
+        if d.get(C_ENABLE_FREE_COOLING) == "on" and (
+            d.get(C_OUTDOOR_TEMPERATURE) is None
+        ):
+            issues.append("free_cooling_without_outdoor_probe")
+        if d.get(C_TEMPERATURE_UNIT) == "fahrenheit":
+            issues.append("temperature_unit_fahrenheit")
+        return issues
+
     def _compute_derived(self) -> None:
-        """Write airflow (m³/h) sensor values derived from calibration + live fan output."""
+        """Write computed values: setup check and airflow (m³/h)."""
+        self.setup_issues = self._compute_setup_issues()
+        self.data[C_SETUP_CHECK] = "attention" if self.setup_issues else "ok"
         self.data[C_MAX_TOTAL_AIRFLOW] = self._airflow_max
         self.data[C_SUPPLY_FAN_MAX_AIRFLOW] = self._airflow_max
         out = self.data.get(C_SUPPLY_FAN_OUTPUT)
@@ -507,6 +583,12 @@ class HrdsModbusHub:
         else:
             faktor = get_entity_factor(props)
             raw = round(float(value) / faktor) if faktor else round(float(value))
+
+        if entity_key in OPERATIONAL_KEYS and raw != 0 and not self.operation_allowed:
+            raise ServiceValidationError(
+                "Operational requests are not allowed yet. Review the setup "
+                "entities, then turn on 'Allow operational requests'."
+            )
 
         words = ModbusTcpClient.convert_to_registers(value=int(raw), data_type=dt)
         ok = await self._hass.async_add_executor_job(self._write_registers, reg, words)

@@ -6,6 +6,23 @@ All notable changes to this project are documented here, newest first.
 
 ## 2026-10-19
 
+### feat: setup through the integration, operation gate, grouped device page
+
+* **Setup check** sensor (`ok` / `attention`, `issues` attribute) computed from
+  the polled read-back: pending Modbus/headless enables, remote contact open,
+  scheduler/clock holds, probes allocated but not wired, time programs, free
+  cooling without an outdoor probe, Fahrenheit.
+* **Allow operational requests** switch (default off, restored on restart). While
+  off, `write_entity_value` refuses non-zero writes to unit on/off, dehumidify,
+  active cooling and the manual fan speed. OFF and configuration writes pass; the
+  hub's own enable/headless writes bypass the gate.
+* New read-only entities for how the unit is configured (HB03, HB04, PC11, PH05,
+  HC04, HD01, PS01, remote contact) plus writable HA02/HA03 and PH03.
+* **Device page:** a linked `<name> setup` device holds the setup items; post-setup
+  parameters are `EntityCategory.CONFIG` and read-only extras `DIAGNOSTIC` on the
+  main device, which keeps the operational surface. Unique ids are unchanged.
+* README gains the device layout and a first-use checklist.
+
 ### fix: run without a display, verify the device, stop misreading PG01 and unwired probes
 
 Driven by the first bring-up against a real HRDS+ 30 R (`tests/diagnose_hrds.py`).

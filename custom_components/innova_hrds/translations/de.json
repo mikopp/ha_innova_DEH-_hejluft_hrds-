@@ -42,25 +42,59 @@
   },
   "entity": {
     "climate": {
-      "hrds_climate": { "name": "Klima" }
+      "hrds_climate": {
+        "name": "Klima"
+      }
     },
     "sensor": {
-      "room_temperature": { "name": "Raumtemperatur" },
-      "outdoor_temperature": { "name": "Außentemperatur" },
-      "water_temperature": { "name": "Wassertemperatur" },
-      "supply_temperature": { "name": "Zulufttemperatur" },
-      "room_humidity": { "name": "Raumluftfeuchtigkeit" },
-      "air_quality": { "name": "Luftqualität" },
-      "actual_setpoint": { "name": "Aktiver Sollwert" },
-      "supply_fan_output": { "name": "Zuluftventilator-Ausgang" },
-      "compressor_output": { "name": "Kompressor-Ausgang" },
-      "supply_fan_rpm": { "name": "Zuluftventilator-Drehzahl" },
-      "exhaust_temperature": { "name": "Fortlufttemperatur" },
-      "evaporator_temperature": { "name": "Verdampfertemperatur" },
-      "fan_manual_request": { "name": "Manuelle Lüfteranforderung (Display)" },
-      "max_total_airflow": { "name": "Max. Gesamt-Volumenstrom" },
-      "supply_fan_max_airflow": { "name": "Zuluftventilator max. Volumenstrom" },
-      "supply_fan_airflow": { "name": "Zuluftventilator Volumenstrom" },
+      "room_temperature": {
+        "name": "Raumtemperatur"
+      },
+      "outdoor_temperature": {
+        "name": "Außentemperatur"
+      },
+      "water_temperature": {
+        "name": "Wassertemperatur"
+      },
+      "supply_temperature": {
+        "name": "Zulufttemperatur"
+      },
+      "room_humidity": {
+        "name": "Raumluftfeuchtigkeit"
+      },
+      "air_quality": {
+        "name": "Luftqualität"
+      },
+      "actual_setpoint": {
+        "name": "Aktiver Sollwert"
+      },
+      "supply_fan_output": {
+        "name": "Zuluftventilator-Ausgang"
+      },
+      "compressor_output": {
+        "name": "Kompressor-Ausgang"
+      },
+      "supply_fan_rpm": {
+        "name": "Zuluftventilator-Drehzahl"
+      },
+      "exhaust_temperature": {
+        "name": "Fortlufttemperatur"
+      },
+      "evaporator_temperature": {
+        "name": "Verdampfertemperatur"
+      },
+      "fan_manual_request": {
+        "name": "Manuelle Lüfteranforderung (Display)"
+      },
+      "max_total_airflow": {
+        "name": "Max. Gesamt-Volumenstrom"
+      },
+      "supply_fan_max_airflow": {
+        "name": "Zuluftventilator max. Volumenstrom"
+      },
+      "supply_fan_airflow": {
+        "name": "Zuluftventilator Volumenstrom"
+      },
       "machine_type": {
         "name": "Maschinentyp (PG01)",
         "state": {
@@ -128,31 +162,125 @@
           "winter": "Winter",
           "auto": "Automatik"
         }
+      },
+      "remote_onoff_input": {
+        "name": "Fern-EIN/AUS-Eingang (HB03)",
+        "state": {
+          "unused": "Nicht verwendet",
+          "normally_closed": "Öffner",
+          "normally_open": "Schließer"
+        }
+      },
+      "season_input": {
+        "name": "Saisoneingang (HB04)",
+        "state": {
+          "normally_closed": "Winter (Öffner)",
+          "normally_open": "Sommer (Schließer)"
+        }
+      },
+      "season_owner": {
+        "name": "Saisonumschaltung durch (PC11)",
+        "state": {
+          "display": "Display",
+          "digital_input": "Digitaleingang"
+        }
+      },
+      "temperature_unit": {
+        "name": "Temperatureinheit (PH05)",
+        "state": {
+          "celsius": "Celsius",
+          "fahrenheit": "Fahrenheit"
+        }
+      },
+      "fan_output_allocation": {
+        "name": "Zuordnung Zuluftventilator-Ausgang (HC04)"
+      },
+      "damper_relay_allocation": {
+        "name": "Zuordnung Relais Umluftklappe (HD01)"
+      },
+      "damper_prestart_time": {
+        "name": "Vorlaufzeit Klappe (PS01)"
+      },
+      "setup_check": {
+        "name": "Einrichtungsprüfung",
+        "state": {
+          "ok": "In Ordnung",
+          "attention": "Prüfen"
+        }
       }
     },
     "binary_sensor": {
-      "dehumidify_request": { "name": "Entfeuchtung angefordert" },
-      "recirculation_active": { "name": "Umluft aktiv" },
-      "alarm_active": { "name": "Alarm aktiv" },
-      "temp_probe_ok": { "name": "Raumtemperaturfühler OK" },
-      "humidity_probe_ok": { "name": "Raumfeuchtesensor OK" },
-      "active_cooling_available": { "name": "Aktive Kühlung verfügbar" },
-      "alarm_compressor_lowpressure": { "name": "Alarm: Kompressor Niederdruck / Frostschutz" },
-      "alarm_compressor_highpressure": { "name": "Alarm: Kompressor Hochdruck" },
-      "alarm_water_antifreeze": { "name": "Alarm: Wasserkreislauf Frostschutz" },
-      "alarm_dirty_filter": { "name": "Alarm: Filter verschmutzt" }
+      "dehumidify_request": {
+        "name": "Entfeuchtung angefordert"
+      },
+      "recirculation_active": {
+        "name": "Umluft aktiv"
+      },
+      "alarm_active": {
+        "name": "Alarm aktiv"
+      },
+      "temp_probe_ok": {
+        "name": "Raumtemperaturfühler OK"
+      },
+      "humidity_probe_ok": {
+        "name": "Raumfeuchtesensor OK"
+      },
+      "active_cooling_available": {
+        "name": "Aktive Kühlung verfügbar"
+      },
+      "alarm_compressor_lowpressure": {
+        "name": "Alarm: Kompressor Niederdruck / Frostschutz"
+      },
+      "alarm_compressor_highpressure": {
+        "name": "Alarm: Kompressor Hochdruck"
+      },
+      "alarm_water_antifreeze": {
+        "name": "Alarm: Wasserkreislauf Frostschutz"
+      },
+      "alarm_dirty_filter": {
+        "name": "Alarm: Filter verschmutzt"
+      },
+      "remote_contact_closed": {
+        "name": "Fern-EIN/AUS-Kontakt geschlossen"
+      }
     },
     "switch": {
-      "unit_on_off": { "name": "Gerät ein/aus (Modbus)" },
-      "dehumidify": { "name": "Entfeuchtung (Modbus)" },
-      "active_cooling": { "name": "Aktive Kühlung (Modbus)" },
-      "enable_onoff_display": { "name": "Ein/Aus über Display freigeben (PH01)" },
-      "enable_onoff_bms": { "name": "Ein/Aus über Modbus freigeben" },
-      "enable_dehumidify_bms": { "name": "Entfeuchtung über Modbus freigeben" },
-      "enable_cooling_bms": { "name": "Kühlung über Modbus freigeben" },
-      "force_dehumidify_in_cooling": { "name": "Entfeuchtung bei Kühlung erzwingen" },
-      "enable_integration": { "name": "Integration (aktive Kühlung) freigeben" },
-      "enable_free_cooling": { "name": "Free-Cooling/Heating freigeben" }
+      "unit_on_off": {
+        "name": "Gerät ein/aus (Modbus)"
+      },
+      "dehumidify": {
+        "name": "Entfeuchtung (Modbus)"
+      },
+      "active_cooling": {
+        "name": "Aktive Kühlung (Modbus)"
+      },
+      "enable_onoff_display": {
+        "name": "Ein/Aus über Display freigeben (PH01)"
+      },
+      "enable_onoff_bms": {
+        "name": "Ein/Aus über Modbus freigeben"
+      },
+      "enable_dehumidify_bms": {
+        "name": "Entfeuchtung über Modbus freigeben"
+      },
+      "enable_cooling_bms": {
+        "name": "Kühlung über Modbus freigeben"
+      },
+      "force_dehumidify_in_cooling": {
+        "name": "Entfeuchtung bei Kühlung erzwingen"
+      },
+      "enable_integration": {
+        "name": "Integration (aktive Kühlung) freigeben"
+      },
+      "enable_free_cooling": {
+        "name": "Free-Cooling/Heating freigeben"
+      },
+      "enable_time_programs": {
+        "name": "Zeitprogramme aktiv (PH03)"
+      },
+      "operation_allowed": {
+        "name": "Betriebsanforderungen erlauben"
+      }
     },
     "select": {
       "probe_source": {
@@ -177,25 +305,65 @@
       }
     },
     "fan": {
-      "hrds_supply_fan": { "name": "Zuluftventilator" }
+      "hrds_supply_fan": {
+        "name": "Zuluftventilator"
+      }
     },
     "number": {
-      "humidity_setpoint": { "name": "Feuchte-Sollwert" },
-      "summer_setpoint": { "name": "Sommer-Sollwert" },
-      "winter_setpoint": { "name": "Winter-Sollwert" },
-      "fan_min_speed_dehumidify": { "name": "Ventilator min. Drehzahl (Entfeuchtung)" },
-      "fan_max_speed_dehumidify": { "name": "Ventilator max. Drehzahl (Entfeuchtung)" },
-      "fan_min_speed_cooling": { "name": "Ventilator min. Drehzahl (Kühlung)" },
-      "fan_min_speed_vmc": { "name": "Ventilator min. Drehzahl (VMC)" },
-      "fan_max_speed_cooling": { "name": "Ventilator max. Drehzahl (Kühlung)" },
-      "fan_manual_speed": { "name": "Manuelle Ventilatordrehzahl" },
-      "dehumidify_differential": { "name": "Entfeuchtungs-Differenz" },
-      "min_room_temp_dehumidify": { "name": "Min. Raumtemperatur für Entfeuchtung" },
-      "min_room_temp_diff_dehumidify": { "name": "Min. Raumtemperatur-Differenz" },
-      "fan_min_runtime": { "name": "Lüfter-Mindestlaufzeit" },
-      "fan_post_run_time": { "name": "Lüfter-Nachlaufzeit" },
-      "humidity_setpoint_min": { "name": "Feuchte-Sollwert Minimum" },
-      "humidity_setpoint_max": { "name": "Feuchte-Sollwert Maximum" }
+      "humidity_setpoint": {
+        "name": "Feuchte-Sollwert"
+      },
+      "summer_setpoint": {
+        "name": "Sommer-Sollwert"
+      },
+      "winter_setpoint": {
+        "name": "Winter-Sollwert"
+      },
+      "fan_min_speed_dehumidify": {
+        "name": "Ventilator min. Drehzahl (Entfeuchtung)"
+      },
+      "fan_max_speed_dehumidify": {
+        "name": "Ventilator max. Drehzahl (Entfeuchtung)"
+      },
+      "fan_min_speed_cooling": {
+        "name": "Ventilator min. Drehzahl (Kühlung)"
+      },
+      "fan_min_speed_vmc": {
+        "name": "Ventilator min. Drehzahl (VMC)"
+      },
+      "fan_max_speed_cooling": {
+        "name": "Ventilator max. Drehzahl (Kühlung)"
+      },
+      "fan_manual_speed": {
+        "name": "Manuelle Ventilatordrehzahl"
+      },
+      "dehumidify_differential": {
+        "name": "Entfeuchtungs-Differenz"
+      },
+      "min_room_temp_dehumidify": {
+        "name": "Min. Raumtemperatur für Entfeuchtung"
+      },
+      "min_room_temp_diff_dehumidify": {
+        "name": "Min. Raumtemperatur-Differenz"
+      },
+      "fan_min_runtime": {
+        "name": "Lüfter-Mindestlaufzeit"
+      },
+      "fan_post_run_time": {
+        "name": "Lüfter-Nachlaufzeit"
+      },
+      "humidity_setpoint_min": {
+        "name": "Feuchte-Sollwert Minimum"
+      },
+      "humidity_setpoint_max": {
+        "name": "Feuchte-Sollwert Maximum"
+      },
+      "ai2_allocation": {
+        "name": "Zuordnung AI2 (HA02)"
+      },
+      "ai3_allocation": {
+        "name": "Zuordnung AI3 (HA03)"
+      }
     }
   }
 }
