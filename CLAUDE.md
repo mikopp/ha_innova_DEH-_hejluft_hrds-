@@ -357,6 +357,20 @@ GitHub Actions (in `.github/workflows/`):
 * `tests.yaml` — in-process tests + coverage (see **Tests**).
 * `e2e.yaml` — the integration in a real HA container against simulators;
   nightly also against the `beta` image (allowed to fail).
+* **Triggers** (so nothing runs twice): lint, hassfest, hacs, tests and e2e run
+  on `pull_request` and on `push` to `main` only (plus `workflow_dispatch`;
+  hacs daily, e2e nightly incl. `beta`). A plain `push:` is never used, since a
+  branch with an open PR would run every workflow for both events. tests and e2e
+  also run from `release.yaml` (`workflow_call`) on the tagged commit before the
+  zip is built. tests/e2e cancel a superseded PR run (`concurrency`).
+* **Branch protection is a GitHub setting, not a file** — keep it as follows
+  (Settings -> Rules -> Rulesets, target the default branch, enforcement active):
+  require a pull request (0 approvals; the owner merges their own), require the
+  checks `ruff`, `hassfest`, `hacs`, `pytest`, `e2e (pinned)` to pass, block
+  force pushes and deletion, no bypass actors, squash merge only. Only people
+  with write access can merge, so keep the owner the sole collaborator with
+  write; Actions -> General -> workflow permissions "read", and approve fork PR
+  workflows manually.
 * `lint.yaml` also runs `tests/wiring_check.py`. Dependabot bumps the HA
   image, `requirements_test.txt` and `tests/e2e/requirements.txt`; keep the
   image and `pytest-homeassistant-custom-component` on the same HA release.

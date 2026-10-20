@@ -1,6 +1,7 @@
 # End-to-end tests: the integration in a real Home Assistant container.
 #
-# Same approach as the homeassistent-config repo: one Home Assistant container
+# Runs on pull requests, on main after a merge, nightly, and from release.yaml
+# on the tagged commit. Same approach as the homeassistent-config repo: one Home Assistant container
 # for the session, onboarded once, driven only over REST and websocket, with
 # polling asserts. On top of that, simulated HRDS+ units (tests/sim) run as
 # processes on the runner, so the integration talks real Modbus TCP to a
@@ -13,15 +14,20 @@
 name: E2E (Home Assistant in Docker)
 
 on:
-  push:
   pull_request:
+  push:
+    branches: [main]
   workflow_dispatch:
-  workflow_call:
+  workflow_call:  # release.yaml: the tagged commit
   schedule:
     - cron: "17 3 * * *"
 
 permissions:
   contents: read
+
+concurrency:
+  group: e2e-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   e2e:
