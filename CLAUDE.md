@@ -2,7 +2,8 @@
 
 Home Assistant custom integration for the **Innova DEH+ / hej.luft HRDS+** air
 dehumidification module via **Modbus TCP**. Minimum Home Assistant version is
-**2026.9**; `pymodbus` is pinned to `3.13.1`, the version HA 2026.9 ships. It serves a similar purpose to the
+**2026.9**; `pymodbus` is required as `>=3.13.1` (the version HA 2026.9 ships;
+hassfest rejects an exact `==` pin on a package HA depends on). It serves a similar purpose to the
 sibling `ha_comfoconnectpro` integration and shares its architecture.
 
 The integration domain is `innova_hrds`; the component lives in
@@ -209,8 +210,25 @@ ruff format .
 GitHub Actions (in `.github/workflows/`):
 * `lint.yaml` — Ruff lint + format check (Python).
 * `hassfest.yaml` — Home Assistant manifest/translation validation.
-* `hacs.yaml` — HACS repository validation (also daily); ignores `brands` (not yet in the HACS brands repo).
-* `release.yaml` — re-runs hassfest + hacs when a release is published.
+* `hacs.yaml` — HACS repository validation (also daily); ignores `brands` (the
+  images ship locally in `brand/`, see below, rather than in the HACS brands repo).
+* `release.yaml` — on a published release: hassfest, hacs, then a `package` job
+  that stamps the tag into `manifest.json` (`.github/scripts/update_hacs_manifest.py`),
+  zips `custom_components/innova_hrds` and attaches `innova_hrds.zip` to the
+  release. `hacs.json` has `zip_release` + `filename` so HACS installs that asset.
+
+Releasing: publish a GitHub release whose tag is `vX.Y.Z`. The release must carry
+`innova_hrds.zip` or HACS cannot install it, so if the `package` job fails, fix it
+and re-run rather than leaving the release without the asset.
+
+### Brand images
+
+`custom_components/innova_hrds/brand/` holds `icon.png` (256²), `icon@2x.png`
+(512²), `logo.png` / `logo@2x.png` (shortest side 256 / 512) and `dark_*`
+variants. Home Assistant 2026.3+ prefers them over the brands CDN. They are the
+Innova mark/wordmark recoloured (`#00643e`, white for dark); never use Home
+Assistant branded images in a custom integration. `wiring_check.py` verifies the
+sizes.
 
 `tests/wiring_check.py` runs without Home Assistant installed: it stubs the HA
 API, imports `const.py`, and asserts that every entity is classified, every
