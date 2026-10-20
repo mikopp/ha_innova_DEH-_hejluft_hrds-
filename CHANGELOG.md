@@ -4,6 +4,17 @@ All notable changes to this project are documented here, newest first.
 
 ---
 
+## 2026-10-20
+
+### fix: entities show the primed read-back right after setup
+
+* Setup reads the unit once before creating entities, but the entities did
+  not use that read: every entity was `unknown` until the first scheduled poll
+  (30 s by default). They now publish the cached values when added. Found by
+  the new simulator tests.
+* The *Allow operational requests* switch restores its last state before
+  publishing, so it no longer flickers off on startup.
+
 ## 2026-10-19
 
 ### feat: brine temperature guard

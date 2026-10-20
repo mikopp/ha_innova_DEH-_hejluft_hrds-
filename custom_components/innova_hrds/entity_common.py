@@ -72,6 +72,10 @@ class HubBackedEntity(Entity):
 
     async def async_added_to_hass(self) -> None:
         self._hub.async_add_my_modbus_sensor(self._on_hub_update)
+        # Setup primes the cache before creating entities: show that read-back
+        # now instead of `unknown` until the first scheduled poll.
+        if self._hub.last_update_success:
+            self._on_hub_update()
 
     async def async_will_remove_from_hass(self) -> None:
         self._hub.async_remove_my_modbus_sensor(self._on_hub_update)

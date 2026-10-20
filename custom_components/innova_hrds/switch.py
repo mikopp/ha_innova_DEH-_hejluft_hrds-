@@ -69,10 +69,12 @@ class HrdsOperationSwitch(HubBackedEntity, SwitchEntity, RestoreEntity):
     _attr_is_on = False
 
     async def async_added_to_hass(self) -> None:
-        await super().async_added_to_hass()
+        # Restore before the base class publishes the hub state, so the gate
+        # never flickers off on startup.
         if (last := await self.async_get_last_state()) is not None:
             self._attr_is_on = last.state == STATE_ON
         self._hub.operation_allowed = self._attr_is_on
+        await super().async_added_to_hass()
 
     def _apply_hub_payload(self, payload: Any) -> None:
         self._attr_is_on = self._hub.operation_allowed
