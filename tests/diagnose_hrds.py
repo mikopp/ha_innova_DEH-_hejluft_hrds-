@@ -20,7 +20,7 @@ The script NEVER writes to the unit: it only uses FC 03, FC 04 and FC 43.
 It reuses ``custom_components/innova_hrds/const.py`` for the register map, so it
 always checks exactly what the integration would poll.
 
-Requirements:  pip install pymodbus==3.13.1   (the version HA 2026.9 ships)
+Requirements:  pip install 'pymodbus>=3.13.1'   (the version HA 2026.10 ships)
 
 Examples:
     python3 tests/diagnose_hrds.py 192.168.1.50
@@ -56,7 +56,7 @@ sys.path.insert(0, str(HERE))
 try:
     from pymodbus.client import ModbusTcpClient
 except ImportError:  # pragma: no cover - environment problem, not logic
-    sys.exit("pymodbus is required:  pip install pymodbus==3.13.1")
+    sys.exit("pymodbus is required:  pip install 'pymodbus>=3.13.1'")
 
 # const.py imports Home Assistant; reuse the stubs from wiring_check.py so this
 # script needs nothing but pymodbus. The stubs also replace pymodbus.client, so

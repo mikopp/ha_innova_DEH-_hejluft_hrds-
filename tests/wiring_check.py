@@ -24,6 +24,7 @@ import importlib.util
 import json
 import pathlib
 import re
+import struct
 import sys
 import types
 from dataclasses import dataclass
@@ -238,6 +239,13 @@ def check(condition: bool, message: str) -> None:
     print(("  ok   " if condition else "  FAIL ") + message)
     if not condition:
         FAILURES.append(message)
+
+
+def png_size(path: pathlib.Path) -> tuple[int, int]:
+    """Return (width, height) read from a PNG's IHDR chunk."""
+    data = path.read_bytes()
+    check(data[:8] == b"\x89PNG\r\n\x1a\n", f"{path.name} is a PNG")
+    return struct.unpack(">II", data[16:24])
 
 
 def build_blocks(addresses, foreign, max_gap, max_block):
@@ -528,6 +536,26 @@ def main() -> int:
                 {"brine_temperature_entity", "brine_min_temperature"}
                 <= set(section["step"][step]["data"]),
                 f"{lang}.json labels the brine guard options ({step})",
+            )
+
+    print("== manifest and brand images ==")
+    manifest = json.loads((COMP / "manifest.json").read_text())
+    pinned = [r for r in manifest["requirements"] if "==" in r]
+    check(not pinned, f"no exact == requirement pin (hassfest rejects: {pinned})")
+    brand = COMP / "brand"
+    for name, side in (("icon", 256), ("icon@2x", 512)):
+        for prefix in ("", "dark_"):
+            width, height = png_size(brand / f"{prefix}{name}.png")
+            check(
+                (width, height) == (side, side),
+                f"{prefix}{name}.png is {side}x{side} (got {width}x{height})",
+            )
+    for name, short in (("logo", 256), ("logo@2x", 512)):
+        for prefix in ("", "dark_"):
+            width, height = png_size(brand / f"{prefix}{name}.png")
+            check(
+                min(width, height) == short,
+                f"{prefix}{name}.png shortest side is {short} (got {width}x{height})",
             )
 
     print()

@@ -38,6 +38,31 @@ All notable changes to this project are documented here, newest first.
   Assistant container, driven over REST/websocket; headless and display
   units, both operation modes, fan speeds, failures. Nightly also on `beta`.
 * `tests/out.json` moved to `tests/devices/hrds_30+_headless_factory_state.json`.
+### fix: hassfest requirement, brand images, release packaging
+
+- **Minimum Home Assistant is now 2026.10** (`hacs.json`, README, CLAUDE.md).
+  HA 2026.10 still ships `pymodbus` 3.13.1, so the requirement below is unchanged.
+- **hassfest was failing** on `pymodbus==3.13.1`: it rejects an exact pin on a
+  package Home Assistant itself depends on. The manifest now requires
+  `pymodbus>=3.13.1`, which still resolves to the version HA ships.
+- **Brand images** now ship in `custom_components/innova_hrds/brand/`
+  (`icon`, `logo`, and `dark_` variants, each with an `@2x`), which Home
+  Assistant 2026.3+ serves for custom integrations. The artwork is the Innova
+  mark and wordmark taken from the vector logo on
+  [innova.it](https://www.innova.it/en/products/vmc/active-integration/hrd/),
+  recoloured to Innova green (`#00643e`) and white for dark mode. The Innova
+  name and logo are their trademarks; they identify the hardware this
+  integration talks to and imply no endorsement.
+- **Releases are packaged by CI.** Publishing a release now also stamps the tag
+  into `manifest.json` with `.github/scripts/update_hacs_manifest.py`, zips the
+  integration and attaches `innova_hrds.zip`. `hacs.json` sets `zip_release` /
+  `filename` so HACS installs that asset. The script now strips a leading `v`,
+  refuses non-version input and keeps the manifest's key order.
+- `release.yaml` runs the HACS check with `ignore: brands` like `hacs.yaml`.
+- `tests/wiring_check.py` also checks the brand image sizes and that no manifest
+  requirement is an exact pin.
+- Removed `strings.json`: it was an exact copy of `translations/en.json`, and a
+  custom integration only needs the `translations/` files (hassfest reads those).
 
 ## 2026-10-19
 

@@ -1,13 +1,17 @@
-# Release checks.
+# Release checks and packaging.
 #
-# Triggered when a GitHub Release is published. It re-runs the checks that
-# matter for a shippable artifact:
+# Triggered when a GitHub Release is published:
 #   1. hassfest  -> manifest/translations are valid
 #   2. hacs      -> repository is installable via HACS (only runs if hassfest passes)
 #   3. tests     -> in-process tests against the simulated unit (tests.yaml)
 #   4. e2e       -> the integration in a real Home Assistant container (e2e.yaml)
-# The bump of the version inside manifest.json is handled separately by
-# .github/scripts/update_hacs_manifest.py (see that file).
+#   5. package   -> stamps manifest.json with the release tag via
+#                   .github/scripts/update_hacs_manifest.py, zips
+#                   custom_components/innova_hrds and attaches innova_hrds.zip
+#                   to the release. hacs.json sets zip_release, so HACS installs
+#                   that asset and Home Assistant shows the release version
+#                   regardless of what the tagged commit's manifest says.
+#                   Only runs when all four checks above pass.
 name: Release checks
 
 on:
@@ -29,9 +33,31 @@ jobs:
       - uses: hacs/action@d556e736723344f83838d08488c983a15381059a # 22.5.0
         with:
           category: integration
+          ignore: brands
 
   tests:
     uses: ./.github/workflows/tests.yaml
 
   e2e:
     uses: ./.github/workflows/e2e.yaml
+
+  package:
+    runs-on: ubuntu-latest
+    needs: [hassfest, hacs, tests, e2e]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Stamp manifest with the release version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: python3 .github/scripts/update_hacs_manifest.py --version "$TAG"
+      - name: Zip the integration
+        run: |
+          cd custom_components/innova_hrds
+          zip -r ../../innova_hrds.zip . -x '__pycache__/*' '*.pyc'
+      - name: Attach the zip to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" innova_hrds.zip --clobber --repo "$GITHUB_REPOSITORY"
