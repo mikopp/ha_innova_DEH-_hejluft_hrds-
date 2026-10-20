@@ -294,7 +294,7 @@ register.)
 installing the integration. It reuses `const.py` and the integration's block
 plan, reports device identification, connected probes, settings to review, and
 exactly what the integration writes on first connect. Needs only
-`pip install pymodbus==3.13.1`. Keep its `build_blocks` in sync with
+`pip install 'pymodbus>=3.13.1'`. Keep its `build_blocks` in sync with
 `_build_blocks` in `__init__.py`.
 
 The port is configurable in the integration too (`port` in the config flow and
