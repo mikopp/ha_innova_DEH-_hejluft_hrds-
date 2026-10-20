@@ -381,6 +381,10 @@ class HrdsModbusHub:
         if not self._sensors and self._unsub:
             self._unsub()
             self._unsub = None
+            # A write just before unload leaves its debounced refresh pending.
+            if self._pending_refresh is not None:
+                self._pending_refresh()
+                self._pending_refresh = None
             # Hand the socket close to an executor: it acquires the same lock a
             # poll in flight may hold, which would stall the event loop.
             self._hass.async_add_executor_job(self.close)
