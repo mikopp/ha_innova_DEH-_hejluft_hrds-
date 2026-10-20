@@ -9,7 +9,12 @@ from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import STATE_ON
 from homeassistant.helpers.restore_state import ExtraStoredData, RestoreEntity
 
-from .const import BINARY_TYPES, OPERATION_TYPES, MyBinaryEntityDescription
+from .const import (
+    BINARY_TYPES,
+    OPERATION_TYPES,
+    SWITCH_HINTS,
+    MyBinaryEntityDescription,
+)
 from .entity_common import HubBackedEntity, setup_platform_from_types
 
 _LOGGER = logging.getLogger(__name__)
@@ -36,6 +41,15 @@ class HrdsSwitch(HubBackedEntity, SwitchEntity):
     """A read-write 0/1 register exposed as a switch."""
 
     entity_description: MyBinaryEntityDescription
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """When to leave the switch on or turn it off, in the user's language."""
+        hint = SWITCH_HINTS.get(self.entity_description.key)
+        if hint is None:
+            return None
+        german = self.hass is not None and self.hass.config.language.startswith("de")
+        return {"hint": hint[1] if german else hint[0]}
 
     def _apply_hub_payload(self, payload: Any) -> None:
         if isinstance(payload, str):

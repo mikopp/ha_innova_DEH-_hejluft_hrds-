@@ -198,6 +198,16 @@ PROBE_SOURCE = {
     6: "cnu2_temp_humidity",
 }
 
+# HA02 (reg 1805) / HA03 (reg 1806) — what is wired to analog inputs AI2 / AI3
+# (handbook 6.7). Only the room-probe codes are documented; any other code of
+# the 0-60 range decodes to None and the setup check flags it.
+ROOM_TEMP_PROBE_INPUT = {0: "unused", 45: "room_temperature_ntc"}
+ROOM_HUMIDITY_PROBE_INPUT = {
+    0: "unused",
+    53: "room_humidity_4_20ma",
+    54: "room_humidity_0_10v",
+}
+
 # ------------------------------------------------------------------
 # Entity-key constants (== Home Assistant object_id / translation_key)
 # ------------------------------------------------------------------
@@ -660,27 +670,6 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "SWITCH": {"off": 0, "on": 1},
         "NAME": "Enable time programs (PH03)",
     },
-    # AI2/AI3 allocation: 0 = input unused. 45 = room temperature probe (AI2),
-    # 53/54 = room humidity probe (AI3). A probe code with nothing wired raises
-    # AL28/AL34, so a sensor-less unit needs 0.
-    C_AI2_ALLOCATION: {
-        "RT": C_REG_TYPE_HOLDING_REGISTERS,
-        "REG": 1805,
-        "DT": C_DT_UINT16,
-        "MIN": 0,
-        "MAX": 60,
-        "STEP": 1,
-        "NAME": "AI2 allocation (HA02)",
-    },
-    C_AI3_ALLOCATION: {
-        "RT": C_REG_TYPE_HOLDING_REGISTERS,
-        "REG": 1806,
-        "DT": C_DT_UINT16,
-        "MIN": 0,
-        "MAX": 60,
-        "STEP": 1,
-        "NAME": "AI3 allocation (HA03)",
-    },
     C_REMOTE_ONOFF_INPUT: {
         "RT": C_REG_TYPE_HOLDING_REGISTERS,
         "REG": 1824,
@@ -774,10 +763,13 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "BITMASK": 0,
         "NAME": "Remote on/off contact closed",
     },
-    # --- T/H probe source (HA00, holding register R/W) ---
-    # Controls which sensor supplies room temperature and humidity readings.
-    # Set to 0 ("none_or_external") when no display is connected; external
-    # NTC/0-10V probes on AI2/AI3 are then used if wired.
+    # --- T/H probes: source (HA00) and the external probe inputs (HA02/HA03) ---
+    # HA00 picks where room temperature and humidity come from. Without a
+    # display it must be 0 ("none_or_external"); the unit then only has a room
+    # reading if a probe is wired to AI2 (temperature, terminal M2) or AI3
+    # (humidity, M3) and HA02/HA03 say so. A probe code with nothing wired
+    # raises AL28/AL34, so a sensor-less unit needs "unused" on both. The names
+    # share a "T/H probe" prefix so the three sit together on the setup device.
     C_PROBE_SOURCE: {
         "RT": C_REG_TYPE_HOLDING_REGISTERS,
         "REG": 1803,
@@ -785,6 +777,20 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "VALUES": PROBE_SOURCE,
         "DEFAULT": 6,
         "NAME": "T/H probe source (HA00)",
+    },
+    C_AI2_ALLOCATION: {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": 1805,
+        "DT": C_DT_UINT16,
+        "VALUES": ROOM_TEMP_PROBE_INPUT,
+        "NAME": "T/H probe temperature input (AI2, HA02)",
+    },
+    C_AI3_ALLOCATION: {
+        "RT": C_REG_TYPE_HOLDING_REGISTERS,
+        "REG": 1806,
+        "DT": C_DT_UINT16,
+        "VALUES": ROOM_HUMIDITY_PROBE_INPUT,
+        "NAME": "T/H probe humidity input (AI3, HA03)",
     },
     # --- Probe-OK binary sensors derived from packed alarm registers ---
     # PackedAlarm_2 (reg 769): bit 11 = AL28 (room temperature probe fault).
@@ -1044,6 +1050,52 @@ for _code, _reg, _kind, _factor, _min, _max, _unit, _en, _de, _on in INSTALLER_P
         _props["RW"] = 0
     ENTITIES_DICT[installer_key(_code)] = _props
 
+# Guidance shown as the `hint` attribute of a setup switch: when to leave it on
+# or turn it off. Home Assistant has no tooltip for entities; the attribute is
+# what the more-info dialog shows. {key: (English, German)}
+SWITCH_HINTS: Dict[str, tuple[str, str]] = {
+    C_ENABLE_FREE_COOLING: (
+        "Turn this OFF unless an outdoor temperature probe is wired. It lets the "
+        "unit act on the outdoor temperature (bypass relay); with no probe there is "
+        "no valid reading and the unit may raise the external-probe alarm (AL29). "
+        "Also leave it off if a central ventilation system already handles free "
+        "cooling. The setup check reports free_cooling_without_outdoor_probe while "
+        "it is on without a probe.",
+        "AUS schalten, solange kein Außentemperaturfühler angeschlossen ist. Die "
+        "Funktion lässt das Gerät auf die Außentemperatur reagieren (Bypass-Relais); "
+        "ohne Fühler gibt es keinen gültigen Messwert und das Gerät kann den "
+        "Alarm AL29 (externer Fühler) auslösen. Ebenfalls aus lassen, wenn eine "
+        "zentrale Lüftungsanlage das Free-Cooling übernimmt. Die Einrichtungsprüfung "
+        "meldet free_cooling_without_outdoor_probe, solange sie ohne Fühler an ist.",
+    ),
+    C_ENABLE_ONOFF_DISPLAY: (
+        "Leave OFF without a CNU2 display: the unit would otherwise stay off "
+        "waiting for it. The integration keeps it off unless the display option is "
+        "ticked.",
+        "Ohne CNU2-Display AUS lassen: sonst bleibt das Gerät aus und wartet auf "
+        "das Display. Die Integration hält es aus, solange die Display-Option nicht "
+        "aktiv ist.",
+    ),
+    C_ENABLE_ONOFF_BMS: (
+        "Leave ON. The unit ignores on/off from Home Assistant without it; the "
+        "integration sets it again on every poll.",
+        "AN lassen. Ohne diese Freigabe ignoriert das Gerät Ein/Aus aus Home "
+        "Assistant; die Integration setzt sie bei jeder Abfrage erneut.",
+    ),
+    C_ENABLE_DEHUM_BMS: (
+        "Leave ON. The unit ignores the dehumidify (DEU) request without it; the "
+        "integration sets it again on every poll.",
+        "AN lassen. Ohne diese Freigabe ignoriert das Gerät die Entfeuchtungs-"
+        "anforderung (DEU); die Integration setzt sie bei jeder Abfrage erneut.",
+    ),
+    C_ENABLE_INT_BMS: (
+        "Leave ON. The unit ignores the integration (INT) request without it; the "
+        "integration sets it again on every poll.",
+        "AN lassen. Ohne diese Freigabe ignoriert das Gerät die Integrations-"
+        "anforderung (INT); die Integration setzt sie bei jeder Abfrage erneut.",
+    ),
+}
+
 # Registers written (in order) when the integration is set up, to make sure
 # Modbus control is actually permitted by the unit.
 BMS_ENABLE_KEYS = (C_ENABLE_ONOFF_BMS, C_ENABLE_DEHUM_BMS, C_ENABLE_INT_BMS)
@@ -1135,9 +1187,11 @@ INSTALLER_DEVICE_SUFFIX = "-installer"
 # one the unit ignores its setpoints, and Home Assistant must do the control.
 TEMPERATURE_TARGET_KEYS = frozenset({C_SUMMER_SETPOINT, C_WINTER_SETPOINT})
 HUMIDITY_TARGET_KEYS = frozenset({C_HUMIDITY_SETPOINT, C_DEHUM_DIFFERENTIAL})
-# HA02 / HA03 codes that put a room probe on AI2 / AI3.
-ROOM_TEMP_PROBE_CODES = frozenset({45})
-ROOM_HUMIDITY_PROBE_CODES = frozenset({53, 54})
+# HA02 / HA03 options that put a room probe on AI2 / AI3.
+ROOM_TEMP_PROBE_CODES = frozenset(v for k, v in ROOM_TEMP_PROBE_INPUT.items() if k)
+ROOM_HUMIDITY_PROBE_CODES = frozenset(
+    v for k, v in ROOM_HUMIDITY_PROBE_INPUT.items() if k
+)
 
 
 def entity_category_for(key: str) -> EntityCategory | None:

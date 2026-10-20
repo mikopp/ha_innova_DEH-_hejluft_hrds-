@@ -4,13 +4,28 @@ All notable changes to this project are documented here, newest first.
 
 ---
 
-## Unreleased: setup enables named after what they do
+## Unreleased
+
+**Changed:** the *AI2 allocation (HA02)* and *AI3 allocation (HA03)* numbers on
+the setup device are now dropdowns named *T/H probe temperature input* and
+*T/H probe humidity input*, with the options *Unused*, *Room temperature probe
+(NTC 10 kΩ)*, and *Room humidity probe (4–20 mA / 0–10 V)* instead of raw codes.
+They sort next to *T/H probe source (HA00)*. The old number entities are removed
+on update; automations that set `number.*ai2_allocation` / `*ai3_allocation`
+must use the new selects. A code other than the documented ones shows as
+unknown, and the setup check reports `probe_input_unrecognised`.
 
 **Changed:** the device has two requests, DEU and INT, and the setup switches
 now say so. `enable_cooling_bms` (PH27, 1869) is the permission for the INT
 request, not a cooling mode, and is now `switch.enable_integration_bms`
 ("Enable integration (INT) via Modbus (PH27)"); PH28 is labelled DEU. Existing
 installs keep the entity and its entity id; only the name changes.
+
+**Added:** the setup switches for free cooling (PG03), the display on/off
+(PH01) and the three Modbus enables carry a `hint` attribute (English or
+German, following the Home Assistant language) that says when to leave them on
+or turn them off. Home Assistant has no tooltip for entities; the attribute
+shows in the entity's *Attributes*. The README setup step lists the same advice.
 
 **Removed:** `switch.enable_integration` (PG02, 1798). PG02 is an installer
 setting that says whether the unit has the integration function, already shown

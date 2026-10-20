@@ -279,6 +279,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     _migrate_setup_entities(hass, entry)
 
+    # HA02/HA03 were numbers up to 0.9.1 and are selects now, with the same
+    # unique id: drop the orphaned number entities.
+    ent_registry = er.async_get(hass)
+    for key in (C_AI2_ALLOCATION, C_AI3_ALLOCATION):
+        if old_id := ent_registry.async_get_entity_id(
+            Platform.NUMBER, DOMAIN, f"{entry.entry_id}-{key}"
+        ):
+            ent_registry.async_remove(old_id)
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
@@ -1003,10 +1012,19 @@ class HrdsModbusHub:
 
         # An allocated analog input that reads the unwired sentinel is a probe
         # the unit waits for but cannot get.
-        if d.get(C_AI2_ALLOCATION) and d.get(C_ROOM_TEMPERATURE) is None:
+        if (
+            d.get(C_AI2_ALLOCATION) in ROOM_TEMP_PROBE_CODES
+            and d.get(C_ROOM_TEMPERATURE) is None
+        ):
             issues.append("room_temperature_probe_missing")
-        if d.get(C_AI3_ALLOCATION) and d.get(C_ROOM_HUMIDITY) is None:
+        if (
+            d.get(C_AI3_ALLOCATION) in ROOM_HUMIDITY_PROBE_CODES
+            and d.get(C_ROOM_HUMIDITY) is None
+        ):
             issues.append("room_humidity_probe_missing")
+        # Read but decoded to None: a code outside the documented probe codes.
+        if any(k in d and d[k] is None for k in (C_AI2_ALLOCATION, C_AI3_ALLOCATION)):
+            issues.append("probe_input_unrecognised")
 
         if d.get(C_TIME_PROGRAMS) in ("on", 1, 1.0):
             issues.append("time_programs_enabled")

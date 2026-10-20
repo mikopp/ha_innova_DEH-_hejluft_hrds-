@@ -570,6 +570,21 @@
           "cnu2_temp_humidity": "CNU2-Display (Temperatur + Feuchte)"
         }
       },
+      "ai2_allocation": {
+        "name": "T/H-Fühler Temperatureingang (AI2, HA02)",
+        "state": {
+          "unused": "Nicht belegt (kein Fühler)",
+          "room_temperature_ntc": "Raumtemperaturfühler (NTC 10 kΩ)"
+        }
+      },
+      "ai3_allocation": {
+        "name": "T/H-Fühler Feuchteeingang (AI3, HA03)",
+        "state": {
+          "unused": "Nicht belegt (kein Fühler)",
+          "room_humidity_4_20ma": "Raumfeuchtefühler (4–20 mA)",
+          "room_humidity_0_10v": "Raumfeuchtefühler (0–10 V)"
+        }
+      },
       "winter_dehumidify": {
         "name": "Winter-Entfeuchtung",
         "state": {
@@ -639,12 +654,6 @@
       },
       "humidity_setpoint_max": {
         "name": "Feuchte-Sollwert Maximum"
-      },
-      "ai2_allocation": {
-        "name": "Zuordnung AI2 (HA02)"
-      },
-      "ai3_allocation": {
-        "name": "Zuordnung AI3 (HA03)"
       },
       "inst_pm00": {
         "name": "PM00 Betriebsstundengrenze Ventilatoren"
