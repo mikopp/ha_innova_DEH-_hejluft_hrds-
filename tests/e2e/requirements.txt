@@ -3,6 +3,6 @@
 pymodbus==3.13.1
 pytest==9.0.3
 pytest-timeout==2.4.0
-pytest-github-actions-annotate-failures==0.3.0
+pytest-github-actions-annotate-failures==0.4.2
 requests==2.34.2
 websocket-client==1.9.2
