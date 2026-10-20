@@ -277,9 +277,8 @@ C_OPERATION_ALLOWED = "operation_allowed"
 C_ENABLE_ONOFF_DISPLAY = "enable_onoff_display"
 C_ENABLE_ONOFF_BMS = "enable_onoff_bms"
 C_ENABLE_DEHUM_BMS = "enable_dehumidify_bms"
-C_ENABLE_COOLING_BMS = "enable_cooling_bms"
+C_ENABLE_INT_BMS = "enable_integration_bms"
 C_FORCE_DEHUM_IN_COOLING = "force_dehumidify_in_cooling"
-C_ENABLE_INTEGRATION = "enable_integration"
 C_ENABLE_FREE_COOLING = "enable_free_cooling"
 # Read-write selects
 C_PROBE_SOURCE = "probe_source"
@@ -618,14 +617,14 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "REG": 1870,
         "DT": C_DT_UINT16,
         "SWITCH": {"off": 0, "on": 1},
-        "NAME": "Enable dehumidify via Modbus",
+        "NAME": "Enable dehumidify (DEU) via Modbus (PH28)",
     },
-    C_ENABLE_COOLING_BMS: {
+    C_ENABLE_INT_BMS: {
         "RT": C_REG_TYPE_HOLDING_REGISTERS,
         "REG": 1869,
         "DT": C_DT_UINT16,
         "SWITCH": {"off": 0, "on": 1},
-        "NAME": "Enable cooling via Modbus",
+        "NAME": "Enable integration (INT) via Modbus (PH27)",
     },
     # --- Hardware-variant read-only sensors (holding registers, RW=0) ---
     # PG01_MachineType (1797): fan arrangement (supply only / supply + exhaust).
@@ -647,7 +646,7 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "DT": C_DT_UINT16,
         "SWITCH": {"off": 0, "on": 1},
         "RW": 0,
-        "NAME": "Active cooling available",
+        "NAME": "Unit has integration function (PG02)",
     },
     # --- Installer configuration, exposed so the user can see how the unit is set
     # up and change what matters without a service tool. Read-only entries are
@@ -982,13 +981,6 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "SWITCH": {"off": 0, "on": 1},
         "NAME": "Force dehumidify when cooling (PU05)",
     },
-    C_ENABLE_INTEGRATION: {
-        "RT": C_REG_TYPE_HOLDING_REGISTERS,
-        "REG": 1798,
-        "DT": C_DT_UINT16,
-        "SWITCH": {"off": 0, "on": 1},
-        "NAME": "Enable integration / active cooling (PG02)",
-    },
     # When off, outdoor temperature (reg 500) is decoration, not a control input.
     C_ENABLE_FREE_COOLING: {
         "RT": C_REG_TYPE_HOLDING_REGISTERS,
@@ -1054,7 +1046,7 @@ for _code, _reg, _kind, _factor, _min, _max, _unit, _en, _de, _on in INSTALLER_P
 
 # Registers written (in order) when the integration is set up, to make sure
 # Modbus control is actually permitted by the unit.
-BMS_ENABLE_KEYS = (C_ENABLE_ONOFF_BMS, C_ENABLE_DEHUM_BMS, C_ENABLE_COOLING_BMS)
+BMS_ENABLE_KEYS = (C_ENABLE_ONOFF_BMS, C_ENABLE_DEHUM_BMS, C_ENABLE_INT_BMS)
 
 # Settings that must hold when no CNU2 display is fitted: {key: (decoded, raw)}.
 # Without them the unit sits OFF-by-display and expects room T/H from a display
@@ -1085,11 +1077,10 @@ SETUP_KEYS = frozenset(
         C_PROBE_SOURCE,
         C_ENABLE_ONOFF_BMS,
         C_ENABLE_DEHUM_BMS,
-        C_ENABLE_COOLING_BMS,
+        C_ENABLE_INT_BMS,
         C_AI2_ALLOCATION,
         C_AI3_ALLOCATION,
         C_TIME_PROGRAMS,
-        C_ENABLE_INTEGRATION,
         C_ENABLE_FREE_COOLING,
         C_REMOTE_ONOFF_INPUT,
         C_REMOTE_CONTACT_CLOSED,

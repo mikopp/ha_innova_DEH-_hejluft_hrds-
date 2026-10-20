@@ -890,7 +890,7 @@ def step_headless(dev: Dev, rows: dict, extras: dict) -> dict[str, Any]:
     for key, code in (
         (const.C_ENABLE_ONOFF_BMS, "PH02 on/off"),
         (const.C_ENABLE_DEHUM_BMS, "PH28 dehumidify"),
-        (const.C_ENABLE_COOLING_BMS, "PH27 integration"),
+        (const.C_ENABLE_INT_BMS, "PH27 integration"),
     ):
         v = g(key)
         say(

@@ -4,6 +4,22 @@ All notable changes to this project are documented here, newest first.
 
 ---
 
+## Unreleased: setup enables named after what they do
+
+**Changed:** the device has two requests, DEU and INT, and the setup switches
+now say so. `enable_cooling_bms` (PH27, 1869) is the permission for the INT
+request, not a cooling mode, and is now `switch.enable_integration_bms`
+("Enable integration (INT) via Modbus (PH27)"); PH28 is labelled DEU. Existing
+installs keep the entity and its entity id; only the name changes.
+
+**Removed:** `switch.enable_integration` (PG02, 1798). PG02 is an installer
+setting that says whether the unit has the integration function, already shown
+read-only as `binary_sensor.active_cooling_available` (now "Unit has
+integration function (PG02)"). The switch is removed from the entity registry
+on the next start.
+
+---
+
 ## 0.9.1 (2026-10-20): fix setup on real hardware, installer device opt-in
 
 **Fixed:** 0.9.0 did not load on a real unit. The installer device added about

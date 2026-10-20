@@ -459,7 +459,7 @@
         "name": "Raumfeuchtesensor OK"
       },
       "active_cooling_available": {
-        "name": "Aktive Kühlung verfügbar"
+        "name": "Gerät hat Integrationsfunktion (PG02)"
       },
       "alarm_compressor_lowpressure": {
         "name": "Alarm: Kompressor Niederdruck / Frostschutz"
@@ -503,16 +503,13 @@
         "name": "Ein/Aus über Modbus freigeben"
       },
       "enable_dehumidify_bms": {
-        "name": "Entfeuchtung über Modbus freigeben"
+        "name": "Entfeuchtung (DEU) über Modbus freigeben (PH28)"
       },
-      "enable_cooling_bms": {
-        "name": "Kühlung über Modbus freigeben"
+      "enable_integration_bms": {
+        "name": "Integration (INT) über Modbus freigeben (PH27)"
       },
       "force_dehumidify_in_cooling": {
         "name": "Entfeuchtung bei Kühlung erzwingen"
-      },
-      "enable_integration": {
-        "name": "Integration (aktive Kühlung) freigeben"
       },
       "enable_free_cooling": {
         "name": "Free-Cooling/Heating freigeben"

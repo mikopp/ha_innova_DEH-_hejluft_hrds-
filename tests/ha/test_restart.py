@@ -303,6 +303,26 @@ async def test_user_registry_changes_are_kept(hass, setup, clock):
     } == (ids_before)
 
 
+async def test_renamed_setup_switches_are_migrated(hass, setup):
+    """0.9.x registered PH27 as ``enable_cooling_bms`` and PG02 as a switch."""
+    s = setup
+    registry = er.async_get(hass)
+    prefix = f"{s.entry.entry_id}-"
+    assert s.entity_id("switch", "enable_integration") is None
+    ph27 = s.entity_id("switch", "enable_integration_bms")
+    registry.async_update_entity(ph27, new_unique_id=prefix + "enable_cooling_bms")
+    registry.async_get_or_create(
+        "switch", DOMAIN, prefix + "enable_integration", config_entry=s.entry
+    )
+
+    await restart(hass, s)
+
+    # Same entity (and entity id) under the new key; the PG02 switch is gone.
+    assert s.entity_id("switch", "enable_integration_bms") == ph27
+    assert s.entity_id("switch", "enable_cooling_bms") is None
+    assert s.entity_id("switch", "enable_integration") is None
+
+
 # ---- 5. derived state comes back identical -----------------------------------
 @pytest.mark.parametrize(
     ("sim_options", "entry_options"),

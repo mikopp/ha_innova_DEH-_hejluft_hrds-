@@ -140,7 +140,7 @@ holding registers. They are read-only from the integration.
 | Entity | What it means |
 |--------|--------------|
 | `sensor.machine_type` | PG01 fan arrangement: *supply fan only* or *supply and exhaust fan*. **Not** a recirculation flag: an `R` unit reads *supply fan only*. |
-| `binary_sensor.active_cooling_available` | ON: active cooling is enabled on this unit (PG02 = 1) |
+| `binary_sensor.active_cooling_available` | ON: the unit has the integration (INT) function (PG02 = 1). Read-only: an installer setting, not a Modbus permission |
 
 Whether the unit has a recirculation fan (`R`) is shown by
 `sensor.recirculation_damper`: *Disabled* means no damper is wired (non-`R`),
@@ -172,10 +172,9 @@ Each sensor maps to a single bit of a packed alarm register. **ON = alarm is act
 | `switch.enable_onoff_by_di_request` | 1894 | **Setup device.** PC12 — a DEU/INT request on the digital inputs starts the unit even with the OFF contact open |
 | `switch.enable_onoff_display` | 1777 | PH01 — on/off by wired display. Forced **off** while `has_display` is off (the default); turning it on by hand is undone on the next poll |
 | `switch.enable_onoff_bms` | 1778 | PH02 — auto-set on startup; expose to inspect/reset |
-| `switch.enable_dehumidify_bms` | 1870 | PH28 — auto-set on startup |
-| `switch.enable_cooling_bms` | 1869 | PH27 — auto-set on startup |
+| `switch.enable_dehumidify_bms` | 1870 | PH28 — permits the DEU (dehumidify) request over Modbus; auto-set on startup |
+| `switch.enable_integration_bms` | 1869 | PH27 — permits the INT (integration) request over Modbus; auto-set on startup |
 | `switch.force_dehumidify_in_cooling` | 1692 | PU05; couple dehumidify to a cooling request |
-| `switch.enable_integration` | 1798 | PG02; master enable for active cooling |
 | `switch.enable_free_cooling` | 1799 | PG03; while off, outdoor temperature drives nothing |
 
 ### Numbers

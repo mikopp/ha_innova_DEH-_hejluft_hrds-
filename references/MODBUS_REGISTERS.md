@@ -270,7 +270,7 @@ Write `1` to reset the corresponding alarm: `0x030B`=AL01, `0x030C`=AL02,
 
 **Turn active cooling (integration) on / off**
 1. One-time: write `1` to `1869` (PH27 Enable_IntegByBMS) and ensure
-   `PG02_EnableIntegration` (1798) = 1, season = Summer.
+   `PG02_EnableIntegration` (1798) = 1 (installer setting, read-only in the integration), season = Summer.
 2. On: write `1` to `1139`; Off: write `0`.
 3. Compressor feedback via `1122` (`CmpStatus`, `4`=ON).
 

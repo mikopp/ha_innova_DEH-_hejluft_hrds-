@@ -42,7 +42,10 @@ not backed by a single register, and are declared directly in `init()`
   halves the cap for its lifetime (`_shrink_blocks`); a dead link fails the
   poll instead.
 * **"by BMS" enables are mandatory.** Writes are ignored unless PH02/PH27/PH28
-  are set. `_sync_required_settings_locked` re-asserts them **every poll**, driven
+  are set: PH02 gates on/off, PH28 gates the DEU request, PH27 gates the INT
+  request (key `enable_integration_bms`; it is not a cooling mode). PG02 (1798) is
+  a different thing, an installer setting saying the unit has INT at all, and is
+  only shown read-only (`active_cooling_available`). `_sync_required_settings_locked` re-asserts them **every poll**, driven
   by the polled read-back rather than a one-shot flag, so a device power-cycle
   that clears them self-heals. They are also exposed as switches — and because
   the hub re-asserts them, turning one off by hand is undone on the next poll.

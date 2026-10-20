@@ -28,6 +28,7 @@ from homeassistant.exceptions import (
     ServiceValidationError,
 )
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.event import (
     async_call_later,
     async_track_state_change_event,
@@ -51,6 +52,7 @@ from .const import (
     C_DEHUMIDIFY,
     C_DT_INT16,
     C_ENABLE_FREE_COOLING,
+    C_ENABLE_INT_BMS,
     C_INSTALLER_LAST_READ,
     C_MAX_BLOCK,
     C_MAX_GAP,
@@ -275,8 +277,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         # Turned off in the options: the device goes, and its entities with it.
         registry.async_remove_device(installer_device.id)
 
+    _migrate_setup_entities(hass, entry)
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
+
+
+def _migrate_setup_entities(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Carry the renamed PH27 switch over and drop the PG02 switch.
+
+    PH27 was `enable_cooling_bms` but is the INT request's enable, so the key
+    follows the register. The entity id stays as the user has it. PG02 is a
+    hardware capability, shown by `active_cooling_available`; its switch
+    duplicated that register and is gone.
+    """
+    registry = er.async_get(hass)
+    prefix = entry.entry_id + "-"
+    old_uid = prefix + "enable_cooling_bms"
+    if entity_id := registry.async_get_entity_id("switch", DOMAIN, old_uid):
+        registry.async_update_entity(entity_id, new_unique_id=prefix + C_ENABLE_INT_BMS)
+    if entity_id := registry.async_get_entity_id(
+        "switch", DOMAIN, prefix + "enable_integration"
+    ):
+        registry.async_remove(entity_id)
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
