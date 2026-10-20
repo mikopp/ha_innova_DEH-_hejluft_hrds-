@@ -242,8 +242,8 @@ Write `1` to reset the corresponding alarm: `0x030B`=AL01, `0x030C`=AL02,
 | `0x069C` | 1692 | `PU05_ForceDehumInCooling` | Force dehumidify when cooling requested |
 | `0x06F5` | 1781 | `PH05_TemperatureUM` | `0=°C`, `1=°F` |
 | `0x06F3` | 1779 | `PH03_EnableTimePrograms` | `0=No`, `1=Yes`. Time programs can switch the unit OFF (status `off_by_scheduler`). Exposed as a switch; the integration flags it in the setup check. |
-| `0x070D` | 1805 | `HA02_AI2_Allocation` | Analog input 2 allocation. `0`=unused, `45`=room temperature probe. A probe code with nothing wired raises AL28. Exposed as a writable number. |
-| `0x070E` | 1806 | `HA03_AI3_Allocation` | Analog input 3 allocation. `0`=unused, `53`/`54`=room humidity probe. A probe code with nothing wired raises AL34. Exposed as a writable number. |
+| `0x070D` | 1805 | `HA02_AI2_Allocation` | Analog input 2 allocation. `0`=unused, `45`=room temperature probe. A probe code with nothing wired raises AL28. Exposed as the select *T/H probe temperature input*. |
+| `0x070E` | 1806 | `HA03_AI3_Allocation` | Analog input 3 allocation. `0`=unused, `53`/`54`=room humidity probe. A probe code with nothing wired raises AL34. Exposed as the select *T/H probe humidity input*. |
 | `0x0720` | 1824 | `DI3_Configuration` (HB03) | Remote ON/OFF contact (OFF/OFF terminals): `0=unused`, `1=normally closed`, `2=normally open`. With the contact open the unit is forced OFF (`off_by_di`). Shown read-only. |
 | `0x0728` | 1832 | `HC04` | Analog output allocation of the supply fan (raw code; `1` = 0-10 V supply fan). Shown read-only. |
 | `0x072E` | 1838 | `HD01` | Relay DO1 allocation (raw code; `10` = recirculation damper NO, `9` = NC). Shown read-only. |

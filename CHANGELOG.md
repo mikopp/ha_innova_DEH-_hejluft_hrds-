@@ -4,6 +4,19 @@ All notable changes to this project are documented here, newest first.
 
 ---
 
+## Unreleased
+
+**Changed:** the *AI2 allocation (HA02)* and *AI3 allocation (HA03)* numbers on
+the setup device are now dropdowns named *T/H probe temperature input* and
+*T/H probe humidity input*, with the options *Unused*, *Room temperature probe
+(NTC 10 kΩ)*, and *Room humidity probe (4–20 mA / 0–10 V)* instead of raw codes.
+They sort next to *T/H probe source (HA00)*. The old number entities are removed
+on update; automations that set `number.*ai2_allocation` / `*ai3_allocation`
+must use the new selects. A code other than the documented ones shows as
+unknown, and the setup check reports `probe_input_unrecognised`.
+
+---
+
 ## 0.9.1 (2026-10-20): fix setup on real hardware, installer device opt-in
 
 **Fixed:** 0.9.0 did not load on a real unit. The installer device added about

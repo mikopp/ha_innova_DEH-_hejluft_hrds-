@@ -205,6 +205,8 @@ Each sensor maps to a single bit of a packed alarm register. **ON = alarm is act
 |--------|----------|---------|-------|
 | `select.season` | 1825 | Summer, Winter | HB04 — the season switch without a display (the Modbus manual's method: it flips how the open DI4 contact is read). Read-back is `sensor.operating_mode`. Switching to winter is refused while an integration request is on (it would turn into heating) and, on brine, while dehumidify is on. **If a contact is wired to DI4, closing it inverts the meaning.** |
 | `select.probe_source` | 1803 | None/external, CNU2 T, CNU2 T+H, CNU T, CNU T+H, EPJ T, EPJ T+H | HA00 — which sensor feeds room T/H readings. **Set to "None / external probes" when running without a display.** |
+| `select.ai2_allocation` | 1805 | Unused, Room temperature probe (NTC 10 kΩ) | HA02, *T/H probe temperature input*: what is wired to analog input AI2 (terminal M2). Without a display, this is the only room temperature the unit can regulate on. **Leave on "Unused" unless a probe is wired**, or the unit raises AL28. |
+| `select.ai3_allocation` | 1806 | Unused, Room humidity probe (4–20 mA), Room humidity probe (0–10 V) | HA03, *T/H probe humidity input*: the same for AI3 (terminal M3) and a humidity probe; with nothing wired it raises AL34. A code other than these shows as unknown and the setup check reports `probe_input_unrecognised`. |
 | `select.winter_dehumidify` | 1689 | Disabled, With water, Without water | PU02; dehumidification during the heating season |
 
 ### Setup entities (read-only facts about the installation)
@@ -222,7 +224,6 @@ so you can see it without opening the display. See the
 | `sensor.season_owner` | 1878 | PC11 — who owns the season change when a display is connected |
 | `switch.enable_onoff_by_di_request` | 1894 | PC12 — DI requests start the unit despite an open OFF contact |
 | `sensor.temperature_unit` | 1781 | PH05 — Celsius or Fahrenheit |
-| `number.ai2_allocation` / `number.ai3_allocation` | 1805 / 1806 | HA02 / HA03 — what the analog inputs are allocated to (0 = unused, 45 = room temperature, 53/54 = room humidity). **Writable** - set to 0 when no such probe is wired |
 | `sensor.fan_output_allocation` | 1832 | HC04 — raw allocation of the supply fan output |
 | `sensor.damper_relay_allocation` | 1838 | HD01 — raw allocation of relay DO1 (10 = recirculation damper NO, 9 = NC) |
 | `sensor.damper_prestart_time` | 1698 | PS01 — damper pre-start time, seconds |
@@ -359,8 +360,9 @@ below is clean.
    | `unit_off_by_digital_input` | The remote on/off contact (OFF/OFF terminals, HB03) is open, so the unit is forced off. Close it (the factory bridge) or set HB03 accordingly. |
    | `unit_off_by_scheduler` / `unit_off_by_clock` | A time program or the internal clock holds the unit off. Check PH03 (**Time programs enabled**); switch it off for Modbus-only control. |
    | `unit_off_by_display` | Only reported when the display option is ticked: the display has switched the unit off. |
-   | `room_temperature_probe_missing` | AI2 is allocated to a probe (HA02 non-zero) but nothing is wired. The unit will wait for a room temperature. Set `number.ai2_allocation` (HA02) to 0 or wire the probe. |
-   | `room_humidity_probe_missing` | Same for AI3 (`number.ai3_allocation`, HA03) and the humidity probe. |
+   | `room_temperature_probe_missing` | *T/H probe temperature input* (HA02) says a probe is on AI2, but nothing is wired. The unit will wait for a room temperature. Set `select.ai2_allocation` to *Unused* or wire the probe. |
+   | `room_humidity_probe_missing` | Same for *T/H probe humidity input* (`select.ai3_allocation`, HA03) and the humidity probe. |
+   | `probe_input_unrecognised` | HA02 or HA03 holds a code that is not one of the documented probe codes, so the select shows unknown (the raw code is in the log). Pick an option, or check what the installer wired. |
    | `time_programs_enabled` | PH03 is on; the unit may switch itself off on schedule. |
    | `free_cooling_without_outdoor_probe` | **Free cooling** is on but no outdoor probe delivers a value. Turn off `switch.enable_free_cooling` unless an outdoor probe is fitted. |
    | `temperature_unit_fahrenheit` | PH05 is set to °F; the integration assumes °C. |
@@ -370,7 +372,7 @@ below is clean.
 2. Read the remaining setup entities and confirm they match your installation:
    *Machine type* (supply only, or supply and exhaust fan), *Recirculation
    damper relay allocation* (a value other than `disabled`/unused on an `R`
-   model), *AI2/AI3 allocation* and the *probe OK* flags (which probes the unit
+   model), *T/H probe temperature / humidity input* and the *probe OK* flags (which probes the unit
    believes are connected), *Remote on/off input* and *contact closed*.
 3. Check **Minimum room temperature (PU13)** in the Configuration section. The
    unit refuses to dehumidify below it, and what it does with no room
