@@ -1,0 +1,88 @@
+name: Bug report
+description: Something does not work, or a value is wrong.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Issues without the diagnostic output cannot be supported.** The script
+        is read-only (Modbus function codes 03, 04 and 43; it never writes).
+        It needs a copy of the repository, not the HACS download:
+
+        ```
+        git clone https://github.com/mikopp/ha_innova_DEH-_hejluft_hrds-.git
+        cd ha_innova_DEH-_hejluft_hrds-
+        pip install 'pymodbus>=3.13.1'
+        python3 tests/diagnose_hrds.py <gateway-ip> --json diag.json
+        ```
+
+        Add `--port N` / `--unit N` if your gateway differs from port 502 / slave id 1,
+        and `--display` if a CNU2 display is fitted.
+        The file holds the gateway address in its `host` field: replace it before attaching.
+  - type: checkboxes
+    id: diagnostic
+    attributes:
+      label: Diagnostic output
+      options:
+        - label: I attached `diag.json` from `tests/diagnose_hrds.py --json` (gateway address replaced).
+          required: true
+  - type: dropdown
+    id: model
+    attributes:
+      label: Model
+      options:
+        - HRDS+ 30
+        - HRDS+ 50
+        - Other / not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: recirculation
+    attributes:
+      label: Recirculation (`R` on the type plate)
+      options:
+        - R (recirculation fan and damper)
+        - non-R
+        - Not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: display
+    attributes:
+      label: Display
+      options:
+        - Headless (no CNU2 display)
+        - CNU2 display fitted
+    validations:
+      required: true
+  - type: input
+    id: probes
+    attributes:
+      label: External probes
+      description: Room temperature / humidity, outdoor, supply, exhaust. Write "none" if there are none.
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Home Assistant and integration version
+      placeholder: "Home Assistant 2026.10.x, integration 0.9.0"
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: setup-check
+    attributes:
+      label: Setup check
+      description: The `issues` attribute of `sensor.setup_check`, if any.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Home Assistant log
+      description: Relevant lines mentioning `innova_hrds`.
+      render: text

@@ -1,20 +1,34 @@
-**ATTENTION** This is not done yet, use at your own risk
-
 # Innova DEH+ / hej.luft HRDS+ — Home Assistant integration
 
-Home Assistant custom integration for the **Innova DEH+** air dehumidification
-module (sold in Austria by https://www.hejluft.at/ as the **HRDS+**) over **Modbus TCP**.
-
-## Build status
-
+[![Release](https://img.shields.io/github/v/release/mikopp/ha_innova_DEH-_hejluft_hrds-)](https://github.com/mikopp/ha_innova_DEH-_hejluft_hrds-/releases)
+[![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
 [![Lint](https://github.com/mikopp/ha_innova_deh-_hejluft_hrds-/actions/workflows/lint.yaml/badge.svg)](https://github.com/mikopp/ha_innova_deh-_hejluft_hrds-/actions/workflows/lint.yaml)
 [![hassfest](https://github.com/mikopp/ha_innova_deh-_hejluft_hrds-/actions/workflows/hassfest.yaml/badge.svg)](https://github.com/mikopp/ha_innova_deh-_hejluft_hrds-/actions/workflows/hassfest.yaml)
 [![HACS](https://github.com/mikopp/ha_innova_deh-_hejluft_hrds-/actions/workflows/hacs.yaml/badge.svg)](https://github.com/mikopp/ha_innova_deh-_hejluft_hrds-/actions/workflows/hacs.yaml)
 
-> **Status: early / initial.** The register map is taken directly from the
-> manufacturer's Modbus manual (see [`references/`](references/)) but has **not
-> yet been verified against physical hardware**. Treat addresses and scaling as
-> "documented, untested". Feedback from real units is very welcome.
+[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=mikopp&repository=ha_innova_DEH-_hejluft_hrds-&category=integration)
+
+Home Assistant custom integration for the **Innova DEH+** air dehumidification
+module (sold in Austria by https://www.hejluft.at/ as the **HRDS+**) over **Modbus TCP**.
+
+> ## Release 0.9 — beta, not 1.0 yet
+>
+> The integration is released and usable, but it is a **beta**.
+>
+> * **Tested:** the automated test suite in CI (a simulated unit, plus the
+>   integration running in a real Home Assistant container).
+> * **Developed against:** one **HRDS+ 30 with recirculation (`R` variant)**, run
+>   **headless**: no CNU2 display, no external room/outdoor probes, behind a
+>   Modbus RTU→TCP gateway.
+> * **Not yet tested outside CI / on real hardware:** the HRDS+ 50, units
+>   without recirculation (non-`R`), units with a display or external probes
+>   (automatic setpoint control), brine circuits, winter heating, free cooling,
+>   and how the manual fan speed maps to the actual fan output. The open items
+>   are listed in [`plans/todo.md`](plans/todo.md).
+>
+> Reports from other units are very welcome, see
+> [Reporting issues](#reporting-issues). The aim for 1.0 is in
+> [Road to 1.0](#road-to-10).
 
 ## What it does
 
@@ -243,15 +257,20 @@ parameter code, for example `number.hrds_installer_pc07_max_water_temperature...
 
 ### HACS (custom repository)
 
+[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=mikopp&repository=ha_innova_DEH-_hejluft_hrds-&category=integration)
+
+Or by hand:
+
 1. In HACS, add this repository as a custom repository (category: *Integration*):
-   `https://github.com/mikopp/ha_innova_deh-_hejluft_hrds-`
+   `https://github.com/mikopp/ha_innova_DEH-_hejluft_hrds-`
 2. Install **Innova HRDS+ / hej.luft Dehumidifier** and restart Home Assistant.
 
 HACS installs the `innova_hrds.zip` asset attached to each
 [GitHub release](https://github.com/mikopp/ha_innova_deh-_hejluft_hrds-/releases);
 the release workflow stamps the release tag into `manifest.json` before zipping,
 so the version Home Assistant shows is the release version. Updates appear in
-HACS when a new release is published.
+HACS when a new release is published. Release 0.9.0 is a normal (not a
+"pre-release") release, so it is offered without enabling HACS' beta versions.
 
 ### Manual
 
@@ -651,8 +670,45 @@ rest `continue_on_error: true`.
 
 ## Disclaimer
 
-Use at your own risk. Many of the writable registers change installer-level
-behaviour. Only change settings you understand.
+Use at your own risk. This is beta software, and many of the writable registers
+change installer-level behaviour. Only change settings you understand.
+
+## Reporting issues
+
+**Issues without the diagnostic output cannot be supported.** Whatever the
+problem (a wrong value, a refused write, a unit that does not start), the
+read-only diagnostic script shows what the unit reports and what the
+integration would do, and without it there is nothing to go on.
+
+It only reads (Modbus function codes 03, 04 and 43) and never writes to the
+unit. It needs a copy of this repository (the HACS download contains only the
+component) and `pymodbus`:
+
+```
+git clone https://github.com/mikopp/ha_innova_DEH-_hejluft_hrds-.git
+cd ha_innova_DEH-_hejluft_hrds-
+pip install 'pymodbus>=3.13.1'
+python3 tests/diagnose_hrds.py <gateway-ip> --json diag.json
+```
+
+Add `--port N` / `--unit N` if your gateway does not use port 502 / slave id 1,
+and `--display` if a CNU2 display is fitted. **Attach `diag.json` to the issue.**
+The file contains the gateway address in its `host` field: replace it before
+posting.
+
+Please also say which unit it is (HRDS+ 30 or 50, `R` or non-`R`, display or
+headless, which probes are wired), the Home Assistant and integration versions,
+the `issues` of `sensor.setup_check`, and the relevant part of the Home
+Assistant log. The issue form asks for all of this.
+[Open an issue](https://github.com/mikopp/ha_innova_DEH-_hejluft_hrds-/issues/new/choose).
+
+## Road to 1.0
+
+1.0 is for when the open points in [`plans/todo.md`](plans/todo.md) have been
+checked on real hardware (fan behaviour, the minimum room temperature
+interlock without a probe, mode combinations) and the integration has run on at
+least one other kind of unit (a display, external probes, a different
+size/variant). Until then the 0.x releases keep the beta label above.
 
 ## Credits
 

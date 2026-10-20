@@ -1,0 +1,40 @@
+name: Hardware report / other unit
+description: It works (or does not) on a unit other than a headless HRDS+ 30 R.
+labels: [hardware-report]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The integration is developed on a headless HRDS+ 30 with recirculation; reports
+        from other units are what gets it to 1.0. Please attach the diagnostic output
+        (read-only, never writes):
+
+        ```
+        git clone https://github.com/mikopp/ha_innova_DEH-_hejluft_hrds-.git
+        cd ha_innova_DEH-_hejluft_hrds-
+        pip install 'pymodbus>=3.13.1'
+        python3 tests/diagnose_hrds.py <gateway-ip> --json diag.json
+        ```
+
+        The file holds the gateway address in its `host` field: replace it before attaching.
+  - type: checkboxes
+    id: diagnostic
+    attributes:
+      label: Diagnostic output
+      options:
+        - label: I attached `diag.json` from `tests/diagnose_hrds.py --json` (gateway address replaced).
+          required: true
+  - type: input
+    id: unit
+    attributes:
+      label: Unit
+      description: Type plate code, e.g. `HRDS+ 50 H K DC`, and whether a CNU2 display and which probes are fitted.
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: What you tried and what happened
+      description: Which features worked, which did not (display, probes, setpoints, brine, winter heating, fan).
+    validations:
+      required: true

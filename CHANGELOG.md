@@ -4,6 +4,33 @@ All notable changes to this project are documented here, newest first.
 
 ---
 
+## 0.9.0 (2026-10-20): first public release (beta)
+
+First release. The integration is usable, but it is a beta and not 1.0 yet.
+
+**What is in:** climate and fan entities, sensors, binary sensors, switches,
+numbers and selects for the whole documented register map, computed airflow
+sensors, a `setup` device with a setup check and an operation gate
+(*Allow operational requests*, off by default), an `installer` device with the
+installer menu, headless operation (the required PH01/HA00/PH02/PH27/PH28
+settings are written and re-checked every poll), device identity check before
+anything is written, season and winter-heating guards, water-circuit
+diagnostics, and an optional brine temperature guard. Tested in CI against a
+simulated unit and in a real Home Assistant container.
+
+**Tested on:** one HRDS+ 30 with recirculation (`R`), headless (no CNU2 display,
+no external probes).
+
+**Not yet tested outside CI / on real hardware:** HRDS+ 50, non-`R` units,
+units with a display or external probes, brine circuits, winter heating, free
+cooling, and the manual fan speed to actual fan output mapping. See
+`plans/todo.md`.
+
+**Support:** please attach the output of `tests/diagnose_hrds.py --json` to
+every issue (see the README, *Reporting issues*).
+
+---
+
 ## 2026-10-20 (3)
 
 ### fix: a register that stops answering goes unavailable
