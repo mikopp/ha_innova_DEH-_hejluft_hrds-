@@ -381,6 +381,10 @@ class HrdsModbusHub:
         if not self._sensors and self._unsub:
             self._unsub()
             self._unsub = None
+            # A write just before unload leaves its debounced refresh pending.
+            if self._pending_refresh is not None:
+                self._pending_refresh()
+                self._pending_refresh = None
             # Hand the socket close to an executor: it acquires the same lock a
             # poll in flight may hold, which would stall the event loop.
             self._hass.async_add_executor_job(self.close)
@@ -620,21 +624,50 @@ class HrdsModbusHub:
         self.last_update_success = True
         return True
 
+    def _read(self, fc: str, address: int, count: int):
+        """One block read: the reply, or None if the link failed.
+
+        A Modbus exception reply is a real answer and is returned as is. No
+        answer, or one that does not have ``count`` registers, means the link
+        failed; the connection is then dropped, because pymodbus would hand a
+        late answer still on the socket to the *next* request and every
+        following block would decode another block's registers.
+        """
+        try:
+            if fc == "input":
+                resp = self._client.read_input_registers(
+                    address=address, count=count, device_id=self._hostid
+                )
+            else:
+                resp = self._client.read_holding_registers(
+                    address=address, count=count, device_id=self._hostid
+                )
+        except Exception as exc:  # noqa: BLE001 - any failure is a link failure
+            _LOGGER.debug("Read of %s %s+%s raised: %r", fc, address, count, exc)
+            resp = None
+        if resp is not None and (
+            resp.isError() or len(getattr(resp, "registers", None) or ()) == count
+        ):
+            return resp
+        self._client.close()
+        return None
+
     def _read_blocks(self, blocks, fc: str) -> Optional[Dict[int, int]]:
         """Read every block of a register type into an {address: raw} map."""
         values: Dict[int, int] = {}
         for start, count in blocks:
-            if fc == "input":
-                resp = self._client.read_input_registers(
-                    address=start, count=count, device_id=self._hostid
-                )
-            else:
-                resp = self._client.read_holding_registers(
-                    address=start, count=count, device_id=self._hostid
-                )
-            if resp is None or resp.isError() or not getattr(resp, "registers", None):
+            resp = self._read(fc, start, count)
+            if resp is None:
                 _LOGGER.warning(
-                    "Modbus block read failed (%s @ %s+%s); retrying individually",
+                    "No valid reply to Modbus block read (%s @ %s+%s)",
+                    fc,
+                    start,
+                    count,
+                )
+                return None
+            if resp.isError():
+                _LOGGER.warning(
+                    "Modbus block read rejected (%s @ %s+%s); retrying individually",
                     fc,
                     start,
                     count,
@@ -649,27 +682,18 @@ class HrdsModbusHub:
     def _read_block_individually(
         self, values: Dict[int, int], start: int, count: int, fc: str
     ) -> bool:
-        """Re-read a failed block one register at a time.
+        """Re-read a rejected block one register at a time.
 
         Drops only the addresses the device rejects, so a single bad address
-        cannot take out every entity in the integration. Returns False only if
-        the whole range is unreadable (a genuine comms failure).
+        cannot take out every entity in the integration. Returns False if the
+        link fails or the whole range is rejected.
         """
         any_ok = False
         for addr in range(start, start + count):
-            try:
-                if fc == "input":
-                    resp = self._client.read_input_registers(
-                        address=addr, count=1, device_id=self._hostid
-                    )
-                else:
-                    resp = self._client.read_holding_registers(
-                        address=addr, count=1, device_id=self._hostid
-                    )
-            except Exception as exc:  # noqa: BLE001 - one bad address is not fatal
-                _LOGGER.debug("Read of %s register %s raised: %r", fc, addr, exc)
-                continue
-            if resp is None or resp.isError() or not getattr(resp, "registers", None):
+            resp = self._read(fc, addr, 1)
+            if resp is None:
+                return False
+            if resp.isError():
                 continue
             values[addr] = resp.registers[0]
             any_ok = True

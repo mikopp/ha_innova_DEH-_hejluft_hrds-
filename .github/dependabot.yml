@@ -4,3 +4,18 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+  # Home Assistant image the e2e tests run against: keep it on the latest
+  # release. Bump requirements_test.txt (pytest-homeassistant-custom-component
+  # for the same release) in the same PR.
+  - package-ecosystem: "docker"
+    directory: "/.github/ha-versions"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "pip"
+    directory: "/tests/e2e"
+    schedule:
+      interval: "weekly"

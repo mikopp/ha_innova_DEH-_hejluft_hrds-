@@ -4,16 +4,18 @@
 # that custom_components/innova_hrds/manifest.json is well-formed (domain,
 # requirements, codeowners, iot_class, version, ...) and that the translation
 # files are consistent. This is the canonical "will Home Assistant accept this
-# integration?" check and runs on every push and pull request.
+# integration?" check and runs on every pull request and on main (not twice per PR).
 name: hassfest
 
 on:
-  push:
   pull_request:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
   validate:
+    name: hassfest
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

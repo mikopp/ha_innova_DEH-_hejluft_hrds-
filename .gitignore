@@ -32,3 +32,6 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+
+# e2e test logs
+tests/e2e/.artifacts/

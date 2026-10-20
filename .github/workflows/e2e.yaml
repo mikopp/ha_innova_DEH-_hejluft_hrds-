@@ -1,0 +1,109 @@
+# End-to-end tests: the integration in a real Home Assistant container.
+#
+# Runs on pull requests, on main after a merge, nightly, and from release.yaml
+# on the tagged commit. Same approach as the homeassistent-config repo: one Home Assistant container
+# for the session, onboarded once, driven only over REST and websocket, with
+# polling asserts. On top of that, simulated HRDS+ units (tests/sim) run as
+# processes on the runner, so the integration talks real Modbus TCP to a
+# device that reacts: headless and display units, both operation modes, fan
+# speeds, alarms, probe faults, offline and slow links. Their control API
+# (tests/sim/control.py) injects the failures.
+#
+# The image is pinned in .github/ha-versions/Dockerfile (latest release,
+# bumped by Dependabot); the nightly run also tries the beta image.
+name: E2E (Home Assistant in Docker)
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call:  # release.yaml: the tagged commit
+  schedule:
+    - cron: "17 3 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  e2e:
+    name: e2e (${{ matrix.channel }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        channel: [pinned, beta]
+        exclude:
+          - channel: ${{ github.event_name != 'schedule' && 'beta' || 'none' }}
+    continue-on-error: ${{ matrix.channel == 'beta' }}
+    env:
+      HRDS_E2E_ARTIFACTS: ${{ github.workspace }}/e2e-artifacts
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Pull in the background while Python is set up (as the config repo does).
+      - name: Pick and pull the Home Assistant image
+        run: |
+          if [ "${{ matrix.channel }}" = "beta" ]; then
+            image=ghcr.io/home-assistant/home-assistant:beta
+          else
+            image=$(awk '/^FROM /{print $2}' .github/ha-versions/Dockerfile)
+          fi
+          echo "HRDS_E2E_IMAGE=$image" >> "$GITHUB_ENV"
+          nohup sh -c "docker pull $image > /tmp/pull.log 2>&1; echo \$? > /tmp/pull.rc" &
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: tests/e2e/requirements.txt
+      - name: Install e2e requirements
+        run: pip install -r tests/e2e/requirements.txt
+
+      - name: Wait for the image
+        run: |
+          while [ ! -f /tmp/pull.rc ]; do sleep 2; done
+          cat /tmp/pull.log | tail -3
+          if [ "$(cat /tmp/pull.rc)" != "0" ]; then docker pull "$HRDS_E2E_IMAGE"; fi
+
+      - name: check_config
+        run: |
+          python -m tests.e2e.stage /tmp/ha-check
+          docker run --rm -v /tmp/ha-check:/config "$HRDS_E2E_IMAGE" \
+            python -m homeassistant --config /config --script check_config \
+            2>&1 | tee /tmp/check_config.txt
+          if grep -Eiq "invalid config|Setup of package.*failed|ERROR" /tmp/check_config.txt; then
+            echo "::error::check_config reported problems"; exit 1
+          fi
+
+      - name: Run e2e tests
+        run: |
+          set -o pipefail
+          pytest tests/e2e -v -p no:homeassistant --timeout=300 --timeout-method=thread \
+            2>&1 | tee /tmp/pytest_e2e.txt
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "## E2E against \`$HRDS_E2E_IMAGE\`"
+            echo '```'
+            grep -E "PASSED|FAILED|ERROR|passed|failed" /tmp/pytest_e2e.txt | tail -80 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-logs-${{ matrix.channel }}
+          path: |
+            e2e-artifacts/
+            /tmp/pytest_e2e.txt
+            /tmp/check_config.txt
+          if-no-files-found: ignore

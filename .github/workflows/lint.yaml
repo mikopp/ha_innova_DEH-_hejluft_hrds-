@@ -1,15 +1,19 @@
 # Python linting & formatting check.
 #
-# Runs Ruff (linter + formatter) over the whole repository on every push and
-# pull request. This is the fast "is the Python clean?" gate:
+# Runs Ruff (linter + formatter) over the whole repository on every pull
+# request and on main (after a merge). Not on every push to a branch: a branch
+# with an open PR is covered by the PR run, so nothing runs twice. This is the fast "is the Python clean?" gate:
 #   * `ruff check`  -> static lint rules (pyflakes/pycodestyle/isort, see ruff.toml)
 #   * `ruff format --check` -> fails if any file is not formatted
+#   * tests/wiring_check.py -> classification, platforms, translations,
+#     register docs and block plan, with Home Assistant stubbed out
 # It does NOT import Home Assistant, so it is quick and has no HA dependency.
 name: Lint
 
 on:
-  push:
   pull_request:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -26,3 +30,5 @@ jobs:
         run: ruff check .
       - name: Ruff format check
         run: ruff format --check .
+      - name: Wiring check
+        run: python3 tests/wiring_check.py

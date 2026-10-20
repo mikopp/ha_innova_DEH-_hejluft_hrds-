@@ -1,0 +1,1200 @@
+{
+  "host": "192.168.1.254",
+  "port": 8899,
+  "unit": 1,
+  "identity": {
+    "fc43_basic": {
+      "0": "EVCO",
+      "1": "EPB9ORSINDEU",
+      "2": "V01.00.09.02"
+    },
+    "fc43_regular": {
+      "0": "EVCO",
+      "1": "EPB9ORSINDEU",
+      "2": "V01.00.09.02"
+    },
+    "fc43_extended": {
+      "0": "EVCO",
+      "1": "EPB9ORSINDEU",
+      "2": "V01.00.09.02"
+    },
+    "PG01_MachineType": 0,
+    "PG02_EnableIntegration": 1,
+    "PG03_EnableFreeCooling": 1,
+    "Serial address": 1,
+    "Serial baud": 3,
+    "Serial parity": 0,
+    "Serial stop bits": 0,
+    "fingerprint": "hrds:1797=0,1798=1,1799=1,1773=1,1774=3,1775=0,1776=0",
+    "status_enums_valid": "4/4"
+  },
+  "inputs": {
+    "live": {
+      "501": 187,
+      "511": 168,
+      "513": 0,
+      "514": 0,
+      "515": 0,
+      "516": 0,
+      "517": 0,
+      "518": 0,
+      "519": 0
+    },
+    "no_signal": [
+      499,
+      500,
+      502,
+      503,
+      504,
+      505,
+      506,
+      507,
+      508,
+      509,
+      510,
+      512
+    ],
+    "allocations": {
+      "HA01": 58,
+      "HA02": 0,
+      "HA03": 0,
+      "HA04": 52,
+      "HA05": 47,
+      "HA06": 6,
+      "HA07": 8
+    }
+  },
+  "registers": {
+    "room_temperature": {
+      "reg": 499,
+      "type": 4,
+      "raw": 32772,
+      "value": null,
+      "unit": "\u00b0C"
+    },
+    "outdoor_temperature": {
+      "reg": 500,
+      "type": 4,
+      "raw": 32772,
+      "value": null,
+      "unit": "\u00b0C"
+    },
+    "water_temperature": {
+      "reg": 501,
+      "type": 4,
+      "raw": 187,
+      "value": 18.7,
+      "unit": "\u00b0C"
+    },
+    "supply_temperature": {
+      "reg": 503,
+      "type": 4,
+      "raw": 32772,
+      "value": null,
+      "unit": "\u00b0C"
+    },
+    "room_humidity": {
+      "reg": 505,
+      "type": 4,
+      "raw": 32772,
+      "value": null,
+      "unit": "%"
+    },
+    "air_quality": {
+      "reg": 506,
+      "type": 4,
+      "raw": 32772,
+      "value": null,
+      "unit": "ppm"
+    },
+    "actual_setpoint": {
+      "reg": 1111,
+      "type": 4,
+      "raw": 280,
+      "value": 28.0,
+      "unit": "\u00b0C"
+    },
+    "supply_fan_output": {
+      "reg": 639,
+      "type": 4,
+      "raw": 0,
+      "value": 0.0,
+      "unit": "%"
+    },
+    "compressor_output": {
+      "reg": 641,
+      "type": 4,
+      "raw": 0,
+      "value": 0.0,
+      "unit": "%"
+    },
+    "supply_fan_rpm": {
+      "reg": 1117,
+      "type": 4,
+      "raw": 0,
+      "value": 0.0,
+      "unit": "rpm"
+    },
+    "unit_status": {
+      "reg": 1104,
+      "type": 4,
+      "raw": 0,
+      "value": "off_by_display",
+      "unit": ""
+    },
+    "mode_status": {
+      "reg": 1110,
+      "type": 4,
+      "raw": 4,
+      "value": "summer_di",
+      "unit": ""
+    },
+    "supply_fan_status": {
+      "reg": 1119,
+      "type": 4,
+      "raw": 1,
+      "value": "off",
+      "unit": ""
+    },
+    "compressor_status": {
+      "reg": 1122,
+      "type": 4,
+      "raw": 6,
+      "value": "off",
+      "unit": ""
+    },
+    "operating_mode": {
+      "reg": 1583,
+      "type": 4,
+      "raw": 0,
+      "value": "summer",
+      "unit": ""
+    },
+    "dehumidify_request": {
+      "reg": 1121,
+      "type": 4,
+      "raw": 0,
+      "value": "off",
+      "unit": ""
+    },
+    "recirculation_active": {
+      "reg": 1112,
+      "type": 4,
+      "raw": 0,
+      "value": "off",
+      "unit": ""
+    },
+    "recirculation_damper": {
+      "reg": 1134,
+      "type": 4,
+      "raw": 0,
+      "value": "off",
+      "unit": ""
+    },
+    "alarm_active": {
+      "reg": 1103,
+      "type": 4,
+      "raw": 0,
+      "value": "off",
+      "unit": ""
+    },
+    "humidity_setpoint": {
+      "reg": 1586,
+      "type": 3,
+      "raw": 60,
+      "value": 60.0,
+      "unit": "%"
+    },
+    "summer_setpoint": {
+      "reg": 1584,
+      "type": 3,
+      "raw": 280,
+      "value": 28.0,
+      "unit": "\u00b0C"
+    },
+    "winter_setpoint": {
+      "reg": 1585,
+      "type": 3,
+      "raw": 140,
+      "value": 14.0,
+      "unit": "\u00b0C"
+    },
+    "fan_min_speed_dehumidify": {
+      "reg": 1853,
+      "type": 3,
+      "raw": 5000,
+      "value": 50.0,
+      "unit": "%"
+    },
+    "fan_max_speed_dehumidify": {
+      "reg": 1647,
+      "type": 3,
+      "raw": 8500,
+      "value": 85.0,
+      "unit": "%"
+    },
+    "fan_min_speed_cooling": {
+      "reg": 1852,
+      "type": 3,
+      "raw": 5000,
+      "value": 50.0,
+      "unit": "%"
+    },
+    "fan_min_speed_vmc": {
+      "reg": 1644,
+      "type": 3,
+      "raw": 3000,
+      "value": 30.0,
+      "unit": "%"
+    },
+    "fan_max_speed_cooling": {
+      "reg": 1646,
+      "type": 3,
+      "raw": 8500,
+      "value": 85.0,
+      "unit": "%"
+    },
+    "fan_manual_speed": {
+      "reg": 1614,
+      "type": 3,
+      "raw": 0,
+      "value": 0.0,
+      "unit": "%"
+    },
+    "unit_on_off": {
+      "reg": 1105,
+      "type": 3,
+      "raw": 0,
+      "value": "off",
+      "unit": ""
+    },
+    "dehumidify": {
+      "reg": 1140,
+      "type": 3,
+      "raw": 0,
+      "value": "off",
+      "unit": ""
+    },
+    "active_cooling": {
+      "reg": 1139,
+      "type": 3,
+      "raw": 0,
+      "value": "off",
+      "unit": ""
+    },
+    "enable_onoff_display": {
+      "reg": 1777,
+      "type": 3,
+      "raw": 1,
+      "value": "on",
+      "unit": ""
+    },
+    "enable_onoff_bms": {
+      "reg": 1778,
+      "type": 3,
+      "raw": 0,
+      "value": "off",
+      "unit": ""
+    },
+    "enable_dehumidify_bms": {
+      "reg": 1870,
+      "type": 3,
+      "raw": 1,
+      "value": "on",
+      "unit": ""
+    },
+    "enable_cooling_bms": {
+      "reg": 1869,
+      "type": 3,
+      "raw": 1,
+      "value": "on",
+      "unit": ""
+    },
+    "machine_type": {
+      "reg": 1797,
+      "type": 3,
+      "raw": 0,
+      "value": "supply_fan_only",
+      "unit": ""
+    },
+    "active_cooling_available": {
+      "reg": 1798,
+      "type": 3,
+      "raw": 1,
+      "value": "on",
+      "unit": ""
+    },
+    "probe_source": {
+      "reg": 1803,
+      "type": 3,
+      "raw": 2,
+      "value": "cnu_temp_humidity",
+      "unit": ""
+    },
+    "temp_probe_ok": {
+      "reg": 769,
+      "type": 4,
+      "raw": 0,
+      "value": "on",
+      "unit": ""
+    },
+    "humidity_probe_ok": {
+      "reg": 770,
+      "type": 4,
+      "raw": 0,
+      "value": "on",
+      "unit": ""
+    },
+    "alarm_compressor_lowpressure": {
+      "reg": 768,
+      "type": 4,
+      "raw": 0,
+      "value": "off",
+      "unit": ""
+    },
+    "alarm_compressor_highpressure": {
+      "reg": 768,
+      "type": 4,
+      "raw": 0,
+      "value": "off",
+      "unit": ""
+    },
+    "alarm_water_antifreeze": {
+      "reg": 768,
+      "type": 4,
+      "raw": 0,
+      "value": "off",
+      "unit": ""
+    },
+    "alarm_dirty_filter": {
+      "reg": 769,
+      "type": 4,
+      "raw": 0,
+      "value": "off",
+      "unit": ""
+    },
+    "exhaust_temperature": {
+      "reg": 502,
+      "type": 4,
+      "raw": 32772,
+      "value": null,
+      "unit": "\u00b0C"
+    },
+    "evaporator_temperature": {
+      "reg": 511,
+      "type": 4,
+      "raw": 168,
+      "value": 16.8,
+      "unit": "\u00b0C"
+    },
+    "fan_manual_request": {
+      "reg": 1114,
+      "type": 4,
+      "raw": 0,
+      "value": 0.0,
+      "unit": "%"
+    },
+    "dehumidify_differential": {
+      "reg": 1694,
+      "type": 3,
+      "raw": 3,
+      "value": 3.0,
+      "unit": "%"
+    },
+    "min_room_temp_dehumidify": {
+      "reg": 1889,
+      "type": 3,
+      "raw": 100,
+      "value": 10.0,
+      "unit": "\u00b0C"
+    },
+    "min_room_temp_diff_dehumidify": {
+      "reg": 1890,
+      "type": 3,
+      "raw": 5,
+      "value": 0.5,
+      "unit": "\u00b0C"
+    },
+    "fan_min_runtime": {
+      "reg": 1638,
+      "type": 3,
+      "raw": 60,
+      "value": 60.0,
+      "unit": "s"
+    },
+    "fan_post_run_time": {
+      "reg": 1640,
+      "type": 3,
+      "raw": 30,
+      "value": 30.0,
+      "unit": "s"
+    },
+    "humidity_setpoint_min": {
+      "reg": 1892,
+      "type": 3,
+      "raw": 55,
+      "value": 55.0,
+      "unit": "%"
+    },
+    "humidity_setpoint_max": {
+      "reg": 1893,
+      "type": 3,
+      "raw": 65,
+      "value": 65.0,
+      "unit": "%"
+    },
+    "force_dehumidify_in_cooling": {
+      "reg": 1692,
+      "type": 3,
+      "raw": 1,
+      "value": "on",
+      "unit": ""
+    },
+    "enable_integration": {
+      "reg": 1798,
+      "type": 3,
+      "raw": 1,
+      "value": "on",
+      "unit": ""
+    },
+    "enable_free_cooling": {
+      "reg": 1799,
+      "type": 3,
+      "raw": 1,
+      "value": "on",
+      "unit": ""
+    },
+    "winter_dehumidify": {
+      "reg": 1689,
+      "type": 3,
+      "raw": 0,
+      "value": "disabled",
+      "unit": ""
+    },
+    "_raw": {
+      "4:499": 32772,
+      "4:500": 32772,
+      "4:501": 187,
+      "4:502": 32772,
+      "4:503": 32772,
+      "4:504": 32772,
+      "4:505": 32772,
+      "4:506": 32772,
+      "4:507": 32762,
+      "4:508": 32772,
+      "4:509": 32772,
+      "4:510": 32772,
+      "4:511": 168,
+      "4:639": 0,
+      "4:640": 0,
+      "4:641": 0,
+      "4:768": 0,
+      "4:769": 0,
+      "4:770": 0,
+      "4:1103": 0,
+      "4:1104": 0,
+      "4:1110": 4,
+      "4:1111": 280,
+      "4:1112": 0,
+      "4:1113": 0,
+      "4:1114": 0,
+      "4:1115": 0,
+      "4:1116": 0,
+      "4:1117": 0,
+      "4:1118": 0,
+      "4:1119": 1,
+      "4:1120": 0,
+      "4:1121": 0,
+      "4:1122": 6,
+      "4:1134": 0,
+      "4:1583": 0,
+      "3:1105": 0,
+      "3:1139": 0,
+      "3:1140": 0,
+      "3:1584": 280,
+      "3:1585": 140,
+      "3:1586": 60,
+      "3:1614": 0,
+      "3:1638": 60,
+      "3:1639": 5,
+      "3:1640": 30,
+      "3:1641": 0,
+      "3:1642": 3000,
+      "3:1643": 0,
+      "3:1644": 3000,
+      "3:1645": 6000,
+      "3:1646": 8500,
+      "3:1647": 8500,
+      "3:1689": 0,
+      "3:1690": 0,
+      "3:1691": 0,
+      "3:1692": 1,
+      "3:1693": 0,
+      "3:1694": 3,
+      "3:1777": 1,
+      "3:1778": 0,
+      "3:1797": 0,
+      "3:1798": 1,
+      "3:1799": 1,
+      "3:1800": 0,
+      "3:1801": 0,
+      "3:1802": 10,
+      "3:1803": 2,
+      "3:1852": 5000,
+      "3:1853": 5000,
+      "3:1869": 1,
+      "3:1870": 1,
+      "3:1889": 100,
+      "3:1890": 5,
+      "3:1891": 1,
+      "3:1892": 55,
+      "3:1893": 65
+    }
+  },
+  "extras": {
+    "1103": 0,
+    "768": 0,
+    "769": 0,
+    "770": 0,
+    "1112": 0,
+    "384": 37002,
+    "385": 10410,
+    "257": 43521,
+    "1773": 1,
+    "1774": 3,
+    "1775": 0,
+    "1776": 0,
+    "1777": 1,
+    "1781": 0,
+    "1602": 20000,
+    "1604": 0
+  },
+  "headless": {
+    "params": {
+      "1698": 90,
+      "1777": 1,
+      "1778": 0,
+      "1779": 0,
+      "1780": 1,
+      "1781": 0,
+      "1803": 2,
+      "1804": 58,
+      "1805": 0,
+      "1806": 0,
+      "1807": 52,
+      "1808": 47,
+      "1809": 6,
+      "1810": 8,
+      "1822": 27,
+      "1823": 26,
+      "1824": 2,
+      "1825": 4,
+      "1829": 5,
+      "1830": 0,
+      "1831": 0,
+      "1832": 1,
+      "1838": 10,
+      "1839": 26,
+      "1878": 0,
+      "1879": 2,
+      "1889": 100,
+      "1890": 5
+    }
+  },
+  "snapshot": {
+    "input": {
+      "256": 5,
+      "257": 43521,
+      "258": 2730,
+      "259": 43690,
+      "384": 37002,
+      "385": 10410,
+      "499": 32772,
+      "500": 32772,
+      "501": 187,
+      "502": 32772,
+      "503": 32772,
+      "504": 32772,
+      "505": 32772,
+      "506": 32772,
+      "507": 32762,
+      "508": 32772,
+      "509": 32772,
+      "510": 32772,
+      "511": 168,
+      "512": 32772,
+      "513": 0,
+      "514": 0,
+      "639": 0,
+      "640": 0,
+      "641": 0,
+      "642": 0,
+      "643": 0,
+      "644": 0,
+      "645": 0,
+      "768": 0,
+      "769": 0,
+      "770": 0,
+      "771": 0,
+      "772": 0,
+      "773": 0,
+      "774": 0,
+      "775": 0,
+      "1101": 62825,
+      "1102": 4334,
+      "1103": 0,
+      "1104": 0,
+      "1105": 0,
+      "1106": 0,
+      "1107": 0,
+      "1108": 0,
+      "1109": 0,
+      "1110": 4,
+      "1111": 280,
+      "1112": 0,
+      "1113": 0,
+      "1114": 0,
+      "1115": 0,
+      "1116": 0,
+      "1117": 0,
+      "1118": 0,
+      "1119": 1,
+      "1120": 0,
+      "1121": 0,
+      "1122": 6,
+      "1123": 0,
+      "1124": 1,
+      "1125": 2,
+      "1126": 0,
+      "1127": 0,
+      "1128": 0,
+      "1129": 0,
+      "1130": 32772,
+      "1131": 32772,
+      "1132": 0,
+      "1133": 0,
+      "1134": 0,
+      "1135": 0,
+      "1136": 0,
+      "1137": 0,
+      "1138": 0,
+      "1139": 0,
+      "1140": 0
+    },
+    "holding": {
+      "1590": 65526,
+      "1591": 20,
+      "1592": 65516,
+      "1593": 280,
+      "1594": 140,
+      "1595": 6000,
+      "1596": 5000,
+      "1597": 4000,
+      "1598": 2,
+      "1599": 15,
+      "1600": 30,
+      "1601": 0,
+      "1602": 20000,
+      "1603": 0,
+      "1604": 0,
+      "1605": 0,
+      "1606": 0,
+      "1607": 0,
+      "1608": 20000,
+      "1609": 0,
+      "1610": 0,
+      "1611": 0,
+      "1612": 16129,
+      "1613": 3852,
+      "1614": 0,
+      "1615": 0,
+      "1616": 0,
+      "1617": 0,
+      "1618": 0,
+      "1619": 0,
+      "1620": 0,
+      "1621": 0,
+      "1622": 0,
+      "1623": 0,
+      "1624": 0,
+      "1625": 0,
+      "1626": 1,
+      "1627": 0,
+      "1628": 15,
+      "1629": 1,
+      "1630": 1,
+      "1631": 0,
+      "1632": 0,
+      "1633": 300,
+      "1634": 100,
+      "1635": 200,
+      "1636": 100,
+      "1637": 4000,
+      "1638": 60,
+      "1639": 5,
+      "1640": 30,
+      "1641": 0,
+      "1642": 3000,
+      "1643": 0,
+      "1644": 3000,
+      "1645": 6000,
+      "1646": 8500,
+      "1647": 8500,
+      "1648": 7,
+      "1649": 5,
+      "1650": 5,
+      "1651": 0,
+      "1652": 1,
+      "1653": 9999,
+      "1654": 800,
+      "1655": 200,
+      "1656": 5,
+      "1657": 500,
+      "1658": 5,
+      "1659": 1000,
+      "1660": 7000,
+      "1661": 0,
+      "1662": 0,
+      "1663": 300,
+      "1664": 20,
+      "1665": 420,
+      "1666": 180,
+      "1667": 0,
+      "1668": 2000,
+      "1669": 5000,
+      "1670": 100,
+      "1671": 10,
+      "1672": 8,
+      "1673": 100,
+      "1674": 1,
+      "1675": 0,
+      "1676": 2,
+      "1677": 80,
+      "1678": 10,
+      "1679": 370,
+      "1680": 50,
+      "1681": 500,
+      "1682": 10,
+      "1683": 30,
+      "1684": 360,
+      "1685": 3,
+      "1686": 100,
+      "1687": 100,
+      "1688": 0,
+      "1689": 0,
+      "1690": 0,
+      "1691": 0,
+      "1692": 1,
+      "1693": 0,
+      "1694": 3,
+      "1695": 100,
+      "1696": 1,
+      "1697": 120,
+      "1698": 90,
+      "1699": 20,
+      "1700": 15,
+      "1701": 0,
+      "1702": 10000,
+      "1703": 40,
+      "1704": 20,
+      "1705": 500,
+      "1706": 60,
+      "1707": 50,
+      "1708": 30,
+      "1709": 40,
+      "1710": 20,
+      "1711": 5,
+      "1712": 20,
+      "1713": 30,
+      "1714": 500,
+      "1715": 5,
+      "1716": 10,
+      "1717": 1,
+      "1718": 0,
+      "1719": 1,
+      "1720": 10,
+      "1721": 1,
+      "1722": 30,
+      "1723": 5,
+      "1724": 2,
+      "1725": 30,
+      "1726": 5,
+      "1727": 5,
+      "1728": 2,
+      "1729": 2,
+      "1730": 1,
+      "1731": 1,
+      "1732": 900,
+      "1733": 20,
+      "1734": 1,
+      "1735": 75,
+      "1736": 1,
+      "1737": 60,
+      "1738": 0,
+      "1739": 30,
+      "1740": 5,
+      "1741": 1400,
+      "1742": 2,
+      "1743": 2,
+      "1744": 1,
+      "1745": 2,
+      "1746": 120,
+      "1747": 30,
+      "1748": 5,
+      "1749": 420,
+      "1750": 70,
+      "1751": 5,
+      "1752": 2,
+      "1753": 30,
+      "1754": 900,
+      "1755": 200,
+      "1756": 3,
+      "1757": 2,
+      "1758": 5,
+      "1759": 30,
+      "1760": 20,
+      "1761": 2,
+      "1762": 1,
+      "1763": 2,
+      "1764": 30,
+      "1765": 0,
+      "1766": 30,
+      "1767": 1,
+      "1768": 0,
+      "1769": 0,
+      "1770": 1,
+      "1771": 2,
+      "1772": 1,
+      "1773": 1,
+      "1774": 3,
+      "1775": 0,
+      "1776": 0,
+      "1777": 1,
+      "1778": 0,
+      "1779": 0,
+      "1780": 1,
+      "1781": 0,
+      "1782": 0,
+      "1783": 280,
+      "1784": 280,
+      "1785": 140,
+      "1786": 140,
+      "1787": 0,
+      "1788": 3,
+      "1789": 1,
+      "1790": 0,
+      "1791": 15,
+      "1792": 2000,
+      "1793": 50,
+      "1794": 500,
+      "1795": 1,
+      "1796": 2,
+      "1797": 0,
+      "1798": 1,
+      "1799": 1,
+      "1800": 0,
+      "1801": 0,
+      "1802": 10,
+      "1803": 2,
+      "1804": 58,
+      "1805": 0,
+      "1806": 0,
+      "1807": 52,
+      "1808": 47,
+      "1809": 6,
+      "1810": 8,
+      "1811": 0,
+      "1812": 0,
+      "1813": 0,
+      "1814": 0,
+      "1815": 0,
+      "1816": 0,
+      "1817": 0,
+      "1818": 0,
+      "1819": 0,
+      "1820": 0,
+      "1821": 0,
+      "1822": 27,
+      "1823": 26,
+      "1824": 2,
+      "1825": 4,
+      "1826": 0,
+      "1827": 0,
+      "1828": 0,
+      "1829": 5,
+      "1830": 0,
+      "1831": 0,
+      "1832": 1,
+      "1833": 0,
+      "1834": 0,
+      "1835": 10,
+      "1836": 10,
+      "1837": 10,
+      "1838": 10,
+      "1839": 26,
+      "1840": 10,
+      "1841": 13,
+      "1842": 12,
+      "1843": 6,
+      "1844": 0,
+      "1845": 0,
+      "1846": 0,
+      "1847": 0,
+      "1848": 0,
+      "1849": 60,
+      "1850": 60,
+      "1851": 2000,
+      "1852": 5000,
+      "1853": 5000,
+      "1854": 4000,
+      "1855": 7000,
+      "1856": 1,
+      "1857": 7000,
+      "1858": 4000,
+      "1859": 6000,
+      "1860": 5000,
+      "1861": 4000,
+      "1862": 4000,
+      "1863": 4000,
+      "1864": 0,
+      "1865": 0,
+      "1866": 50,
+      "1867": 500,
+      "1868": 6,
+      "1869": 1,
+      "1870": 1,
+      "1871": 5000,
+      "1872": 0,
+      "1873": 60,
+      "1874": 15,
+      "1875": 65526,
+      "1876": 0,
+      "1877": 0,
+      "1878": 0,
+      "1879": 2,
+      "1880": 12,
+      "1881": 8,
+      "1882": 115,
+      "1883": 52,
+      "1884": 80,
+      "1885": 60,
+      "1886": 60,
+      "1887": 90,
+      "1888": 1,
+      "1889": 100,
+      "1890": 5,
+      "1891": 1,
+      "1892": 55,
+      "1893": 65,
+      "1894": 0,
+      "1895": 0,
+      "1896": 60,
+      "1897": 0,
+      "1898": 0,
+      "1899": 0,
+      "1900": 0
+    }
+  },
+  "findings": [
+    [
+      "OK",
+      "TCP port is open"
+    ],
+    [
+      "OK",
+      "unit id 1 answers (unit status register 1104 = 0)"
+    ],
+    [
+      "OK",
+      "FC43/14 basic: {0: 'EVCO', 1: 'EPB9ORSINDEU', 2: 'V01.00.09.02'}"
+    ],
+    [
+      "OK",
+      "FC43/14 regular: {0: 'EVCO', 1: 'EPB9ORSINDEU', 2: 'V01.00.09.02'}"
+    ],
+    [
+      "OK",
+      "FC43/14 extended: {0: 'EVCO', 1: 'EPB9ORSINDEU', 2: 'V01.00.09.02'}"
+    ],
+    [
+      "OK",
+      "identity check passes: EVCO EPB9ORSINDEU (integration accepts it)"
+    ],
+    [
+      "INFO",
+      "register fingerprint: hrds:1797=0,1798=1,1799=1,1773=1,1774=3,1775=0,1776=0"
+    ],
+    [
+      "OK",
+      "status registers hold documented enum values: 4/4"
+    ],
+    [
+      "INFO",
+      "The register map documents no serial number register (FC43 gives the firmware revision only). Use --sweep to look for undocumented ones."
+    ],
+    [
+      "INFO",
+      "The integration's identity check (identity.py) is: FC43 vendor/product if the gateway forwards it, AND all status registers hold documented enum values."
+    ],
+    [
+      "OK",
+      "every block read succeeded (integration block plan is valid)"
+    ],
+    [
+      "OK",
+      "all 58 integration registers answered"
+    ],
+    [
+      "INFO",
+      "Room temp (499): no probe wired - automatic dehumidify cannot run on its own; HA must send explicit requests. The climate entity shows no current temperature/humidity."
+    ],
+    [
+      "INFO",
+      "Room humidity (505): no probe wired - automatic dehumidify cannot run on its own; HA must send explicit requests. The climate entity shows no current temperature/humidity."
+    ],
+    [
+      "OK",
+      "inputs with a real value: 501 (water_temperature) raw 187; 511 (evaporator_temperature) raw 168; 513 ((not in register map)) raw 0; 514 ((not in register map)) raw 0; 515 ((not in register map)) raw 0; 516 ((not in register map)) raw 0; 517 ((not in register map)) raw 0; 518 ((not in register map)) raw 0; 519 ((not in register map)) raw 0"
+    ],
+    [
+      "WARN",
+      "live inputs [513, 514, 515, 516, 517, 518, 519] are not in the register map: identify them (compare with a known temperature; x0.1 may not be the scale)"
+    ],
+    [
+      "INFO",
+      "12 inputs read the 'no signal' word. That means unwired OR not allocated (AI2/AI3 allocation 0 = unused): a probe attached to an unallocated input would look the same. Only the factory-wired water (501) and evaporator (511) probes are expected to be live on a bare unit."
+    ],
+    [
+      "OK",
+      "no alarm bits set"
+    ],
+    [
+      "ACTION",
+      "integration will change enable_onoff_bms (reg 1778) off -> on on first connect"
+    ],
+    [
+      "ACTION",
+      "integration will change enable_onoff_display (reg 1777) on -> off on first connect"
+    ],
+    [
+      "ACTION",
+      "integration will change probe_source (reg 1803) cnu_temp_humidity -> none_or_external on first connect"
+    ],
+    [
+      "INFO",
+      "No other register is written on connect; all further writes happen only on user action (switches, numbers, climate, fan)."
+    ],
+    [
+      "INFO",
+      "Writes are skipped by the unit unless the BMS enables are 1."
+    ],
+    [
+      "INFO",
+      "unit status is 'off_by_display' because PH01=1 with no display; the integration clears PH01 on connect, after which the unit reports 'off_by_bms' and can be started from HA."
+    ],
+    [
+      "INFO",
+      "PG01=0: supply fan only (this is also what an R unit reads - its single fan is the recirculation fan)"
+    ],
+    [
+      "INFO",
+      "recirculation damper output present (state 'off'): R unit. Every dehumidify/integration request opens the damper and runs the fan; writing fan 0 does not prevent that (MODBUS_REGISTERS.md 13.5)."
+    ],
+    [
+      "WARN",
+      "PG03=1: free cooling/heating enabled; the unit may act on outdoor temperature. Leave 0 if the Comfo owns free cooling."
+    ],
+    [
+      "INFO",
+      "PU13=10.0 degC min room temp interlock; there is no room temperature, so check it does not veto Modbus dehumidify requests (test it; set PU13 to 0 if it does)."
+    ],
+    [
+      "INFO",
+      "dehumidify fan band PF28..PF10 = 50.0%..85.0% (a manual request is scaled across this band - verify on hardware)"
+    ],
+    [
+      "INFO",
+      "model 30 vs 50 cannot be read from the unit; read it from the type plate (HRDS+ 30/50 ...) and set it in the integration config."
+    ],
+    [
+      "INFO",
+      "current unit status: off_by_display"
+    ],
+    [
+      "INFO",
+      "PH01 (display on/off) = 1: 1 keeps the unit OFF-by-display with no display; the integration writes 0 in headless mode"
+    ],
+    [
+      "INFO",
+      "HA00 (T/H source) = 2: expects display sensors; the integration writes 0 in headless mode"
+    ],
+    [
+      "OK",
+      "HA02 (AI2) = 0: no room temperature probe configured"
+    ],
+    [
+      "OK",
+      "HA03 (AI3) = 0: no room humidity probe configured"
+    ],
+    [
+      "INFO",
+      "PH02 on/off via Modbus = off: the integration writes 1 on connect"
+    ],
+    [
+      "OK",
+      "PH28 dehumidify via Modbus = on"
+    ],
+    [
+      "OK",
+      "PH27 integration via Modbus = on"
+    ],
+    [
+      "INFO",
+      "remote ON/OFF contact field in Packed_logicDI1 = 1 (HB03 = 2; 2 = normally-open, active when closed)"
+    ],
+    [
+      "OK",
+      "remote ON/OFF contact reads closed/active (bridge fitted) - this is inferred from the field value 1; confirm once on the unit."
+    ],
+    [
+      "INFO",
+      "PC12 = 2: DI requests start the unit even if OFF is open"
+    ],
+    [
+      "INFO",
+      "PU13 = 10.0 C (factory 22.0). The compressor does not start below it, and the handbook does not say what happens with no room temperature at all. This is the main open question: it can only be answered with the unit ON (dehumidify request over Modbus and see whether the compressor starts)."
+    ],
+    [
+      "INFO",
+      "Fallback if PU13 vetoes: give AI2 a fixed ~25 C reading (10 kOhm NTC resistor, HA02 = 45) - an idea, not from the manual."
+    ],
+    [
+      "INFO",
+      "Season (summer/winter) comes from DI4 (HB04, open = summer) when no display owns it; 'summer_di' in the mode status is therefore expected."
+    ],
+    [
+      "INFO",
+      "Packed_DO1 (384): compressor=0, recirc_damper=0, water_valve=1"
+    ],
+    [
+      "INFO",
+      "Packed_DO2 (385): on_off=2, summer_winter=2, serious_alarm=0, light_alarm=2"
+    ],
+    [
+      "INFO",
+      "Packed_logicDI1 (257): remote_on_off=1, summer_winter=0, dehum_req=0, integ_req=0"
+    ],
+    [
+      "INFO",
+      "reg 1838 HD01 DO1 allocation (10 = recirculation damper NO, 9 = NC) = 10"
+    ],
+    [
+      "INFO",
+      "reg 1698 PS01 recirculation-damper pre-start time (s) = 90"
+    ],
+    [
+      "INFO",
+      "reg 1614 PM20 manual fan setpoint = 0"
+    ]
+  ]
+}

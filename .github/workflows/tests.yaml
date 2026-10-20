@@ -1,0 +1,59 @@
+# In-process tests: real Home Assistant core + simulated HRDS+.
+#
+# pytest-homeassistant-custom-component runs the actual Home Assistant release
+# pinned in requirements_test.txt (always the latest; Dependabot bumps it).
+# The integration's real pymodbus client talks over TCP to the simulator in
+# tests/sim, so config flow, polling, decoding, guards and writes run for
+# real. Fast (about a minute) and the only layer that measures coverage.
+#   * tests/sim       - the device model on its own
+#   * tests/ha        - config flow, setup, operation, fan, failures, display,
+#                       one smoke run per real-device dump in tests/devices
+#   * tests/test_wiring.py - tests/wiring_check.py (no-HA consistency checks)
+# The Docker layer (real HA container) is e2e.yaml.
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call:  # release.yaml: the tagged commit
+
+permissions:
+  contents: read
+
+# A newer push to the same PR cancels the superseded run; main and release
+# runs always finish. The literal prefix keeps this group distinct from e2e's
+# when release.yaml calls both.
+concurrency:
+  group: tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements_test.txt
+      - name: Install test requirements
+        run: pip install -r requirements_test.txt
+      - name: Run tests
+        run: >-
+          pytest tests/sim tests/ha tests/test_wiring.py
+          --timeout=120
+          --cov=custom_components.innova_hrds
+          --cov-report=term-missing
+          --cov-report=xml
+          --cov-fail-under=90
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage
+          path: coverage.xml
+          if-no-files-found: ignore

@@ -219,9 +219,12 @@ figures in the technical data are the tested spec range, **not** a firmware floo
 
 * Polls all registers every N seconds (default 30) via
   `async_refresh_modbus_data()`, reading input and holding blocks separately.
-  Blocks never span an address belonging to the other function code, and a
-  failed block is retried register-by-register so one bad address cannot blank
-  every entity.
+  Blocks never span an address belonging to the other function code. A block
+  the device *rejects* (Modbus exception) is retried register-by-register so
+  one bad address cannot blank every entity; a block with *no* answer, or an
+  answer of the wrong length, fails the cycle and drops the connection
+  (`_read`): after a timeout pymodbus hands the late answer to the next
+  request, which decoded one block's registers as another's.
 * `last_update_success` drives `HubBackedEntity.available`. Listeners are
   notified on failure too — that is what moves entities to `unavailable`
   instead of leaving them showing stale readings.
@@ -300,6 +303,43 @@ exactly what the integration writes on first connect. Needs only
 The port is configurable in the integration too (`port` in the config flow and
 options flow, default 502), as are the unit id (`hostid`) and model.
 
+## Tests
+
+Two layers, both against a **simulated HRDS+** (`tests/sim/`) that speaks real
+Modbus TCP (pymodbus 3.13 `SimDevice`), so the integration's own client,
+block plan, decoding, guards and writes all run for real:
+
+* **In-process** (`tests/ha/`, `tests.yaml`): the real Home Assistant core via
+  `pytest-homeassistant-custom-component` (pinned to the latest HA release in
+  `requirements_test.txt`). Fast, measures coverage (fail under 90 %).
+  `pip install -r requirements_test.txt && pytest tests/sim tests/ha tests/test_wiring.py`
+* **Docker e2e** (`tests/e2e/`, `e2e.yaml`): the official HA image from
+  `.github/ha-versions/Dockerfile`, one container per session, onboarded and
+  driven over REST/websocket like the `homeassistent-config` repo's harness.
+  Simulators run as host processes (`python -m tests.sim --port 5020
+  --control-port 8020 [--overlay display_with_probes]`) and are steered through
+  their HTTP control API (`tests/sim/control.py`: alarms, probe faults, power
+  cycle, offline, slow replies, rejected writes, wrong identity, fan model).
+  `pip install -r tests/e2e/requirements.txt && pytest tests/e2e -p no:homeassistant`
+  (needs Docker; logs land in `tests/e2e/.artifacts/`).
+
+Rules:
+
+* The simulator does **not** import `const.py`: its addresses and behaviour
+  come from `references/MODBUS_REGISTERS.md` (`tests/sim/registers.py`,
+  `tests/sim/device.py`), so a wrong address in the integration fails a test
+  instead of being mirrored. When the device docs change, change the model.
+* Seeds are real-device dumps in `tests/devices/<model>_<display|headless>_<state>.json`
+  (`diagnose_hrds.py --json` output); every file there is smoke-tested
+  automatically. Overlays (`tests/sim/overlays/`) patch a seed for setups
+  without a dump yet.
+* The PM20 -> fan output mapping is unconfirmed, so the simulator offers
+  `fan_model` = `rescale` (default) / `clamp` / `direct`; fan tests cover all
+  three.
+* A behaviour change needs a scenario in `tests/ha` (and in `tests/e2e` when it
+  is user-visible). `tests/ha/snapshots/` holds per-profile entity-state
+  snapshots: `pytest tests/ha/test_seeds.py --snapshot-update`, then review.
+
 ## Linting
 
 ```
@@ -310,12 +350,32 @@ ruff format .
 ## CI
 
 GitHub Actions (in `.github/workflows/`):
-* `lint.yaml` — Ruff lint + format check (Python).
+* `lint.yaml` — Ruff lint + format check (Python), wiring check.
 * `hassfest.yaml` — Home Assistant manifest/translation validation.
 * `hacs.yaml` — HACS repository validation (also daily); ignores `brands` (the
   images ship locally in `brand/`, see below, rather than in the HACS brands repo).
-* `release.yaml` — on a published release: hassfest, hacs, then a `package` job
-  that stamps the tag into `manifest.json` (`.github/scripts/update_hacs_manifest.py`),
+* `tests.yaml` — in-process tests + coverage (see **Tests**).
+* `e2e.yaml` — the integration in a real HA container against simulators;
+  nightly also against the `beta` image (allowed to fail).
+* **Triggers** (so nothing runs twice): lint, hassfest, hacs, tests and e2e run
+  on `pull_request` and on `push` to `main` only (plus `workflow_dispatch`;
+  hacs daily, e2e nightly incl. `beta`). A plain `push:` is never used, since a
+  branch with an open PR would run every workflow for both events. tests and e2e
+  also run from `release.yaml` (`workflow_call`) on the tagged commit before the
+  zip is built. tests/e2e cancel a superseded PR run (`concurrency`).
+* **Branch protection is a GitHub setting, not a file** — keep it as follows
+  (Settings -> Rules -> Rulesets, target the default branch, enforcement active):
+  require a pull request (0 approvals; the owner merges their own), require the
+  checks `ruff`, `hassfest`, `hacs`, `pytest`, `e2e (pinned)` to pass, block
+  force pushes and deletion, no bypass actors, squash merge only. Only people
+  with write access can merge, so keep the owner the sole collaborator with
+  write; Actions -> General -> workflow permissions "read", and approve fork PR
+  workflows manually.
+* `lint.yaml` also runs `tests/wiring_check.py`. Dependabot bumps the HA
+  image, `requirements_test.txt` and `tests/e2e/requirements.txt`; keep the
+  image and `pytest-homeassistant-custom-component` on the same HA release.
+* `release.yaml` — on a published release: hassfest, hacs, the two test
+  workflows above, then a `package` job (only if all pass) that stamps the tag into `manifest.json` (`.github/scripts/update_hacs_manifest.py`),
   zips `custom_components/innova_hrds` and attaches `innova_hrds.zip` to the
   release. `hacs.json` has `zip_release` + `filename` so HACS installs that asset.
 

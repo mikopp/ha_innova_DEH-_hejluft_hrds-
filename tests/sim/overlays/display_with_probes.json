@@ -1,0 +1,6 @@
+{
+  "description": "Unit with a CNU2 display (switched on) and wired room probes: AI2 = room temperature (HA02 = 45), AI3 = room humidity (HA03 = 53). No real dump of such a unit exists yet; replace with one in tests/devices/ when available.",
+  "meta": {"display": true},
+  "input": {"499": 225, "505": 55},
+  "holding": {"1805": 45, "1806": 53}
+}

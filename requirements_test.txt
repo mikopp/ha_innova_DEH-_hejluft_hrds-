@@ -1,0 +1,7 @@
+# In-process test layer (tests/sim, tests/ha, tests/test_wiring.py).
+# pytest-homeassistant-custom-component pins one exact Home Assistant release;
+# keep it on the latest one (Dependabot bumps it together with
+# .github/ha-versions/Dockerfile). 0.13.373 = Home Assistant 2026.10.2.
+pytest-homeassistant-custom-component==0.13.373
+# The version Home Assistant ships (the manifest requires >=3.13.1; tests use the exact one).
+pymodbus==3.13.1

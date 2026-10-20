@@ -1,0 +1,13 @@
+# Test configuration only - the integration itself is packaged by HACS
+# (custom_components/innova_hrds/manifest.json), not from this file.
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+# diagnose_hrds.py and wiring_check.py are scripts, not test modules.
+addopts = "--ignore=tests/diagnose_hrds.py --ignore=tests/wiring_check.py"
+# The Docker layer only runs when asked for explicitly (it needs Docker and
+# starts a real Home Assistant container): pytest tests/e2e
+norecursedirs = ["tests/e2e/config"]
+timeout_func_only = true

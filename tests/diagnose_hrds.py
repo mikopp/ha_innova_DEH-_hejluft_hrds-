@@ -26,7 +26,7 @@ Examples:
     python3 tests/diagnose_hrds.py 192.168.1.50
     python3 tests/diagnose_hrds.py 192.168.1.50 --port 8899 --unit 1
     python3 tests/diagnose_hrds.py 192.168.1.50 --scan-ids 1-10
-    python3 tests/diagnose_hrds.py 192.168.1.50 --sweep 0-300,1700-1900 --json out.json
+    python3 tests/diagnose_hrds.py 192.168.1.50 --sweep 0-300,1700-1900 --json tests/devices/<model>_<display|headless>_<state>.json
     python3 tests/diagnose_hrds.py 192.168.1.50 --watch 300 --no-snapshot
 
 Besides the integration's own registers it takes a read-only SNAPSHOT of the
