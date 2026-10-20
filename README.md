@@ -247,6 +247,12 @@ parameter code, for example `number.hrds_installer_pc07_max_water_temperature...
    `https://github.com/mikopp/ha_innova_deh-_hejluft_hrds-`
 2. Install **Innova HRDS+ / hej.luft Dehumidifier** and restart Home Assistant.
 
+HACS installs the `innova_hrds.zip` asset attached to each
+[GitHub release](https://github.com/mikopp/ha_innova_deh-_hejluft_hrds-/releases);
+the release workflow stamps the release tag into `manifest.json` before zipping,
+so the version Home Assistant shows is the release version. Updates appear in
+HACS when a new release is published.
+
 ### Manual
 
 Copy `custom_components/innova_hrds/` into your Home Assistant
@@ -620,8 +626,9 @@ for full probe specifications, wiring, and the HA00/PH01 configuration detail.
 
 ## Requirements
 
-* **Home Assistant 2026.9 or newer.**
-* `pymodbus` 3.13.1 (pinned in the manifest to match what HA 2026.9 ships).
+* **Home Assistant 2026.10 or newer.**
+* `pymodbus` 3.13.1 or newer (a minimum version in the manifest, as hassfest
+  requires for packages Home Assistant itself ships; HA 2026.10 ships 3.13.1).
 
 ### Availability
 
