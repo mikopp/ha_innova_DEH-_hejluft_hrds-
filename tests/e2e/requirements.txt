@@ -1,7 +1,7 @@
 # Docker e2e layer: no Home Assistant install needed on the runner, it runs in
 # the container (.github/ha-versions/Dockerfile).
 pymodbus==3.13.1
-pytest==9.0.3
+pytest==9.1.1
 pytest-timeout==2.4.0
 pytest-github-actions-annotate-failures==0.3.0
 requests==2.34.2
