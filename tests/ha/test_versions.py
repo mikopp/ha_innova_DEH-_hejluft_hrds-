@@ -14,7 +14,7 @@ import re
 from importlib.metadata import version
 from pathlib import Path
 
-import homeassistant.components.modbus
+import homeassistant
 from homeassistant.const import MAJOR_VERSION, MINOR_VERSION
 
 DOCKERFILE = Path(__file__).parents[2] / ".github" / "ha-versions" / "Dockerfile"
@@ -34,7 +34,11 @@ def test_in_process_ha_matches_docker_image():
 
 
 def test_pymodbus_matches_home_assistant():
-    manifest = Path(homeassistant.components.modbus.__file__).with_name("manifest.json")
+    # Read the file instead of importing the component: importing it needs
+    # modbus_connection, which is not installed.
+    manifest = (
+        Path(homeassistant.__file__).parent / "components" / "modbus" / "manifest.json"
+    )
     wanted = [
         r.partition("==")[2]
         for r in json.loads(manifest.read_text())["requirements"]
