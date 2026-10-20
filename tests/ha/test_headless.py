@@ -5,7 +5,9 @@ from __future__ import annotations
 import pytest
 from homeassistant.components.climate import ClimateEntityFeature
 from homeassistant.exceptions import ServiceValidationError
+from homeassistant.helpers import entity_registry as er
 
+from custom_components.innova_hrds.const import DOMAIN
 from tests.sim import registers as R
 
 from .conftest import CLIMATE, add_entry, allow_operation, set_hvac_mode
@@ -87,6 +89,55 @@ async def test_enables_ignored_by_device_are_reported(hass, sim, clock):
     s = await add_entry(hass, sim)
     await clock.poll()
     assert "modbus_enables_pending" in _issues(s)
+
+
+async def test_probe_inputs_are_named_options(setup, clock):
+    s = setup
+    temp = s.state("select", "ai2_allocation")
+    assert temp.state == "unused"
+    assert temp.attributes["options"] == ["unused", "room_temperature_ntc"]
+    s.device.clear_write_log()
+    await s.service(
+        "select", "select_option", "ai2_allocation", option="room_temperature_ntc"
+    )
+    await s.service(
+        "select", "select_option", "ai3_allocation", option="room_humidity_0_10v"
+    )
+    await clock.settle()
+    assert {w.address: w.value for w in s.device.write_log} == {
+        R.HA02_AI2: 45,
+        R.HA03_AI3: 54,
+    }
+    # Nothing is wired on this unit, so the setup check says so.
+    assert {"room_temperature_probe_missing", "room_humidity_probe_missing"} <= set(
+        _issues(s)
+    )
+
+
+async def test_undocumented_probe_code_is_flagged(setup, clock):
+    s = setup
+    s.device.holding[R.HA02_AI2] = 7
+    await clock.poll()
+    assert s.state("select", "ai2_allocation").state == "unknown"
+    assert "probe_input_unrecognised" in _issues(s)
+    assert "room_temperature_probe_missing" not in _issues(s)
+
+
+async def test_old_probe_numbers_are_removed(hass, sim):
+    # Up to 0.9.1 HA02/HA03 were number entities with the same unique id.
+    s = await add_entry(hass, sim)
+    registry = er.async_get(hass)
+    for key in ("ai2_allocation", "ai3_allocation"):
+        registry.async_get_or_create(
+            "number", DOMAIN, f"{s.entry.entry_id}-{key}", config_entry=s.entry
+        )
+    await hass.config_entries.async_reload(s.entry.entry_id)
+    await hass.async_block_till_done()
+    for key in ("ai2_allocation", "ai3_allocation"):
+        assert s.entity_id("number", key) is None, key
+        assert s.entity_id("select", key) is not None, key
+    await hass.config_entries.async_unload(s.entry.entry_id)
+    await hass.async_block_till_done()
 
 
 # ---- operation gate ----------------------------------------------------------

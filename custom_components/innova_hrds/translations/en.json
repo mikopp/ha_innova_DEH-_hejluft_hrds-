@@ -573,6 +573,21 @@
           "cnu2_temp_humidity": "CNU2 display (temperature + humidity)"
         }
       },
+      "ai2_allocation": {
+        "name": "T/H probe temperature input (AI2, HA02)",
+        "state": {
+          "unused": "Unused (no probe)",
+          "room_temperature_ntc": "Room temperature probe (NTC 10 kΩ)"
+        }
+      },
+      "ai3_allocation": {
+        "name": "T/H probe humidity input (AI3, HA03)",
+        "state": {
+          "unused": "Unused (no probe)",
+          "room_humidity_4_20ma": "Room humidity probe (4–20 mA)",
+          "room_humidity_0_10v": "Room humidity probe (0–10 V)"
+        }
+      },
       "winter_dehumidify": {
         "name": "Winter dehumidification",
         "state": {
@@ -642,12 +657,6 @@
       },
       "humidity_setpoint_max": {
         "name": "Humidity setpoint maximum"
-      },
-      "ai2_allocation": {
-        "name": "AI2 allocation (HA02)"
-      },
-      "ai3_allocation": {
-        "name": "AI3 allocation (HA03)"
       },
       "inst_pm00": {
         "name": "PM00 Fan hours alarm limit"
