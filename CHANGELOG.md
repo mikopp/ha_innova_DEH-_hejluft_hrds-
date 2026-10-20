@@ -4,6 +4,40 @@ All notable changes to this project are documented here, newest first.
 
 ---
 
+## 2026-10-20 (2)
+
+### fix: setup and installer devices use `via_device_id`
+
+* `via_device` is deprecated and stops working in Home Assistant 2027.8; HA
+  2026.10 already logged a warning at every setup. The main device is now
+  registered first and the setup and installer devices link to it with
+  `via_device_id` (also in the `DeviceInfo` of their entities).
+
+### test: each layer only tests what it alone can show
+
+* `tests/e2e` (real Home Assistant) is down from 40 to 15 tests and from about
+  6 to 2.5 minutes. About 34 repeated a scenario that `tests/ha` already covers
+  in-process; those are gone. What stays needs a real container, and every
+  test says why (`@pytest.mark.needs_real_ha("<reason>")`, enforced at
+  collection): the integration installed and loaded by HA itself, flows and
+  services as HTTP/JSON, the real scheduler, restarts, and the real log.
+* **Restart tests.** In-process (`tests/ha/test_restart.py`): a running unit is
+  left alone (only the required settings are written), season and fan setpoint
+  are untouched, a unit that lost its settings gets them back, booting before
+  the unit is reachable ends loaded by itself, the gate is restored, options
+  stay authoritative, user registry edits are kept, every entity comes back
+  identical. Real restarts (`tests/e2e/test_restart.py`, four container
+  restarts): the same contract from disk, including options, a renamed entity,
+  an enabled installer entity and the restored gate.
+* **Deprecation guards.** In-process: a test fails when HA logs a deprecation
+  naming this integration (this is what found `via_device`). Real HA: the whole
+  session's container log must be free of errors, tracebacks and deprecations
+  from the integration.
+* The test rules are documented in `tests/CLAUDE.md` (with short
+  `tests/ha/CLAUDE.md` and `tests/e2e/CLAUDE.md`); the main `CLAUDE.md` only
+  points there. A bare `pytest` no longer collects `tests/e2e`.
+* Removed the leftover `tests/out.json` (the dump lives in `tests/devices/`).
+
 ## 2026-10-20
 
 ### fix: entities show the primed read-back right after setup

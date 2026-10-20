@@ -71,3 +71,16 @@ probe faults, water circuit), and a unit with display and room probes.
 
 Open (xfail in `tests/ha/test_seeds.py`): the climate entity offers COOL on a
 unit without active cooling (PG02 = 0).
+
+## 5. Layering decision (2026-10-20)
+
+The first version ran every scenario in both layers. After it ran, the e2e
+layer had found no bug of its own and about 34 of its 40 tests repeated
+`tests/ha`. Decision: the in-process layer is the default; the real container
+only holds what an in-process HA cannot show, and each test says why
+(`needs_real_ha`, enforced at collection). Reasons: install path, HTTP/JSON
+surface, real scheduler, persistence over real restarts, boot order, runtime
+log. The restart contract (the initial setup survives a restart) is checked in
+both layers, from different sides: the code's behaviour on a fresh start
+in-process, the state coming back from disk after a real boot in e2e. Details:
+`tests/CLAUDE.md`.

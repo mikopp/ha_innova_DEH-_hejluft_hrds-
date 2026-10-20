@@ -235,9 +235,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hub.update_hidden_keys()
 
     # Register the devices up front, parent first: the setup and installer
-    # devices point at the main one via `via_device`, which must already exist.
+    # devices point at the main one via `via_device_id`, which needs its id.
     registry = dr.async_get(hass)
-    for info in build_device_infos(entry, hub):
+    main_info, _, _ = build_device_infos(entry, hub)
+    main_device = registry.async_get_or_create(
+        config_entry_id=entry.entry_id, **main_info
+    )
+    for info in build_device_infos(entry, hub, main_device.id)[1:]:
         registry.async_get_or_create(config_entry_id=entry.entry_id, **info)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

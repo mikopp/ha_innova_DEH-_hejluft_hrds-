@@ -57,6 +57,26 @@ class HomeAssistant:
             time.sleep(1)
         raise TimeoutError(f"Home Assistant not ready after {timeout}s: {last!r}")
 
+    def wait_running(self, timeout: float = 300) -> None:
+        """Wait until Home Assistant reports it is fully started (after a restart).
+
+        The API answers long before that; entries are still being set up.
+        """
+        deadline = time.monotonic() + timeout
+        last: object = None
+        while time.monotonic() < deadline:
+            try:
+                resp = requests.get(
+                    f"{self.base_url}/api/config", headers=self._headers, timeout=5
+                )
+                if resp.status_code == 200 and resp.json().get("state") == "RUNNING":
+                    return
+                last = resp.status_code
+            except requests.RequestException as exc:
+                last = exc
+            time.sleep(1)
+        raise TimeoutError(f"Home Assistant not running after {timeout}s: {last!r}")
+
     def onboard(self, username: str = "ci", password: str = "ci-password") -> None:
         """Create the owner user, log in and swap to a long-lived token."""
         resp = requests.post(
@@ -144,13 +164,28 @@ class HomeAssistant:
     def flow_configure(self, flow_id: str, data: dict) -> dict:
         return self.post(f"/api/config/config_entries/flow/{flow_id}", data)
 
-    def options_flow(self, entry_id: str, data: dict) -> dict:
-        flow = self.post(
+    def options_flow_start(self, entry_id: str) -> dict:
+        """Open the options form; the reply carries the form schema."""
+        return self.post(
             "/api/config/config_entries/options/flow", {"handler": entry_id}
         )
-        return self.post(
-            f"/api/config/config_entries/options/flow/{flow['flow_id']}", data
+
+    def options_flow_configure(self, flow_id: str, data: dict) -> dict:
+        return self.post(f"/api/config/config_entries/options/flow/{flow_id}", data)
+
+    def options_flow_abort(self, flow_id: str) -> None:
+        requests.delete(
+            f"{self.base_url}/api/config/config_entries/options/flow/{flow_id}",
+            headers=self._headers,
+            timeout=DEFAULT_TIMEOUT,
         )
+
+    def options_flow(self, entry_id: str, data: dict) -> dict:
+        flow = self.options_flow_start(entry_id)
+        return self.options_flow_configure(flow["flow_id"], data)
+
+    def reload_entry(self, entry_id: str) -> None:
+        self.post(f"/api/config/config_entries/entry/{entry_id}/reload")
 
     def config_entries(self, domain: str) -> list[dict]:
         return self.get(f"/api/config/config_entries/entry?domain={domain}")
@@ -211,6 +246,15 @@ class HomeAssistant:
 
     def device_registry(self) -> list[dict]:
         return self.ws({"type": "config/device_registry/list"})
+
+    def entity_registry_update(self, entity_id: str, **changes: Any) -> dict:
+        return self.ws(
+            {
+                "type": "config/entity_registry/update",
+                "entity_id": entity_id,
+                **changes,
+            }
+        )
 
     # ---- assertions ----------------------------------------------------------
     def assert_entity_state(

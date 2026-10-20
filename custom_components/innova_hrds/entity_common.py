@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Type, TypeVar
 
 from homeassistant.const import CONF_NAME
 from homeassistant.core import callback
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 
@@ -94,8 +95,15 @@ class HubBackedEntity(Entity):
         """Map the hub payload onto entity attributes (override in subclasses)."""
 
 
-def build_device_infos(entry, hub) -> tuple[DeviceInfo, DeviceInfo, DeviceInfo]:
+def build_device_infos(
+    entry, hub, main_device_id: str | None = None
+) -> tuple[DeviceInfo, DeviceInfo, DeviceInfo]:
     """Return (main, setup, installer) device infos for a config entry.
+
+    ``main_device_id`` is the registry id of the main device; the two child
+    devices link to it with ``via_device_id`` (``via_device`` is deprecated and
+    goes away in Home Assistant 2027.8). Leave it out only to build the main
+    device itself, before there is an id.
 
     The device page then separates: the operational surface and post-setup
     configuration on the main device; everything the user must check once
@@ -118,15 +126,16 @@ def build_device_infos(entry, hub) -> tuple[DeviceInfo, DeviceInfo, DeviceInfo]:
         name=f"{name} setup",
         manufacturer=ATTR_MANUFACTURER,
         model="Setup and installer configuration",
-        via_device=(DOMAIN, entry.entry_id),
     )
     installer = DeviceInfo(
         identifiers={(DOMAIN, entry.entry_id + INSTALLER_DEVICE_SUFFIX)},
         name=f"{name} installer",
         manufacturer=ATTR_MANUFACTURER,
         model="Installer menu parameters",
-        via_device=(DOMAIN, entry.entry_id),
     )
+    if main_device_id is not None:
+        setup["via_device_id"] = main_device_id
+        installer["via_device_id"] = main_device_id
     return main, setup, installer
 
 
@@ -134,7 +143,11 @@ def get_hub_and_device_info(hass, entry) -> tuple:
     """Return (hub_name, hub, {main, setup, installer} device infos)."""
     hub_name = entry.options.get(CONF_NAME, entry.data[CONF_NAME])
     hub = entry.runtime_data
-    return hub_name, hub, build_device_infos(entry, hub)
+    # The main device is registered in async_setup_entry before the platforms.
+    main = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, entry.entry_id), entry.entry_id
+    )
+    return hub_name, hub, build_device_infos(entry, hub, main.id if main else None)
 
 
 def device_info_for(key: str, devices: tuple) -> DeviceInfo:
