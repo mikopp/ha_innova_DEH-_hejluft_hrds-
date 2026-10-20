@@ -9,8 +9,11 @@ asyncio_default_fixture_loop_scope = "function"
 addopts = "--ignore=tests/diagnose_hrds.py --ignore=tests/wiring_check.py"
 # The Docker layer only runs when asked for explicitly (it needs Docker and
 # starts a real Home Assistant container): pytest tests/e2e
-norecursedirs = ["tests/e2e/config"]
+norecursedirs = ["tests/e2e", "tests/e2e/config"]
 timeout_func_only = true
+markers = [
+    "needs_real_ha(reason): why this test must run in a real Home Assistant (tests/e2e only, see tests/CLAUDE.md)",
+]
 # A deprecation raised from this integration's own code is a failure; the ones
 # Home Assistant reports through its log are caught by tests/ha/conftest.py.
 filterwarnings = ["error::DeprecationWarning:custom_components"]
