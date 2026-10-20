@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://github.com/mikopp/ha_innova_DEH-_hejluft_hrds-#readme
+    about: Setup, first-use checklist and entity reference.

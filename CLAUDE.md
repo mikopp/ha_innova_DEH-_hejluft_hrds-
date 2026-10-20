@@ -355,6 +355,12 @@ Releasing: publish a GitHub release whose tag is `vX.Y.Z`. The release must carr
 `innova_hrds.zip` or HACS cannot install it, so if the `package` job fails, fix it
 and re-run rather than leaving the release without the asset.
 
+The tag must be `vX.Y.Z` (the stamp script rejects `v0.9`). Publish a normal
+release, not a GitHub pre-release: HACS hides pre-releases by default. Before a
+release, set `manifest.json`'s version, add a `CHANGELOG.md` entry (its text is the
+release body) and check the README status banner and "Road to 1.0" section; drop
+the beta wording at 1.0.
+
 ### Brand images
 
 `custom_components/innova_hrds/brand/` holds `icon.png` (256²), `icon@2x.png`
