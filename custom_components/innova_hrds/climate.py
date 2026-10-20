@@ -2,8 +2,13 @@
 
 This entity is not backed by a single register. It aggregates several status
 registers for display (temperature, humidity, HVAC action) and translates the
-selected HVAC mode into the unit's on/off + dehumidify + active-cooling request
+selected HVAC mode into the unit's on/off + dehumidify + integration request
 registers.
+
+The unit has two requests: dehumidify (DEU) and integration (INT). INT
+dehumidifies *and* cools in summer but heats in winter, so the offered modes
+follow the season: Cool only in summer, Heat only in winter and only when the
+user enabled winter heating (never on a brine circuit).
 """
 
 from __future__ import annotations
@@ -12,6 +17,7 @@ import logging
 
 from homeassistant.components.climate import (
     ClimateEntity,
+    ClimateEntityFeature,
     HVACAction,
     HVACMode,
 )
@@ -30,6 +36,7 @@ from .const import (
     C_TEMP_PROBE_OK,
     C_UNIT_ON_OFF,
     C_UNIT_STATUS,
+    C_WINTER_SETPOINT,
     CLIMATE_CURRENT_HUMIDITY,
     CLIMATE_CURRENT_TEMP,
     CLIMATE_MAX_HUMIDITY,
@@ -87,12 +94,14 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
     def __init__(self, platform_name, hub, device_info, description):
         super().__init__(platform_name, hub, device_info, description)
         self._attr_temperature_unit = description.temperature_unit
-        self._attr_supported_features = description.supported_features
-        self._attr_hvac_modes = [
-            HVACMode.OFF,
-            HVACMode.DRY,
-            HVACMode.COOL,
-        ]
+        features = description.supported_features
+        # Without a room probe the unit ignores its setpoints: do not offer them.
+        if not hub.show_temperature_target:
+            features &= ~ClimateEntityFeature.TARGET_TEMPERATURE
+        if not hub.show_humidity_target:
+            features &= ~ClimateEntityFeature.TARGET_HUMIDITY
+        self._attr_supported_features = features
+        self._attr_hvac_modes = self._modes_for(hub.season)
         self._attr_hvac_mode = HVACMode.OFF
         self._attr_hvac_action = HVACAction.OFF
         self._attr_min_temp = 15.0
@@ -103,28 +112,36 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
         self._attr_fan_modes = _FAN_MODES
         self._attr_fan_mode = _FAN_OFF
 
+    def _modes_for(self, season) -> list[HVACMode]:
+        modes = [HVACMode.OFF, HVACMode.DRY]
+        if season == "summer":
+            modes.append(HVACMode.COOL)
+        elif season == "winter" and self._hub.allow_winter_heating:
+            modes.append(HVACMode.HEAT)
+        return modes
+
     @callback
     def _on_hub_update(self) -> None:
         data = self._hub.data
+        self._attr_hvac_modes = self._modes_for(self._hub.season)
 
-        # Suppress temperature/humidity readings when the unit reports a probe
-        # fault (AL28 / AL34). probe_ok == "off" means the alarm is active.
-        # probe_ok == None means no alarm data yet — show reading if available.
-        temp_ok = data.get(C_TEMP_PROBE_OK)
-        if temp_ok == "off":
+        # No reading when the unit reports a probe fault (AL28 / AL34;
+        # probe_ok == "off" means the alarm is active) or when the input carries
+        # the unwired-probe sentinel (the hub decodes that to None). Never keep
+        # the previous value: a probe that disappears must not leave a stale
+        # temperature on the card. probe_ok == None (no alarm data yet) is
+        # treated as healthy.
+        temp = data.get(CLIMATE_CURRENT_TEMP)
+        if data.get(C_TEMP_PROBE_OK) == "off" or temp is None:
             self._attr_current_temperature = None
         else:
-            temp = data.get(CLIMATE_CURRENT_TEMP)
-            if temp is not None:
-                self._attr_current_temperature = float(temp)
+            self._attr_current_temperature = float(temp)
 
-        hum_ok = data.get(C_HUMIDITY_PROBE_OK)
-        if hum_ok == "off":
+        hum = data.get(CLIMATE_CURRENT_HUMIDITY)
+        if data.get(C_HUMIDITY_PROBE_OK) == "off" or hum is None:
             self._attr_current_humidity = None
         else:
-            hum = data.get(CLIMATE_CURRENT_HUMIDITY)
-            if hum is not None:
-                self._attr_current_humidity = int(hum)
+            self._attr_current_humidity = int(hum)
 
         # Advertise the unit's own PU01 clamps (PH29/PH30) instead of a guess.
         hum_min = data.get(CLIMATE_MIN_HUMIDITY)
@@ -137,7 +154,10 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
         if target_hum is not None:
             self._attr_target_humidity = int(target_hum)
 
-        target_temp = data.get(CLIMATE_TARGET_TEMP)
+        # SEtC drives summer integration, SEtH winter integration.
+        target_temp = data.get(
+            C_WINTER_SETPOINT if self._hub.season == "winter" else CLIMATE_TARGET_TEMP
+        )
         if target_temp is not None:
             self._attr_target_temperature = float(target_temp)
 
@@ -150,7 +170,7 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
         if data.get(C_UNIT_ON_OFF) != "on" and data.get(C_UNIT_STATUS) != "on":
             return HVACMode.OFF
         if data.get(C_ACTIVE_COOLING) == "on":
-            return HVACMode.COOL
+            return HVACMode.HEAT if self._hub.season == "winter" else HVACMode.COOL
         return HVACMode.DRY
 
     def _derive_fan_mode(self, data) -> str:
@@ -175,12 +195,12 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
     def _derive_action(self, data) -> HVACAction:
         if data.get(C_UNIT_STATUS) != "on":
             return HVACAction.OFF
+        integration = data.get(C_ACTIVE_COOLING) == "on"
+        if integration and self._hub.season == "winter":
+            # Winter integration: compressor off, warm water through the coil.
+            return HVACAction.HEATING
         if data.get(C_COMPRESSOR_STATUS) == "on":
-            return (
-                HVACAction.COOLING
-                if data.get(C_ACTIVE_COOLING) == "on"
-                else HVACAction.DRYING
-            )
+            return HVACAction.COOLING if integration else HVACAction.DRYING
         if data.get(C_DEHUM_REQUEST) == "on":
             return HVACAction.DRYING
         return HVACAction.IDLE
@@ -191,13 +211,17 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
             await self._hub.write_entity_value(C_UNIT_ON_OFF, 0)
             return
 
-        await self._hub.write_entity_value(C_UNIT_ON_OFF, 1)
-        if hvac_mode == HVACMode.COOL:
+        # Requests first: the hub refuses heating (or brine winter dehumidify)
+        # before the unit is switched on.
+        if hvac_mode in (HVACMode.COOL, HVACMode.HEAT):
             await self._hub.write_entity_value(C_ACTIVE_COOLING, 1)
-            await self._hub.write_entity_value(C_DEHUMIDIFY, 1)
+            await self._hub.write_entity_value(
+                C_DEHUMIDIFY, 1 if hvac_mode == HVACMode.COOL else 0
+            )
         elif hvac_mode == HVACMode.DRY:
             await self._hub.write_entity_value(C_ACTIVE_COOLING, 0)
             await self._hub.write_entity_value(C_DEHUMIDIFY, 1)
+        await self._hub.write_entity_value(C_UNIT_ON_OFF, 1)
 
     async def async_turn_on(self) -> None:
         await self.async_set_hvac_mode(HVACMode.DRY)
@@ -216,7 +240,12 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
     async def async_set_temperature(self, **kwargs) -> None:
         temp = kwargs.get(ATTR_TEMPERATURE)
         if temp is not None:
-            await self._hub.write_entity_value(CLIMATE_TARGET_TEMP, temp)
+            await self._hub.write_entity_value(
+                C_WINTER_SETPOINT
+                if self._hub.season == "winter"
+                else CLIMATE_TARGET_TEMP,
+                temp,
+            )
 
     async def async_set_humidity(self, humidity: int) -> None:
         await self._hub.write_entity_value(CLIMATE_TARGET_HUMIDITY, humidity)

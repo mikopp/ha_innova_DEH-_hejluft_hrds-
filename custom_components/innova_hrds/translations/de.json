@@ -8,13 +8,26 @@
           "port": "Port",
           "hostid": "Modbus-Slave-ID",
           "scan_interval": "Abfrageintervall",
-          "model": "Modell (30 = HRDS+30, 50 = HRDS+50)"
+          "model": "Modell (30 = HRDS+30, 50 = HRDS+50)",
+          "has_display": "Ein verdrahtetes CNU2-Display ist angeschlossen",
+          "water_circuit": "Wasserregister angeschlossen an",
+          "allow_winter_heating": "Heizen im Winter erlauben (Integrationsanforderung im Winter)",
+          "brine_temperature_entity": "Sensor für den Sole-Temperaturwächter",
+          "brine_min_temperature": "Mindesttemperatur des Sole-Temperaturwächters"
+        },
+        "data_description": {
+          "water_circuit": "Ein Solekreis (Erdwärmepumpe) kann nicht heizen und darf im Winter nicht entfeuchten.",
+          "allow_winter_heating": "Im Winter heizt die Integrationsanforderung die Luft mit Wasser aus dem Heizkreis. Standardmäßig aus; bei Solekreis ohne Wirkung.",
+          "brine_temperature_entity": "Optional. Ein Temperatursensor am Sole-Vorlauf (z. B. von der Wärmepumpe). Ist er gesetzt, starten Entfeuchtungs- und Integrationsanforderungen nur, solange er mindestens die Mindesttemperatur meldet und sich in den letzten 24 h gemeldet hat – in jeder Saison. Bei Solekreis ist er Voraussetzung für Entfeuchten im Winter.",
+          "brine_min_temperature": "Niedrigste Soletemperatur, bei der eine Anforderung starten darf."
         }
       }
     },
     "error": {
       "already_configured": "Dieser Host ist bereits konfiguriert",
-      "invalid_host": "Ungültiger Host oder ungültige IP-Adresse"
+      "invalid_host": "Ungültiger Host oder ungültige IP-Adresse",
+      "cannot_connect": "Gerät nicht erreichbar. Host, Port und Modbus-Slave-ID prüfen",
+      "wrong_device": "Das Gerät unter dieser Adresse ist kein HRDS+ (EVCO-EPB9-Regler)"
     }
   },
   "options": {
@@ -27,32 +40,88 @@
           "hostid": "Modbus-Slave-ID",
           "scan_interval": "Abfrageintervall",
           "model": "Modell (30 = HRDS+30, 50 = HRDS+50)",
-          "airflow_max_m3h": "Zuluftventilator max. Volumenstrom (m³/h)"
+          "has_display": "Ein verdrahtetes CNU2-Display ist angeschlossen",
+          "airflow_max_m3h": "Zuluftventilator max. Volumenstrom (m³/h)",
+          "water_circuit": "Wasserregister angeschlossen an",
+          "allow_winter_heating": "Heizen im Winter erlauben (Integrationsanforderung im Winter)",
+          "brine_temperature_entity": "Sensor für den Sole-Temperaturwächter",
+          "brine_min_temperature": "Mindesttemperatur des Sole-Temperaturwächters"
+        },
+        "data_description": {
+          "water_circuit": "Ein Solekreis (Erdwärmepumpe) kann nicht heizen und darf im Winter nicht entfeuchten.",
+          "allow_winter_heating": "Im Winter heizt die Integrationsanforderung die Luft mit Wasser aus dem Heizkreis. Standardmäßig aus; bei Solekreis ohne Wirkung.",
+          "brine_temperature_entity": "Optional. Ein Temperatursensor am Sole-Vorlauf (z. B. von der Wärmepumpe). Ist er gesetzt, starten Entfeuchtungs- und Integrationsanforderungen nur, solange er mindestens die Mindesttemperatur meldet und sich in den letzten 24 h gemeldet hat – in jeder Saison. Bei Solekreis ist er Voraussetzung für Entfeuchten im Winter.",
+          "brine_min_temperature": "Niedrigste Soletemperatur, bei der eine Anforderung starten darf."
         }
       }
+    },
+    "error": {
+      "cannot_connect": "Gerät nicht erreichbar. Host, Port und Modbus-Slave-ID prüfen",
+      "wrong_device": "Das Gerät unter dieser Adresse ist kein HRDS+ (EVCO-EPB9-Regler)"
     }
   },
   "entity": {
     "climate": {
-      "hrds_climate": { "name": "Klima" }
+      "hrds_climate": {
+        "name": "Klima"
+      }
     },
     "sensor": {
-      "room_temperature": { "name": "Raumtemperatur" },
-      "outdoor_temperature": { "name": "Außentemperatur" },
-      "water_temperature": { "name": "Wassertemperatur" },
-      "supply_temperature": { "name": "Zulufttemperatur" },
-      "room_humidity": { "name": "Raumluftfeuchtigkeit" },
-      "air_quality": { "name": "Luftqualität" },
-      "actual_setpoint": { "name": "Aktiver Sollwert" },
-      "supply_fan_output": { "name": "Zuluftventilator-Ausgang" },
-      "compressor_output": { "name": "Kompressor-Ausgang" },
-      "supply_fan_rpm": { "name": "Zuluftventilator-Drehzahl" },
-      "exhaust_temperature": { "name": "Fortlufttemperatur" },
-      "evaporator_temperature": { "name": "Verdampfertemperatur" },
-      "fan_manual_request": { "name": "Manuelle Lüfteranforderung (Display)" },
-      "max_total_airflow": { "name": "Max. Gesamt-Volumenstrom" },
-      "supply_fan_max_airflow": { "name": "Zuluftventilator max. Volumenstrom" },
-      "supply_fan_airflow": { "name": "Zuluftventilator Volumenstrom" },
+      "room_temperature": {
+        "name": "Raumtemperatur"
+      },
+      "outdoor_temperature": {
+        "name": "Außentemperatur"
+      },
+      "water_temperature": {
+        "name": "Wassertemperatur"
+      },
+      "supply_temperature": {
+        "name": "Zulufttemperatur"
+      },
+      "room_humidity": {
+        "name": "Raumluftfeuchtigkeit"
+      },
+      "air_quality": {
+        "name": "Luftqualität"
+      },
+      "actual_setpoint": {
+        "name": "Aktiver Sollwert"
+      },
+      "supply_fan_output": {
+        "name": "Zuluftventilator-Ausgang"
+      },
+      "compressor_output": {
+        "name": "Kompressor-Ausgang"
+      },
+      "supply_fan_rpm": {
+        "name": "Zuluftventilator-Drehzahl"
+      },
+      "exhaust_temperature": {
+        "name": "Fortlufttemperatur"
+      },
+      "evaporator_temperature": {
+        "name": "Verdampfertemperatur"
+      },
+      "fan_manual_request": {
+        "name": "Manuelle Lüfteranforderung (Display)"
+      },
+      "max_total_airflow": {
+        "name": "Max. Gesamt-Volumenstrom"
+      },
+      "supply_fan_max_airflow": {
+        "name": "Zuluftventilator max. Volumenstrom"
+      },
+      "supply_fan_airflow": {
+        "name": "Zuluftventilator Volumenstrom"
+      },
+      "machine_type": {
+        "name": "Maschinentyp (PG01)",
+        "state": {
+          "supply_fan_only": "Nur Zuluftventilator",
+          "supply_and_exhaust_fan": "Zuluft- und Abluftventilator"
+        }
+      },
       "recirculation_damper": {
         "name": "Umluft-Klappe",
         "state": {
@@ -113,31 +182,378 @@
           "winter": "Winter",
           "auto": "Automatik"
         }
+      },
+      "remote_onoff_input": {
+        "name": "Fern-EIN/AUS-Eingang (HB03)",
+        "state": {
+          "unused": "Nicht verwendet",
+          "normally_closed": "Öffner",
+          "normally_open": "Schließer"
+        }
+      },
+      "season_owner": {
+        "name": "Saisonumschaltung durch (PC11)",
+        "state": {
+          "display": "Display",
+          "digital_input": "Digitaleingang"
+        }
+      },
+      "temperature_unit": {
+        "name": "Temperatureinheit (PH05)",
+        "state": {
+          "celsius": "Celsius",
+          "fahrenheit": "Fahrenheit"
+        }
+      },
+      "fan_output_allocation": {
+        "name": "Zuordnung Zuluftventilator-Ausgang (HC04)"
+      },
+      "damper_relay_allocation": {
+        "name": "Zuordnung Relais Umluftklappe (HD01)"
+      },
+      "damper_prestart_time": {
+        "name": "Vorlaufzeit Klappe (PS01)"
+      },
+      "setup_check": {
+        "name": "Einrichtungsprüfung",
+        "state": {
+          "ok": "In Ordnung",
+          "attention": "Prüfen"
+        }
+      },
+      "water_valve_pump": {
+        "name": "Ausgang Wasserventil / Pumpe",
+        "state": {
+          "off": "Aus",
+          "on": "Ein",
+          "disabled": "Nicht konfiguriert"
+        }
+      },
+      "water_condenser_valve": {
+        "name": "Wasserkondensator-Ventil",
+        "state": {
+          "off": "Aus",
+          "on": "Ein",
+          "disabled": "Nicht konfiguriert"
+        }
+      },
+      "water_check": {
+        "name": "Prüfung Wasserkreis",
+        "state": {
+          "ok": "In Ordnung",
+          "attention": "Prüfen"
+        }
+      },
+      "inst_pm02": {
+        "name": "PM02 Betriebsstunden Abluftventilator"
+      },
+      "inst_pm04": {
+        "name": "PM04 Betriebsstunden Kompressor"
+      },
+      "inst_pm21": {
+        "name": "PM21 Kompressorbetrieb erzwungen"
+      },
+      "inst_pm89": {
+        "name": "PM89 Kalibrierung Drucksensor"
+      },
+      "inst_pe05": {
+        "name": "PE05 Umgehung Kompressor-Sicherheitszeiten"
+      },
+      "inst_ph11": {
+        "name": "PH11 Modbus-Adresse"
+      },
+      "inst_ph12": {
+        "name": "PH12 Modbus-Baudrate (Code)"
+      },
+      "inst_ph13": {
+        "name": "PH13 Modbus-Parität (Code)"
+      },
+      "inst_ph14": {
+        "name": "PH14 Modbus-Stoppbits (Code)"
+      },
+      "inst_ph06": {
+        "name": "PH06 Druckeinheit (0 bar, 1 psi)"
+      },
+      "inst_ph16": {
+        "name": "PH16 CAN-Baudrate (Code)"
+      },
+      "inst_ph17": {
+        "name": "PH17 CAN-Knoten"
+      },
+      "inst_ph19": {
+        "name": "PH19 Min. Wert Luftqualitätsfühler"
+      },
+      "inst_ph20": {
+        "name": "PH20 Max. Wert Luftqualitätsfühler"
+      },
+      "inst_ph21": {
+        "name": "PH21 Min. Wert Drucksensor"
+      },
+      "inst_ph22": {
+        "name": "PH22 Max. Wert Drucksensor"
+      },
+      "inst_ph24": {
+        "name": "PH24 Min. Wert Verdampfungsdruck"
+      },
+      "inst_ph25": {
+        "name": "PH25 Max. Wert Verdampfungsdruck"
+      },
+      "inst_ph26": {
+        "name": "PH26 Kältemittel (Code)"
+      },
+      "inst_pg04": {
+        "name": "PG04 Typ Wärmerückgewinner"
+      },
+      "inst_pg05": {
+        "name": "PG05 Erweiterungsmodul"
+      },
+      "inst_ha01": {
+        "name": "HA01 Zuordnung AI1 (Lüfter-Potentiometer)"
+      },
+      "inst_ha04": {
+        "name": "HA04 Zuordnung AI4 (Verdampfertemperatur)"
+      },
+      "inst_ha05": {
+        "name": "HA05 Zuordnung AI5 (Wassertemperatur)"
+      },
+      "inst_ha06": {
+        "name": "HA06 Zuordnung AI6 (Entfeuchtungsanforderung)"
+      },
+      "inst_ha07": {
+        "name": "HA07 Zuordnung AI7 (Integrationsanforderung)"
+      },
+      "inst_ha08": {
+        "name": "HA08 Zuordnung AI1 Epj"
+      },
+      "inst_ha09": {
+        "name": "HA09 Zuordnung AI2 Epj"
+      },
+      "inst_ha10": {
+        "name": "HA10 Zuordnung AI1 Erweiterung"
+      },
+      "inst_ha11": {
+        "name": "HA11 Zuordnung AI2 Erweiterung"
+      },
+      "inst_ha12": {
+        "name": "HA12 Zuordnung AI3 Erweiterung"
+      },
+      "inst_ha13": {
+        "name": "HA13 Zuordnung AI4 Erweiterung"
+      },
+      "inst_ha14": {
+        "name": "HA14 Zuordnung AI5 Erweiterung"
+      },
+      "inst_ha15": {
+        "name": "HA15 Zuordnung AI6 Erweiterung"
+      },
+      "inst_ha16": {
+        "name": "HA16 Zuordnung AI7 Erweiterung"
+      },
+      "inst_ha17": {
+        "name": "HA17 Zuordnung AI1 Evj"
+      },
+      "inst_ha18": {
+        "name": "HA18 Zuordnung AI2 Evj"
+      },
+      "inst_hb01": {
+        "name": "HB01 Zuordnung DI1 (Hochdruck)"
+      },
+      "inst_hb02": {
+        "name": "HB02 Zuordnung DI2 (Niederdruck)"
+      },
+      "inst_hb05": {
+        "name": "HB05 Zuordnung DI1 Erweiterung"
+      },
+      "inst_hb06": {
+        "name": "HB06 Zuordnung DI2 Erweiterung"
+      },
+      "inst_hb07": {
+        "name": "HB07 Zuordnung DI3 Erweiterung"
+      },
+      "inst_hc01": {
+        "name": "HC01 Zuordnung AO1 (Kompressor)"
+      },
+      "inst_hc02": {
+        "name": "HC02 Zuordnung AO2"
+      },
+      "inst_hc03": {
+        "name": "HC03 Zuordnung AO3"
+      },
+      "inst_hc05": {
+        "name": "HC05 Zuordnung AO1 Erweiterung"
+      },
+      "inst_hc06": {
+        "name": "HC06 Zuordnung AO2 Erweiterung"
+      },
+      "inst_hcf1": {
+        "name": "HCF1 PWM-Frequenz Zuluftventilator"
+      },
+      "inst_hcf2": {
+        "name": "HCF2 PWM-Frequenz Abluftventilator"
+      },
+      "inst_hcf3": {
+        "name": "HCF3 PWM-Frequenz Kompressor"
+      },
+      "inst_hd02": {
+        "name": "HD02 Zuordnung DO2 (schwerer Alarm)"
+      },
+      "inst_hd03": {
+        "name": "HD03 Zuordnung DO3 (VMC-Kontakt)"
+      },
+      "inst_hd04": {
+        "name": "HD04 Zuordnung DO4 (Wasserkondensationsventil)"
+      },
+      "inst_hd05": {
+        "name": "HD05 Zuordnung DO5 (externes Wasserventil / Pumpe)"
+      },
+      "inst_hd06": {
+        "name": "HD06 Zuordnung DO6 (Kompressor)"
+      },
+      "inst_hd07": {
+        "name": "HD07 Zuordnung DO1 Erweiterung"
+      },
+      "inst_hd08": {
+        "name": "HD08 Zuordnung DO2 Erweiterung"
+      },
+      "inst_hd09": {
+        "name": "HD09 Zuordnung DO3 Erweiterung"
+      },
+      "inst_hd10": {
+        "name": "HD10 Zuordnung DO4 Erweiterung"
+      },
+      "inst_hd11": {
+        "name": "HD11 Zuordnung Open-Collector Erweiterung"
+      },
+      "inst_pt01": {
+        "name": "PT01 Testmodus aktiv"
+      },
+      "inst_pt02": {
+        "name": "PT02 Zuluftgeschwindigkeit im Testmodus"
+      },
+      "inst_pt03": {
+        "name": "PT03 Abluftgeschwindigkeit im Testmodus"
+      },
+      "inst_pt04": {
+        "name": "PT04 Außenluftklappe im Testmodus"
       }
     },
     "binary_sensor": {
-      "dehumidify_request": { "name": "Entfeuchtung angefordert" },
-      "recirculation_active": { "name": "Umluft aktiv" },
-      "alarm_active": { "name": "Alarm aktiv" },
-      "temp_probe_ok": { "name": "Raumtemperaturfühler OK" },
-      "humidity_probe_ok": { "name": "Raumfeuchtesensor OK" },
-      "has_recirculation": { "name": "Umluftventilator vorhanden" },
-      "active_cooling_available": { "name": "Aktive Kühlung verfügbar" },
-      "alarm_compressor_lowpressure": { "name": "Alarm: Kompressor Niederdruck / Frostschutz" },
-      "alarm_compressor_highpressure": { "name": "Alarm: Kompressor Hochdruck" },
-      "alarm_water_antifreeze": { "name": "Alarm: Wasserkreislauf Frostschutz" },
-      "alarm_dirty_filter": { "name": "Alarm: Filter verschmutzt" }
+      "dehumidify_request": {
+        "name": "Entfeuchtung angefordert"
+      },
+      "recirculation_active": {
+        "name": "Umluft aktiv"
+      },
+      "alarm_active": {
+        "name": "Alarm aktiv"
+      },
+      "temp_probe_ok": {
+        "name": "Raumtemperaturfühler OK"
+      },
+      "humidity_probe_ok": {
+        "name": "Raumfeuchtesensor OK"
+      },
+      "active_cooling_available": {
+        "name": "Aktive Kühlung verfügbar"
+      },
+      "alarm_compressor_lowpressure": {
+        "name": "Alarm: Kompressor Niederdruck / Frostschutz"
+      },
+      "alarm_compressor_highpressure": {
+        "name": "Alarm: Kompressor Hochdruck"
+      },
+      "alarm_water_antifreeze": {
+        "name": "Alarm: Wasserkreislauf Frostschutz"
+      },
+      "alarm_dirty_filter": {
+        "name": "Alarm: Filter verschmutzt"
+      },
+      "remote_contact_closed": {
+        "name": "Fern-EIN/AUS-Kontakt geschlossen"
+      },
+      "alarm_high_water_temperature": {
+        "name": "Alarm: hohe Wassertemperatur (AL03)"
+      },
+      "alarm_low_water_temperature": {
+        "name": "Alarm: niedrige Wassertemperatur (AL04)"
+      },
+      "brine_temperature_guard": {
+        "name": "Sole-Temperaturwächter"
+      }
     },
     "switch": {
-      "unit_on_off": { "name": "Gerät ein/aus (Modbus)" },
-      "dehumidify": { "name": "Entfeuchtung (Modbus)" },
-      "active_cooling": { "name": "Aktive Kühlung (Modbus)" },
-      "enable_onoff_bms": { "name": "Ein/Aus über Modbus freigeben" },
-      "enable_dehumidify_bms": { "name": "Entfeuchtung über Modbus freigeben" },
-      "enable_cooling_bms": { "name": "Kühlung über Modbus freigeben" },
-      "force_dehumidify_in_cooling": { "name": "Entfeuchtung bei Kühlung erzwingen" },
-      "enable_integration": { "name": "Integration (aktive Kühlung) freigeben" },
-      "enable_free_cooling": { "name": "Free-Cooling/Heating freigeben" }
+      "unit_on_off": {
+        "name": "Gerät ein/aus (Modbus)"
+      },
+      "dehumidify": {
+        "name": "Entfeuchtung (Modbus)"
+      },
+      "active_cooling": {
+        "name": "Integrationsanforderung (Sommer kühlen, Winter heizen)"
+      },
+      "enable_onoff_display": {
+        "name": "Ein/Aus über Display freigeben (PH01)"
+      },
+      "enable_onoff_bms": {
+        "name": "Ein/Aus über Modbus freigeben"
+      },
+      "enable_dehumidify_bms": {
+        "name": "Entfeuchtung über Modbus freigeben"
+      },
+      "enable_cooling_bms": {
+        "name": "Kühlung über Modbus freigeben"
+      },
+      "force_dehumidify_in_cooling": {
+        "name": "Entfeuchtung bei Kühlung erzwingen"
+      },
+      "enable_integration": {
+        "name": "Integration (aktive Kühlung) freigeben"
+      },
+      "enable_free_cooling": {
+        "name": "Free-Cooling/Heating freigeben"
+      },
+      "enable_time_programs": {
+        "name": "Zeitprogramme aktiv (PH03)"
+      },
+      "operation_allowed": {
+        "name": "Betriebsanforderungen erlauben"
+      },
+      "enable_onoff_by_di_request": {
+        "name": "Gerät EIN bei DI-Anforderung (PC12)"
+      },
+      "inst_pc01": {
+        "name": "PC01 Schnüffelzyklen Raumtemperatur"
+      },
+      "inst_pc04": {
+        "name": "PC04 Beide Ventilatoren im Schnüffelzyklus"
+      },
+      "inst_pf04": {
+        "name": "PF04 Zuluftventilator bei Abtauung stoppen"
+      },
+      "inst_pe33": {
+        "name": "PE33 Drehzahlregelung Kompressor"
+      },
+      "inst_pu03": {
+        "name": "PU03 Entfeuchtung bei Hochtemperaturalarm"
+      },
+      "inst_pu04": {
+        "name": "PU04 Entfeuchtung bei Alarm Wasserdurchfluss"
+      },
+      "inst_pu09": {
+        "name": "PU09 Kompressor als zweite Stufe"
+      },
+      "inst_pa01": {
+        "name": "PA01 Alarm Betriebsstunden Ventilatoren"
+      },
+      "inst_pa02": {
+        "name": "PA02 Alarm Betriebsstunden Kompressor"
+      },
+      "inst_pa52": {
+        "name": "PA52 Alarm Uhr (RTC)"
+      },
+      "inst_ph23": {
+        "name": "PH23 EVCO-LED"
+      }
     },
     "select": {
       "probe_source": {
@@ -159,28 +575,569 @@
           "with_water": "Mit Wasser",
           "without_water": "Ohne Wasser"
         }
+      },
+      "season": {
+        "name": "Saison",
+        "state": {
+          "summer": "Sommer",
+          "winter": "Winter"
+        }
       }
     },
     "fan": {
-      "hrds_supply_fan": { "name": "Zuluftventilator" }
+      "hrds_supply_fan": {
+        "name": "Zuluftventilator"
+      }
     },
     "number": {
-      "humidity_setpoint": { "name": "Feuchte-Sollwert" },
-      "summer_setpoint": { "name": "Sommer-Sollwert" },
-      "winter_setpoint": { "name": "Winter-Sollwert" },
-      "fan_min_speed_dehumidify": { "name": "Ventilator min. Drehzahl (Entfeuchtung)" },
-      "fan_max_speed_dehumidify": { "name": "Ventilator max. Drehzahl (Entfeuchtung)" },
-      "fan_min_speed_cooling": { "name": "Ventilator min. Drehzahl (Kühlung)" },
-      "fan_min_speed_vmc": { "name": "Ventilator min. Drehzahl (VMC)" },
-      "fan_max_speed_cooling": { "name": "Ventilator max. Drehzahl (Kühlung)" },
-      "fan_manual_speed": { "name": "Manuelle Ventilatordrehzahl" },
-      "dehumidify_differential": { "name": "Entfeuchtungs-Differenz" },
-      "min_room_temp_dehumidify": { "name": "Min. Raumtemperatur für Entfeuchtung" },
-      "min_room_temp_diff_dehumidify": { "name": "Min. Raumtemperatur-Differenz" },
-      "fan_min_runtime": { "name": "Lüfter-Mindestlaufzeit" },
-      "fan_post_run_time": { "name": "Lüfter-Nachlaufzeit" },
-      "humidity_setpoint_min": { "name": "Feuchte-Sollwert Minimum" },
-      "humidity_setpoint_max": { "name": "Feuchte-Sollwert Maximum" }
+      "humidity_setpoint": {
+        "name": "Feuchte-Sollwert"
+      },
+      "summer_setpoint": {
+        "name": "Sommer-Sollwert"
+      },
+      "winter_setpoint": {
+        "name": "Winter-Sollwert"
+      },
+      "fan_min_speed_dehumidify": {
+        "name": "Ventilator min. Drehzahl (Entfeuchtung)"
+      },
+      "fan_max_speed_dehumidify": {
+        "name": "Ventilator max. Drehzahl (Entfeuchtung)"
+      },
+      "fan_min_speed_cooling": {
+        "name": "Ventilator min. Drehzahl (Kühlung)"
+      },
+      "fan_min_speed_vmc": {
+        "name": "Ventilator min. Drehzahl (VMC)"
+      },
+      "fan_max_speed_cooling": {
+        "name": "Ventilator max. Drehzahl (Kühlung)"
+      },
+      "fan_manual_speed": {
+        "name": "Manuelle Ventilatordrehzahl"
+      },
+      "dehumidify_differential": {
+        "name": "Entfeuchtungs-Differenz"
+      },
+      "min_room_temp_dehumidify": {
+        "name": "Min. Raumtemperatur für Entfeuchtung"
+      },
+      "min_room_temp_diff_dehumidify": {
+        "name": "Min. Raumtemperatur-Differenz"
+      },
+      "fan_min_runtime": {
+        "name": "Lüfter-Mindestlaufzeit"
+      },
+      "fan_post_run_time": {
+        "name": "Lüfter-Nachlaufzeit"
+      },
+      "humidity_setpoint_min": {
+        "name": "Feuchte-Sollwert Minimum"
+      },
+      "humidity_setpoint_max": {
+        "name": "Feuchte-Sollwert Maximum"
+      },
+      "ai2_allocation": {
+        "name": "Zuordnung AI2 (HA02)"
+      },
+      "ai3_allocation": {
+        "name": "Zuordnung AI3 (HA03)"
+      },
+      "inst_pm00": {
+        "name": "PM00 Betriebsstundengrenze Ventilatoren"
+      },
+      "inst_pm01": {
+        "name": "PM01 Betriebsstunden Zuluftventilator (0 setzt AL22 zurück)"
+      },
+      "inst_pm03": {
+        "name": "PM03 Betriebsstundengrenze Kompressor"
+      },
+      "inst_pm80": {
+        "name": "PM80 Kalibrierung Raumtemperaturfühler"
+      },
+      "inst_pm81": {
+        "name": "PM81 Kalibrierung Außentemperaturfühler"
+      },
+      "inst_pm82": {
+        "name": "PM82 Kalibrierung Wassertemperaturfühler"
+      },
+      "inst_pm83": {
+        "name": "PM83 Kalibrierung Fortlufttemperaturfühler"
+      },
+      "inst_pm84": {
+        "name": "PM84 Kalibrierung Austrittstemperaturfühler"
+      },
+      "inst_pm85": {
+        "name": "PM85 Kalibrierung Abtaufühler"
+      },
+      "inst_pm86": {
+        "name": "PM86 Kalibrierung Raumfeuchtefühler"
+      },
+      "inst_pm87": {
+        "name": "PM87 Kalibrierung Luftqualitätsfühler"
+      },
+      "inst_pm88": {
+        "name": "PM88 Kalibrierung Lüfter-Potentiometer"
+      },
+      "inst_pm91": {
+        "name": "PM91 Kalibrierung Free-Cooling-Fühler"
+      },
+      "inst_pm92": {
+        "name": "PM92 Kalibrierung Verdampferfühler"
+      },
+      "inst_pc02": {
+        "name": "PC02 Wartezeit Schnüffelzyklus"
+      },
+      "inst_pc03": {
+        "name": "PC03 Aktivierungszeit Schnüffelzyklus"
+      },
+      "inst_pc05": {
+        "name": "PC05 Moduswechsel Sommer/Winter (0 manuell, 1 manuell+auto, 2 auto)"
+      },
+      "inst_pc06": {
+        "name": "PC06 Fühler für Auto-Saisonwechsel (0 Wasser, 1 Raum)"
+      },
+      "inst_pc07": {
+        "name": "PC07 Max. Wassertemperatur Entfeuchtung / Sommer-Integration"
+      },
+      "inst_pc08": {
+        "name": "PC08 Min. Wassertemperatur Winter-Integration"
+      },
+      "inst_pc09": {
+        "name": "PC09 Auto-Sommer über Raumtemperatur"
+      },
+      "inst_pc10": {
+        "name": "PC10 Auto-Winter unter Raumtemperatur"
+      },
+      "inst_pf26": {
+        "name": "PF26 Nachlaufgeschwindigkeit Zuluftventilator"
+      },
+      "inst_pf02": {
+        "name": "PF02 Mindestzeit zwischen den Ventilatoren"
+      },
+      "inst_pf05": {
+        "name": "PF05 Zuluft bei Fehler Luftqualitätsfühler"
+      },
+      "inst_pf08": {
+        "name": "PF08 Max. Geschwindigkeit Zuluftventilator (VMC)"
+      },
+      "inst_pf11": {
+        "name": "PF11 Schrittweite Ventilatorgeschwindigkeit"
+      },
+      "inst_pf12": {
+        "name": "PF12 Totband Raumtemperatur"
+      },
+      "inst_pf13": {
+        "name": "PF13 Zeitintervall Ventilatorschritt (Integration)"
+      },
+      "inst_pf15": {
+        "name": "PF15 Minimaler Sollwert Luftqualität"
+      },
+      "inst_pf16": {
+        "name": "PF16 Maximaler Sollwert Luftqualität"
+      },
+      "inst_pf17": {
+        "name": "PF17 Sollwert Luftqualität"
+      },
+      "inst_pf18": {
+        "name": "PF18 Totband Luftqualität"
+      },
+      "inst_pf19": {
+        "name": "PF19 Zeitintervall Luftqualitätsregelung"
+      },
+      "inst_pf20": {
+        "name": "PF20 Ventilatorschritt bei Abtauung"
+      },
+      "inst_pf21": {
+        "name": "PF21 Zeitintervall Ventilatorschritt Abtauung"
+      },
+      "inst_pf23": {
+        "name": "PF23 Zuluftgeschwindigkeit bei Erzwingung durch DI"
+      },
+      "inst_pf29": {
+        "name": "PF29 Min. Geschwindigkeit Abluftventilator"
+      },
+      "inst_pf30": {
+        "name": "PF30 Max. Geschwindigkeit Abluftventilator"
+      },
+      "inst_pf31": {
+        "name": "PF31 Lüfterregelung bei Integration (0 Temperatur, 1 max. manuell/extern, 2 max. alle)"
+      },
+      "inst_pf32": {
+        "name": "PF32 Abluftgeschwindigkeit bei Erzwingung durch DI"
+      },
+      "inst_pm22": {
+        "name": "PM22 Manuelle Abluftgeschwindigkeit"
+      },
+      "inst_pf33": {
+        "name": "PF33 Abluft bei Fehler Luftqualitätsfühler"
+      },
+      "inst_pf34": {
+        "name": "PF34 Nachlaufgeschwindigkeit Abluftventilator"
+      },
+      "inst_pe01": {
+        "name": "PE01 Mindestabschaltzeit Kompressor"
+      },
+      "inst_pe02": {
+        "name": "PE02 Mindesteinschaltzeit Kompressor"
+      },
+      "inst_pe03": {
+        "name": "PE03 Mindestzeit zwischen Kompressorstarts"
+      },
+      "inst_pe04": {
+        "name": "PE04 Verzögerung Ventilator bis Kompressorstart"
+      },
+      "inst_pe06": {
+        "name": "PE06 Min. Kompressorleistung (Entfeuchtung)"
+      },
+      "inst_pe07": {
+        "name": "PE07 Max. Kompressorleistung (Entfeuchtung)"
+      },
+      "inst_pe08": {
+        "name": "PE08 Schrittweite Kompressorleistung"
+      },
+      "inst_pe09": {
+        "name": "PE09 Zeitintervall Kompressorschritt"
+      },
+      "inst_pe10": {
+        "name": "PE10 Abtauintervall"
+      },
+      "inst_pe11": {
+        "name": "PE11 Sollwert Ende Abtauung"
+      },
+      "inst_pe12": {
+        "name": "PE12 Maximale Abtaudauer"
+      },
+      "inst_pe13": {
+        "name": "PE13 Abtropfdauer"
+      },
+      "inst_pe14": {
+        "name": "PE14 Zählung Abtauintervall"
+      },
+      "inst_pe15": {
+        "name": "PE15 Sollwert Abtauzählung"
+      },
+      "inst_pe16": {
+        "name": "PE16 Umschaltzeit Kondensationsventile"
+      },
+      "inst_pe17": {
+        "name": "PE17 Sollwert Vorwarnung Hochdruck"
+      },
+      "inst_pe18": {
+        "name": "PE18 Differenz Vorwarnung Hochdruck"
+      },
+      "inst_pe19": {
+        "name": "PE19 Kompressorschritt bei Vorwarnung Hochdruck"
+      },
+      "inst_pe20": {
+        "name": "PE20 Zeitintervall bei Vorwarnung Hochdruck"
+      },
+      "inst_pe21": {
+        "name": "PE21 Min. Kompressorleistung (Integration)"
+      },
+      "inst_pe22": {
+        "name": "PE22 Max. Kompressorleistung (Integration)"
+      },
+      "inst_pe24": {
+        "name": "PE24 Drehzahl-Änderungsrate Kompressor"
+      },
+      "inst_pe25": {
+        "name": "PE25 Absenkrate bei Alarm oder Abschaltung"
+      },
+      "inst_pe26": {
+        "name": "PE26 Rampe bis zur Mindeststufe"
+      },
+      "inst_pe27": {
+        "name": "PE27 Max. Drehzahl Kompressor"
+      },
+      "inst_pe28": {
+        "name": "PE28 Drehzahl Kompressorstufe 1"
+      },
+      "inst_pe30": {
+        "name": "PE30 Mindestlaufzeit Stufe 1"
+      },
+      "inst_pe31": {
+        "name": "PE31 Mindestlaufzeit Stufe 2"
+      },
+      "inst_pe32": {
+        "name": "PE32 Max. Zeit unter Stufe 1"
+      },
+      "inst_pb01": {
+        "name": "Pb01 Verzögerung Schließung Wasserventil"
+      },
+      "inst_pb02": {
+        "name": "Pb02 Ventil-Aktivierungszeit Schnüffeln (Temperaturalarm)"
+      },
+      "inst_pb03": {
+        "name": "Pb03 Ventil-Wartezeit Schnüffeln (Temperaturalarm)"
+      },
+      "inst_pb04": {
+        "name": "Pb04 Sollwert Vorwärmung"
+      },
+      "inst_pb05": {
+        "name": "Pb05 Differenz Vorwärmung"
+      },
+      "inst_pb06": {
+        "name": "Pb06 Maximale Dauer Vorwärmung"
+      },
+      "inst_pb07": {
+        "name": "Pb07 Aktivierungszeit Anti-Blockierung"
+      },
+      "inst_pb08": {
+        "name": "Pb08 Wartezeit Anti-Blockierung"
+      },
+      "inst_pu08": {
+        "name": "PU08 Entfeuchtung nur mit Kaltwasser unter Wassertemperatur"
+      },
+      "inst_pu10": {
+        "name": "PU10 Zeit bis Kompressor als zweite Stufe"
+      },
+      "inst_pu11": {
+        "name": "PU11 Sollwert Verdampfertemperatur"
+      },
+      "inst_pu12": {
+        "name": "PU12 Totband Verdampfertemperatur"
+      },
+      "inst_ps02": {
+        "name": "PS02 Vorstartzeit Außenluftklappe"
+      },
+      "inst_ps04": {
+        "name": "PS04 Min. Öffnung Außenluftklappe"
+      },
+      "inst_ps05": {
+        "name": "PS05 Max. Öffnung Außenluftklappe"
+      },
+      "inst_ps06": {
+        "name": "PS06 Sollwert Free-Cooling/-Heating"
+      },
+      "inst_ps07": {
+        "name": "PS07 Differenz Free-Cooling/-Heating"
+      },
+      "inst_ps08": {
+        "name": "PS08 Klappenschritt bei hoher Feuchte"
+      },
+      "inst_ps09": {
+        "name": "PS09 Zeitintervall Klappenschritt"
+      },
+      "inst_pr01": {
+        "name": "Pr01 Sollwertdifferenz Rotationswärmetauscher"
+      },
+      "inst_pr02": {
+        "name": "Pr02 Differenz Rotationswärmetauscher"
+      },
+      "inst_pr03": {
+        "name": "Pr03 Sollwert Abtauung Wärmetauscher"
+      },
+      "inst_pr04": {
+        "name": "Pr04 Totband Abtauung Wärmetauscher"
+      },
+      "inst_pr05": {
+        "name": "Pr05 Zykluszeit Bypass Kreuzstrom"
+      },
+      "inst_pr06": {
+        "name": "Pr06 Sollwert Stillstand Wärmetauscher"
+      },
+      "inst_pr07": {
+        "name": "Pr07 Differenz Stillstand Wärmetauscher"
+      },
+      "inst_pr08": {
+        "name": "Pr08 Schritt Rotationswärmetauscher Abtauung"
+      },
+      "inst_pr09": {
+        "name": "Pr09 Zeitintervall Rotationswärmetauscher"
+      },
+      "inst_pr10": {
+        "name": "Pr10 PWM-Frequenz Rotationswärmetauscher"
+      },
+      "inst_pa03": {
+        "name": "PA03 Relais Betriebsstundenalarm (0 kein, 1 leicht, 2 schwer)"
+      },
+      "inst_pa04": {
+        "name": "PA04 Verzögerung Fühleralarm"
+      },
+      "inst_pa05": {
+        "name": "PA05 Relais Fühleralarm"
+      },
+      "inst_pa06": {
+        "name": "PA06 Verzögerung Luftdurchflussalarm nach Reset"
+      },
+      "inst_pa07": {
+        "name": "PA07 Verzögerung Luftdurchflussalarm"
+      },
+      "inst_pa08": {
+        "name": "PA08 Relais Luftdurchflussalarm"
+      },
+      "inst_pa09": {
+        "name": "PA09 Verzögerung Wasserdurchflussalarm nach Reset"
+      },
+      "inst_pa10": {
+        "name": "PA10 Verzögerung Wasserdurchflussalarm"
+      },
+      "inst_pa11": {
+        "name": "PA11 Wasserdurchflussalarme/Stunde bis manuelles Rücksetzen"
+      },
+      "inst_pa12": {
+        "name": "PA12 Relais Wasserdurchflussalarm"
+      },
+      "inst_pa13": {
+        "name": "PA13 Verzögerung Filteralarm"
+      },
+      "inst_pa14": {
+        "name": "PA14 Rücksetzart Filteralarm"
+      },
+      "inst_pa15": {
+        "name": "PA15 Relais Filteralarm"
+      },
+      "inst_pa16": {
+        "name": "PA16 Verzögerung Hoch-/Niedrigtemperaturalarm"
+      },
+      "inst_pa17": {
+        "name": "PA17 Differenz Hoch-/Niedrigtemperaturalarm"
+      },
+      "inst_pa18": {
+        "name": "PA18 Relais Hoch-/Niedrigtemperaturalarm"
+      },
+      "inst_pa19": {
+        "name": "PA19 Sollwert Warnung hohe Luftfeuchte"
+      },
+      "inst_pa21": {
+        "name": "PA21 Zeit bis Alarm hohe Luftfeuchte"
+      },
+      "inst_pa22": {
+        "name": "PA22 Ereignisse hohe Luftfeuchte"
+      },
+      "inst_pa23": {
+        "name": "PA23 Verzögerung Drehzahlalarm nach Reset"
+      },
+      "inst_pa24": {
+        "name": "PA24 Verzögerung Drehzahlalarm"
+      },
+      "inst_pa25": {
+        "name": "PA25 Max. Drehzahl für Drehzahlalarm"
+      },
+      "inst_pa26": {
+        "name": "PA26 Relais Ventilatoralarm"
+      },
+      "inst_pa27": {
+        "name": "PA27 Verzögerung Temperaturschalter Kompressor"
+      },
+      "inst_pa28": {
+        "name": "PA28 Rücksetzart Temperaturschalter Kompressor"
+      },
+      "inst_pa29": {
+        "name": "PA29 Relais Temperaturschalter Kompressor"
+      },
+      "inst_pa30": {
+        "name": "PA30 Umgehungszeit Niederdruckalarm"
+      },
+      "inst_pa31": {
+        "name": "PA31 Verzögerung Niederdruckalarm"
+      },
+      "inst_pa32": {
+        "name": "PA32 Niederdruckalarme/Stunde bis manuelles Rücksetzen"
+      },
+      "inst_pa33": {
+        "name": "PA33 Sollwert Hochdruckalarm"
+      },
+      "inst_pa34": {
+        "name": "PA34 Differenz Hochdruckalarm"
+      },
+      "inst_pa35": {
+        "name": "PA35 Hochdruckalarme/Stunde bis manuelles Rücksetzen"
+      },
+      "inst_pa36": {
+        "name": "PA36 Relais Druckalarm"
+      },
+      "inst_pa37": {
+        "name": "PA37 Verzögerung Alarm Auslasstemperatur"
+      },
+      "inst_pa38": {
+        "name": "PA38 Sollwert Alarm Auslasstemperatur"
+      },
+      "inst_pa39": {
+        "name": "PA39 Differenz Alarm Auslasstemperatur"
+      },
+      "inst_pa40": {
+        "name": "PA40 Alarme Auslasstemperatur/Stunde"
+      },
+      "inst_pa41": {
+        "name": "PA41 Relais Alarm Auslasstemperatur"
+      },
+      "inst_pa42": {
+        "name": "PA42 Verzögerung Frostschutzalarm"
+      },
+      "inst_pa43": {
+        "name": "PA43 Sollwert Frostschutz Wassertemperatur"
+      },
+      "inst_pa44": {
+        "name": "PA44 Differenz Frostschutz"
+      },
+      "inst_pa45": {
+        "name": "PA45 Relais Frostschutzalarm"
+      },
+      "inst_pa46": {
+        "name": "PA46 Art Feuer-/Rauchalarm"
+      },
+      "inst_pa47": {
+        "name": "PA47 Relais Feuer-/Rauchalarm"
+      },
+      "inst_pa48": {
+        "name": "PA48 Verzögerung allgemeine Warnung"
+      },
+      "inst_pa49": {
+        "name": "PA49 Rücksetzart allgemeine Warnung"
+      },
+      "inst_pa50": {
+        "name": "PA50 Verzögerung allgemeiner Alarm"
+      },
+      "inst_pa51": {
+        "name": "PA51 Rücksetzart allgemeiner Alarm"
+      },
+      "inst_pa53": {
+        "name": "PA53 Rücksetzart Uhr-Alarm"
+      },
+      "inst_pa55": {
+        "name": "PA55 Relais Phasenfolgealarm"
+      },
+      "inst_pa56": {
+        "name": "PA56 Relais Erweiterungsalarm"
+      },
+      "inst_pa57": {
+        "name": "PA57 Art Alarm hohe Luftfeuchte (0 Anzeige, 1 Sperre)"
+      },
+      "inst_pa58": {
+        "name": "PA58 Max. Laufzeit Entfeuchtung durch DI"
+      },
+      "inst_pa59": {
+        "name": "PA59 Alarmrelais (0 immer, 1 nur Sommer)"
+      },
+      "inst_pa60": {
+        "name": "PA60 Verzögerung Auto-Reset Feuchtesperre"
+      },
+      "inst_ph04": {
+        "name": "PH04 Zustand im Urlaub (0 aus, 1 an)"
+      },
+      "inst_ph07": {
+        "name": "PH07 Min. Sollwert Sommer"
+      },
+      "inst_ph08": {
+        "name": "PH08 Max. Sollwert Sommer"
+      },
+      "inst_ph09": {
+        "name": "PH09 Min. Sollwert Winter"
+      },
+      "inst_ph10": {
+        "name": "PH10 Max. Sollwert Winter (werkseitig 14 °C sperrt Auto-Heizen)"
+      }
+    }
+  },
+  "selector": {
+    "water_circuit": {
+      "options": {
+        "heating_cooling": "Heiz-/Kühlkreis (Flächenheizung oder -kühlung)",
+        "brine": "Solekreis einer Erdwärmepumpe"
+      }
     }
   }
 }

@@ -36,6 +36,11 @@ COMP = ROOT / "custom_components/innova_hrds"
 # --------------------------------------------------------------------------
 # Minimal Home Assistant stubs
 # --------------------------------------------------------------------------
+class EntityCategory:
+    CONFIG = "config"
+    DIAGNOSTIC = "diagnostic"
+
+
 @dataclass
 class EntityDescription:
     """Stand-in for HA's description base.
@@ -49,6 +54,8 @@ class EntityDescription:
     name: str | None = None
     translation_key: str | None = None
     device_class: object = None
+    entity_category: object = None
+    entity_registry_enabled_default: bool = True
 
 
 @dataclass
@@ -152,6 +159,7 @@ def install_stubs() -> None:
     _stub("homeassistant.components", is_package=True)
     _stub(
         "homeassistant.components.binary_sensor",
+        BinarySensorDeviceClass=types.SimpleNamespace(PROBLEM="problem"),
         BinarySensorEntityDescription=BinarySensorEntityDescription,
     )
     _stub(
@@ -181,6 +189,7 @@ def install_stubs() -> None:
     _stub(
         "homeassistant.const",
         Platform=Platform,
+        EntityCategory=EntityCategory,
         UnitOfTemperature=UnitOfTemperature,
         UnitOfVolumeFlowRate=UnitOfVolumeFlowRate,
     )
@@ -197,10 +206,17 @@ def load_const() -> types.ModuleType:
     Importing it as a package member would execute ``innova_hrds/__init__.py``,
     which needs far more of Home Assistant than is stubbed here.
     """
-    spec = importlib.util.spec_from_file_location("hrds_const", COMP / "const.py")
+    # An empty package stand-in lets const.py's relative imports (e.g.
+    # installer_params) resolve without running the real __init__.py.
+    package = types.ModuleType("innova_hrds")
+    package.__path__ = [str(COMP)]
+    sys.modules.setdefault("innova_hrds", package)
+    spec = importlib.util.spec_from_file_location(
+        "innova_hrds.const", COMP / "const.py"
+    )
     module = importlib.util.module_from_spec(spec)
     # const.py does sys.modules[__name__] at import time.
-    sys.modules["hrds_const"] = module
+    sys.modules["innova_hrds.const"] = module
     spec.loader.exec_module(module)
     return module
 
@@ -264,6 +280,52 @@ def main() -> int:
         "probe_source default resolves via the DEFAULT field",
     )
     check("default" not in const.PROBE_SOURCE, "PROBE_SOURCE map has no sentinel key")
+
+    print("== headless / identity / probe sentinel ==")
+    # PG01 is the fan arrangement, not "has recirculation"; reading it as the
+    # latter made an `R` unit report "no recirculation".
+    check(
+        "has_recirculation" not in const.ENTITIES_DICT,
+        "no entity claims PG01 means 'has recirculation'",
+    )
+    check("machine_type" in const.SENSOR_TYPES, "PG01 is a read-only enum sensor")
+    for key, (decoded, raw) in const.HEADLESS_SETTINGS.items():
+        props = const.ENTITIES_DICT[key]
+        if const.is_entity_select(props):
+            actual = const.get_entity_select(props).get(raw)
+        else:
+            actual = "on" if raw else "off"
+        check(
+            actual == decoded,
+            f"HEADLESS_SETTINGS[{key}] raw {raw} decodes to '{decoded}'",
+        )
+        check(
+            not const.is_entity_readonly(props),
+            f"headless setting {key} is writable",
+        )
+    check(
+        {"enable_onoff_display", "probe_source"} <= set(const.HEADLESS_SETTINGS),
+        "headless mode asserts PH01 and HA00",
+    )
+    check(
+        const.is_probe_sentinel(0x8004) and const.is_probe_sentinel(0x7FFA),
+        "observed unwired-probe words (0x8004, 0x7FFA) are sentinels",
+    )
+    check(
+        not const.is_probe_sentinel(0xFFF6) and not const.is_probe_sentinel(215),
+        "a real reading (-1.0 degC, 21.5 degC) is not a sentinel",
+    )
+    for lang in ("en", "de"):
+        tr = json.loads((COMP / f"translations/{lang}.json").read_text())
+        for section in (tr["config"], tr["options"]):
+            check(
+                {"cannot_connect", "wrong_device"} <= set(section["error"]),
+                f"{lang}.json has the identity-check form errors",
+            )
+        check(
+            "has_display" in tr["config"]["step"]["user"]["data"],
+            f"{lang}.json labels the has_display option",
+        )
 
     print("== composite entities resolve availability correctly ==")
     # Regression guard: HubBackedEntity.available gates register-backed entities
@@ -371,6 +433,110 @@ def main() -> int:
     bad = [b for b in blocks if any(a in holdings for a in range(b[0], b[0] + b[1]))]
     check(not bad, f"no input block spans a holding register (offenders: {bad})")
     print(f"   input blocks: {blocks}")
+
+    print("== setup / config / operation grouping and gate ==")
+    known = (
+        set(const.ENTITIES_DICT)
+        | set(const.COMPUTED_SENSORS)
+        | set(const.COMPUTED_BINARY_SENSORS)
+        | set(const.OPERATION_TYPES)
+    )
+    for label in ("SETUP_KEYS", "CONFIG_KEYS", "DIAGNOSTIC_KEYS"):
+        stray = sorted(set(getattr(const, label)) - known)
+        check(not stray, f"{label} only names existing entities (stray: {stray})")
+    check(
+        not (const.SETUP_KEYS & (const.CONFIG_KEYS | const.DIAGNOSTIC_KEYS)),
+        "a key is either setup or config/diagnostic, never both",
+    )
+    check(
+        const.C_OPERATION_ALLOWED in const.OPERATION_TYPES
+        and const.C_OPERATION_ALLOWED in const.SETUP_KEYS,
+        "the operation gate switch exists and lives on the setup device",
+    )
+    check(
+        all(k in const.ENTITIES_DICT for k in const.OPERATIONAL_KEYS),
+        "every gated key is a register-backed entity",
+    )
+    check(
+        not (set(const.OPERATIONAL_KEYS) & const.SETUP_KEYS),
+        "gated request entities stay on the main device",
+    )
+    for lang in ("en", "de"):
+        tr = json.loads((COMP / f"translations/{lang}.json").read_text("utf-8"))
+        ent = tr["entity"]
+        check(
+            "operation_allowed" in ent.get("switch", {}),
+            f"{lang}.json names the operation_allowed switch",
+        )
+        states = ent.get("sensor", {}).get("setup_check", {}).get("state", {})
+        check(
+            set(states) == {"ok", "attention"},
+            f"{lang}.json translates both setup_check states",
+        )
+
+    print("== installer device, season and heating guard ==")
+    inst = const.INSTALLER_KEYS
+    check(
+        not (inst & (const.SETUP_KEYS | const.CONFIG_KEYS | const.DIAGNOSTIC_KEYS)),
+        "installer parameters live only on the installer device",
+    )
+    regs = [const.ENTITIES_DICT[k]["REG"] for k in inst]
+    others = {
+        p["REG"]
+        for k, p in const.ENTITIES_DICT.items()
+        if k not in inst and p["RT"] == const.C_REG_TYPE_HOLDING_REGISTERS
+    }
+    check(len(regs) == len(set(regs)), "no installer register is listed twice")
+    dup = sorted(set(regs) & others)
+    check(not dup, f"installer rows do not repeat an existing entity ({dup})")
+    # Passwords, PH15 restore-defaults and PH18 clear-history must never be
+    # reachable; above 1900 readability is unverified (one bad address forces
+    # the slow per-register fallback for its whole block).
+    forbidden = {1601, 1626, 1787, 1790, 1796, 1802, 1875}
+    check(not (set(regs) & forbidden), "no password / reset parameter is exposed")
+    check(max(regs) <= 1900, "no installer register above 1900 is polled")
+    season = const.ENTITIES_DICT[const.C_SEASON]
+    check(
+        season["REG"] == 1825 and set(season["VALUES"]) == {3, 4},
+        "season select writes only HB04 = 3/4 (anything else raises AL25)",
+    )
+    check(
+        const.is_entity_readonly(const.ENTITIES_DICT[const.C_WATER_VALVE_PUMP]),
+        "water valve / pump output is read-only (the unit drives it)",
+    )
+    hub_src = (COMP / "__init__.py").read_text(encoding="utf-8")
+    check(
+        "self._check_request_allowed(entity_key, raw)" in hub_src,
+        "every write passes the winter-heating / brine guard",
+    )
+
+    print("== brine temperature guard ==")
+    guard = const.C_BRINE_GUARD
+    check(
+        guard in const.BINARYSENSOR_TYPES and guard not in const.ENTITIES_DICT,
+        "the brine guard is a computed binary sensor (no register)",
+    )
+    check(
+        const.BINARYSENSOR_TYPES[guard].device_class == "problem",
+        "the brine guard is a problem indicator (on = blocking)",
+    )
+    # Its availability must not hinge on hub.data/poll health alone.
+    check(
+        "C_BRINE_GUARD" in (COMP / "binary_sensor.py").read_text(encoding="utf-8"),
+        "binary_sensor.py special-cases the brine guard",
+    )
+    check(
+        "self.update_brine_guard()" in hub_src and "brine_guard_ok is True" in hub_src,
+        "requests re-judge the guard, and winter brine DEU needs it passing",
+    )
+    for lang in ("en", "de"):
+        tr = json.loads((COMP / f"translations/{lang}.json").read_text("utf-8"))
+        for section, step in ((tr["config"], "user"), (tr["options"], "init")):
+            check(
+                {"brine_temperature_entity", "brine_min_temperature"}
+                <= set(section["step"][step]["data"]),
+                f"{lang}.json labels the brine guard options ({step})",
+            )
 
     print("== manifest and brand images ==")
     manifest = json.loads((COMP / "manifest.json").read_text())

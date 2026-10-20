@@ -17,8 +17,8 @@ reference for building the Home Assistant integration in this repository.
 ## What the unit is
 
 The HRDS+ is an isothermal air dehumidifier for radiant-panel / residential
-ventilation systems. Depending on configuration (`PG01_MachineType`) it runs as
-a pure dehumidifier or as a dehumidifier with integrated ventilation (VMC). It
+ventilation systems. Its fan arrangement is set by `PG01_MachineType` (supply
+fan only, or supply plus exhaust fan; this is *not* the recirculation flag). It
 can additionally provide **active cooling** ("integration") in summer using its
 refrigerant compressor and a chilled-water circuit, and it follows a
 **Summer/Winter** season model.
@@ -180,8 +180,8 @@ The table below lists the best Modbus proxies, exposed as HA sensors:
 | Variant axis | Best Modbus indicator | Register | HA entity |
 |---|---|---|---|
 | **Airflow size (30 vs 50)** | Not readable — set manually in integration setup | — | config `model` field |
-| **Recirculation fan present (`R` / non-`R`)** | `PG01_MachineType` (1797): `1` = VMC (has recirc fan), `0` = dehumidifier only | FC 03, R/W configured as R/O | `binary_sensor.has_recirculation` |
-| **Recirculation damper state** | `outDO_RecircDamper` (1134): `off` = damper closed (room-air duct blocked, MVHR passive flow only), `on` = damper open (room air drawn in and blended), `disabled` = no damper output wired (non-`R` build, no recirculation assembly) | FC 04, R/O | `sensor.recirculation_damper` |
+| **Fan arrangement** | `PG01_MachineType` (1797): `0` = supply fan only, `1` = supply + exhaust fan. **Not** the `R` flag: an `R` unit reads `0`. | FC 03, R/W configured as R/O | `sensor.machine_type` |
+| **Recirculation fan present (`R` / non-`R`)** and **damper state** | `outDO_RecircDamper` (1134), the reliable `R` indicator: `off` = damper closed (room-air duct blocked, MVHR passive flow only), `on` = damper open (room air drawn in and blended), `disabled` = no damper output wired (non-`R` build, no recirculation assembly) | FC 04, R/O | `sensor.recirculation_damper` |
 | **Active cooling present (`DC` / `D`)** | `PG02_EnableIntegration` (1798): `1` = cooling enabled on this unit | FC 03, R/W configured as R/O | `binary_sensor.active_cooling_available` |
 
 **What the damper is:** a motorised flap in the room-air return duct. When
@@ -341,7 +341,10 @@ use for room T/H. The factory default is `6` (CNU2 display with both sensors).
 | External NTC (T) + humidity transmitter (H) on AI2/AI3 | `0` |
 | No display, no external probes (fully manual BMS mode) | `0` + set PH01 = 0 |
 
-The HA integration exposes HA00 as a `select` entity (`T/H probe source`).
+The HA integration exposes HA00 as a `select` entity (`T/H probe source`). In
+its default headless mode (`has_display` off) it also **writes HA00 = 0 and
+PH01 = 0 itself** and re-asserts them every poll. Without PH01 = 0 the unit
+sits in "OFF by display" and ignores a Modbus ON.
 
 ### Probe fault alarms
 
@@ -363,9 +366,34 @@ sensors/numbers/switches:
 * `hvac_action` ← derived from `sm_UnitStatus` / `DehumRequest` / `CmpStatus`
   (OFF / IDLE / DRYING / COOLING / FAN).
 * `hvac_mode` ← used to drive the operating mode: OFF, DRY (dehumidify), COOL
-  (active cooling). Writing a mode toggles the on/off + dehum + integration
-  request registers.
+  (summer integration), HEAT (winter integration, opt-in). Writing a mode
+  toggles the on/off + dehum + integration request registers.
 * `target_humidity` ← `PU01` (1586); `target_temperature` ← season setpoint.
+  Neither is offered headless without a room probe: the unit ignores them.
+
+## Operating modes, season and the water circuit (handbook §2.6-2.7, §6)
+
+| State | Damper / fan | Compressor | Internal valve | V3V + pump | Supply air |
+|-------|--------------|------------|----------------|------------|------------|
+| OFF / ON-standby | closed / off | off | **open** (water may flow through condenser and reheat register) | closed (except anti-stagnation pulses Pb07/Pb08) | passes through untreated |
+| DEU (dehumidify) | open / on | on | open: heat goes to the reheat register | open / on | dry, about room temperature |
+| INT summer | open / on | on (with PU05 = 1, factory) | closed: all heat to the water | open / on | dry and cold |
+| INT winter | open / on | **off** | open | open / on | warmed by water from the heating circuit |
+
+* There is no cooling without dehumidification.
+* Without a display, season is switched with HB04 (1825): 4 = summer, 3 = winter;
+  read-back 1583. PC05 (auto season) defaults to manual.
+* Automatic winter heating needs a room probe and is capped by PH10 (factory
+  14 °C). PG02 = 0 disables both summer cooling and winter heating.
+* Winter dehumidify is PU02 (factory 0 = off). On a **brine** circuit
+  (ground-source heat pump) winter heating is impossible and winter
+  dehumidification is forbidden (coil freezing); anti-stagnation pulses can
+  blow cold air, so the handbook recommends switching the unit off in winter.
+* The unit drives V3V and the PM pump output together (relay K5, status 1126).
+  In the parallel brine variants the PM output switches the brine pump via a
+  relay. The compressor will not start below PU08 water temperature (10 °C) and
+  AL03 blocks summer operation above PC07 (30 °C).
+
 
 Two device traits matter for the implementation and are easy to get wrong:
 

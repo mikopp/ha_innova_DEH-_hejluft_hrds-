@@ -36,10 +36,28 @@ not backed by a single register, and are declared directly in `init()`
   chunks** (`_build_blocks` in `__init__.py`, capped at `C_MAX_BLOCK`, merging
   gaps up to `C_MAX_GAP`).
 * **"by BMS" enables are mandatory.** Writes are ignored unless PH02/PH27/PH28
-  are set. `_sync_bms_enables_locked` re-asserts them **every poll**, driven by
-  the polled read-back rather than a one-shot flag, so a device power-cycle that
-  clears them self-heals. They are also exposed as switches — and because the
-  hub re-asserts them, turning one off by hand is undone on the next poll.
+  are set. `_sync_required_settings_locked` re-asserts them **every poll**, driven
+  by the polled read-back rather than a one-shot flag, so a device power-cycle
+  that clears them self-heals. They are also exposed as switches — and because
+  the hub re-asserts them, turning one off by hand is undone on the next poll.
+* **Headless by default (`has_display` option, default off).** With no CNU2
+  display the unit must have **PH01 (1777) = 0** and **HA00 (1803) = 0**, else
+  it sits in `off_by_display` forever (an OFF from any source beats a Modbus ON)
+  and waits for room T/H from a display that is not there. In headless mode the
+  same `_sync_required_settings_locked` asserts both (`HEADLESS_SETTINGS` in
+  `const.py`). With `has_display` on, they are left alone.
+* **Device identity is verified before anything is written** (`identity.py`,
+  called from `async_setup_entry` and from the config/options flow). FC 43/14
+  must report vendor `EVCO` and a product code starting `EPB9` (a real unit
+  reports `EVCO` / `EPB9ORSINDEU` / `V01.00.09.02`), and the four status
+  registers must hold documented enum values. If the gateway does not forward
+  FC 43 the register fingerprint alone decides. Wrong device → `ConfigEntryError`
+  / form error `wrong_device`; no answer → `ConfigEntryNotReady` / `cannot_connect`.
+  The identity also feeds the device registry (`model_id`, `sw_version`).
+* **Unwired analog inputs read a sentinel** (`0x8004`, window
+  `PROBE_SENTINEL_LOW..HIGH`), not 0. `_decode_all` stores `None` for those
+  INT16 words, so the entity is `unknown` instead of -3276.4 °C. The climate
+  entity must then report no current temperature/humidity (never a stale value).
 * **Scaling:** temperatures/setpoints ×0.1 (`FAKTOR`), fan/percent registers
   ×0.01, humidity ×1.
 
@@ -53,7 +71,7 @@ from the manufacturer PDFs in `references/`.
 |------|---------|
 | `references/MODBUS_REGISTERS.md` | **Start here.** Register addresses, alarm bit map, alarm code table, cookbook for common operations. |
 | `references/README.md` | Implementation notes: airflow / passive flow / fan-integration / active-cooling distinction; variant detection (30/50, R/non-R, DC); fan-speed-to-airflow formula; probe wiring; alarm interpretation. |
-| `references/HRDS+_Technisches_Handbuch_DE.txt` | Full text of the 87-page German technical handbook (searchable). Firmware parameters (PF27/PF28 fan min %, PG01 machine type, BMS enable, etc.), performance tables, wiring diagrams. |
+| `references/HRDS+_Technisches_Handbuch_DE.txt` | Full text of the 87-page German technical handbook (searchable). Firmware parameters (PF27/PF28 fan min %, PG01 fan arrangement, BMS enable, etc.), performance tables, wiring diagrams. |
 | `references/Innova_DEH+_H_Installation_Manual_EN.txt` | Innova DEH+ H installation manual EN — the Italian OEM original of the HRDS+. Alarm table (with effect descriptions), microswitch DIP settings, VMC wiring. |
 | `references/HRDS+_Modbus_RTU_RS485_DE.pdf` | Modbus RTU/RS-485 connection manual — original source of the register table in MODBUS_REGISTERS.md. |
 | `references/HRDS+_Technisches_Handbuch_DE.pdf` | Original German technical handbook PDF (87 pp). |
@@ -107,6 +125,73 @@ Classification rules (`_classify` in `const.py`):
 | holding (R/W) | temp unit, no `PF` | climate (avoid: set `PF=Platform.NUMBER`) |
 | holding (R/W) | otherwise     | number |
 
+## Setup, operation gate and device grouping
+
+* **Setup happens in the integration**, after connect. `_compute_setup_issues`
+  (hub) derives the `setup_check` sensor and its `issues` list from the polled
+  read-back.
+* **Operation gate:** `OPERATIONAL_KEYS` (on/off, dehumidify, active cooling,
+  manual fan) refuse non-zero writes in `write_entity_value` until
+  `hub.operation_allowed` is set via `switch.allow_operational_requests`
+  (`HrdsOperationSwitch`, `OPERATION_TYPES`, default off, `RestoreEntity`). The
+  `_sync_required_settings_locked` writes bypass the gate (they call the client
+  directly). Do not add a request-type write path that skips `write_entity_value`.
+* **Device grouping:** `SETUP_KEYS` entities go on the `-setup` child device
+  (`SETUP_DEVICE_SUFFIX`, `via_device` the main one); `CONFIG_KEYS` /
+  `DIAGNOSTIC_KEYS` become entity categories (`entity_category_for`). A new
+  entity belongs in exactly one of the three groups, or none (operational).
+  `unique_id` always uses the config entry id, so moving a key between devices
+  keeps its entity. All devices are registered in `async_setup_entry`.
+  `wiring_check.py` guards the sets.
+* **Installer device:** the rest of the installer menu lives in
+  `installer_params.py` (one row per parameter: code, register, kind
+  n/s/r, scale, range, unit, en/de name, enabled-by-default). `const.py`
+  appends the rows to `ENTITIES_DICT` as `inst_<code>` keys (`INSTALLER_KEYS`),
+  on the `-installer` child device; writable ones are `CONFIG`, read-only
+  `DIAGNOSTIC`. Addresses come from the Modbus manual's full parameter table
+  (0x0640-0x077A). Scaling was verified against raw read-back: °C / bar / rps
+  ×0.1, fan/compressor/damper % ×0.01, the rest ×1. Never add passwords,
+  PH15 (restore defaults) or PH18 (clear history); keep link settings, I/O
+  allocation, PE05 and test mode read-only; do not poll above 1900 (unverified,
+  and one bad address forces a block onto the per-register fallback). Their
+  translations are generated from the table (names in the row), and
+  `MODBUS_REGISTERS.md` §16 lists them.
+
+## Operating modes, season, water circuit
+
+* Two requests only: **DEU** (`dehumidify`, 1140) and **INT** (`active_cooling`,
+  1139). INT is dehumidify + cool in summer and **heating** in winter (compressor
+  off, warm water through the register). There is no cooling without
+  dehumidifying.
+* `_check_request_allowed` runs on every `write_entity_value`: INT is refused
+  unless the read-back season (`operating_mode`, 1583) is summer, unless the
+  `allow_winter_heating` option is on; with `water_circuit = brine` winter INT
+  is always refused and winter DEU is refused unless the brine guard passes
+  (handbook 3.8.7: no heating, coil freezing), and a season change to winter
+  is refused while a request it would turn unsafe is active. Keep request
+  writes going through `write_entity_value`.
+* **Brine temperature guard** (options `brine_temperature_entity`,
+  `brine_min_temperature`, default 10 °C): an HA sensor, judged by
+  `update_brine_guard()` on the event loop (before each poll, on its state
+  events, and inside `_check_request_allowed`). When configured, any start
+  (DEU/INT on, or unit on with one latched) needs value ≥ minimum and
+  `last_reported` within `BRINE_GUARD_MAX_AGE_HOURS` (24), in every season.
+  It only gates starts; it never stops a running request. The indicator is
+  `binary_sensor.brine_temperature_guard` (`COMPUTED_BINARY_SENSORS`,
+  problem class, hidden when no sensor is set, always available). Options
+  override data for these keys as a whole, so clearing the entity sticks.
+* Season without a display: `select.season` writes HB04 (1825): 4 = summer,
+  3 = winter (Modbus manual). Anything else raises AL25.
+* Water valve/pump (1126, relay K5) and condenser valve (1124, K4) are
+  read-only diagnostics: the unit drives its water circuit; the integration
+  never overrides it (no PT test-mode writes). `_compute_water_issues` feeds
+  `sensor.water_check`.
+* Headless setpoints: without a display, setpoints only act with a room probe
+  (HA02 = 45 / HA03 = 53/54). `hub.update_hidden_keys()` (from the primed
+  read-back) drops `TEMPERATURE_TARGET_KEYS` / `HUMIDITY_TARGET_KEYS` from
+  entity creation and the climate entity's target features; changing HA02/HA03
+  needs a reload.
+
 ## Device variants (30 vs 50, R vs non-R, DC)
 
 The product code on the type plate encodes the variant: `HRDS+ 30 H R K DC`.
@@ -114,7 +199,7 @@ The product code on the type plate encodes the variant: `HRDS+ 30 H R K DC`.
 | Field | Values | Meaning |
 |-------|--------|---------|
 | `30`/`50` | size | Max airflow 300 / 500 m³/h. **No register** — set `model` in config. |
-| `R` | optional | Has recirculation fan + motorised damper + air filter. `PG01_MachineType` (1797) = `1` (VMC). Non-R = `0`. |
+| `R` | optional | Has recirculation fan + motorised damper + air filter. **No dedicated register**: detect it from the damper output `outDO_RecircDamper` (1134): `disabled` = no damper (non-R), `off`/`on` = R. `PG01_MachineType` (1797) is **not** this flag — it is the fan arrangement (0 = supply fan only, 1 = supply + exhaust) and reads `0` on an R unit (verified on an HRDS+ 30 R). |
 | `DC` | optional | Has active cooling. `PG02_EnableIntegration` (1798) = `1`. |
 
 **Non-R variant always runs on passive MVHR airflow** — no recirculation fan at all.
@@ -157,11 +242,15 @@ figures in the technical data are the tested spec range, **not** a firmware floo
 ## Climate entity mapping
 
 * `current_temperature` ← `room_temperature`; `current_humidity` ← `room_humidity`.
-* `hvac_mode` ∈ {OFF, DRY, COOL}; setting it writes `unit_on_off` +
-  `dehumidify` + `active_cooling`.
+* `hvac_mode` ∈ {OFF, DRY, COOL (summer), HEAT (winter, only with
+  `allow_winter_heating`, never on brine)}; setting it writes the request
+  registers first (so the guard refuses before the unit starts), then
+  `unit_on_off`.
 * `hvac_action` derived from `unit_status` / `compressor_status` /
   `dehumidify_request`.
-* `target_humidity` ← `humidity_setpoint`; `target_temperature` ← `summer_setpoint`.
+* `target_humidity` ← `humidity_setpoint`; `target_temperature` ←
+  `summer_setpoint` in summer, `winter_setpoint` in winter. Both features are
+  removed when the hub hides the setpoints (headless, no probe).
 * `min_humidity` / `max_humidity` follow the unit's own PH29/PH30 clamps.
 * `current_temperature` / `current_humidity` report `None` while the matching
   probe-fault alarm is active.
@@ -197,6 +286,19 @@ misreport airflow. `_compute_derived` therefore keys its zero on the device's
 own `supply_fan_status`, not on a percentage threshold. (`airflow_max_m3h`
 *is* legitimately a config option: max airflow is a model property with no
 register.)
+
+## Bring-up diagnostic
+
+`tests/diagnose_hrds.py <host> [--port N] [--unit N]` is a **read-only** script
+(FC03/FC04/FC43 only, it never writes) to run against a real unit before
+installing the integration. It reuses `const.py` and the integration's block
+plan, reports device identification, connected probes, settings to review, and
+exactly what the integration writes on first connect. Needs only
+`pip install 'pymodbus>=3.13.1'`. Keep its `build_blocks` in sync with
+`_build_blocks` in `__init__.py`.
+
+The port is configurable in the integration too (`port` in the config flow and
+options flow, default 502), as are the unit id (`hostid`) and model.
 
 ## Linting
 

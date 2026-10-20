@@ -29,6 +29,104 @@ All notable changes to this project are documented here, newest first.
 - `release.yaml` runs the HACS check with `ignore: brands` like `hacs.yaml`.
 - `tests/wiring_check.py` also checks the brand image sizes and that no manifest
   requirement is an exact pin.
+- Removed `strings.json`: it was an exact copy of `translations/en.json`, and a
+  custom integration only needs the `translations/` files (hassfest reads those).
+
+## 2026-10-19
+
+### feat: brine temperature guard
+
+* New options *Brine temperature guard sensor* (any HA temperature sensor,
+  e.g. the heat pump's brine reading) and *Brine guard minimum temperature*
+  (default 10 °C). When set, a dehumidify / integration request (or unit on
+  with one latched) only starts while the sensor reads at least the minimum
+  and has reported within 24 h, in every season. Unavailable, non-numeric or
+  non-temperature readings block too.
+* On brine, a passing guard permits winter dehumidifying; without a guard it
+  stays refused. Winter heating on brine stays refused. The PU02 setup issue
+  is only raised without a guard.
+* `binary_sensor.brine_temperature_guard` (problem class) is on while the
+  guard blocks, with source, temperature, minimum, last report and reason as
+  attributes; the water check gains `brine_guard_blocking`.
+
+### feat: installer device, season control, winter-heating and brine guards
+
+From the technical handbook (§2.7, §3.8, §5.1, §5.3, §6) and the Modbus
+manual's full parameter table.
+
+* **Installer device.** About 240 installer-menu parameters (PF, PE, Pb, PU,
+  PS, Pr, PA, PC, PH, PG, HA-HD, PM, PT) on a linked `<name> installer` device
+  (`installer_params.py`). Writable ones under Configuration, link settings /
+  I/O allocation / safety bypass / test mode read-only under Diagnostic, unused
+  ones disabled by default. Passwords, PH15 and PH18 are not exposed.
+* **Season select** (HB04: 4 = summer, 3 = winter), replacing the read-only
+  `sensor.season_input`.
+* **Integration request renamed** and guarded: it heats in winter, so it is
+  refused unless the unit is in summer or the new option *Allow winter
+  heating* is on. Climate offers Cool only in summer and Heat only in winter
+  with the option. New option *Water register connected to* (heating/cooling
+  circuit or brine): on brine, winter heating and winter dehumidify are always
+  refused and PU02 is flagged in the setup check.
+* **Water diagnostics:** valve/pump output (1126), condenser valve (1124),
+  AL03/AL04 alarms and a *Water circuit check* sensor. Read-only by design.
+* **Headless setpoints hidden:** without a display or room probe the unit
+  ignores PU01/SEtC/SEtH/PU07, so they are not created and the climate entity
+  offers no targets.
+* **PC12 is at 1894** (1879 is PE24), new setup switch. Winter setpoint range
+  lowered to 5 °C (factory PH10 cap is 14 °C).
+
+### feat: setup through the integration, operation gate, grouped device page
+
+* **Setup check** sensor (`ok` / `attention`, `issues` attribute) computed from
+  the polled read-back: pending Modbus/headless enables, remote contact open,
+  scheduler/clock holds, probes allocated but not wired, time programs, free
+  cooling without an outdoor probe, Fahrenheit.
+* **Allow operational requests** switch (default off, restored on restart). While
+  off, `write_entity_value` refuses non-zero writes to unit on/off, dehumidify,
+  active cooling and the manual fan speed. OFF and configuration writes pass; the
+  hub's own enable/headless writes bypass the gate.
+* New read-only entities for how the unit is configured (HB03, HB04, PC11, PH05,
+  HC04, HD01, PS01, remote contact) plus writable HA02/HA03 and PH03.
+* **Device page:** a linked `<name> setup` device holds the setup items; post-setup
+  parameters are `EntityCategory.CONFIG` and read-only extras `DIAGNOSTIC` on the
+  main device, which keeps the operational surface. Unique ids are unchanged.
+* README gains the device layout and a first-use checklist.
+
+### fix: run without a display, verify the device, stop misreading PG01 and unwired probes
+
+Driven by the first bring-up against a real HRDS+ 30 R (`tests/diagnose_hrds.py`).
+
+**Device identity is checked** (`identity.py`). Setup and the config/options
+flow now require FC 43/14 vendor `EVCO` with a product code starting `EPB9`
+(the unit reports `EVCO` / `EPB9ORSINDEU` / `V01.00.09.02`) **and** the four
+status registers holding documented enum values. A wrong device is refused
+before any register is written (`wrong_device` / `ConfigEntryError`); an
+unreachable one gives `cannot_connect` / `ConfigEntryNotReady`. Without FC 43
+the register fingerprint decides alone. The product code and firmware revision
+now appear in the device registry.
+
+**Headless operation.** New option `has_display` (default **off**). While off,
+the hub asserts **PH01 = 0** (display on/off) and **HA00 = 0** (T/H source
+none) on every poll, next to PH02/PH27/PH28. Before this the unit reported
+`off_by_display` forever, because PH01 = 1 with no display, and a Modbus ON
+cannot override it. New `switch.enable_onoff_display` exposes PH01. Set
+`has_display` if you do have a CNU2: the integration then leaves both alone.
+`_sync_bms_enables_locked` became `_sync_required_settings_locked`.
+
+**Unwired probes no longer read -3276.4 °C.** An unconnected analog input
+returns `0x8004` (and `0x7FFA` next to it), not 0. INT16 words in
+`0x7FF0..0x800F` now decode to "no value" and the entity is `unknown`. The
+climate entity also stops holding the previous temperature/humidity when the
+value disappears.
+
+**PG01 was misread.** The handbook defines it as the fan arrangement (0 =
+supply fan only, 1 = supply + exhaust fan), not "has a recirculation fan". An
+`R` unit reads 0, so `binary_sensor.has_recirculation` wrongly said "no
+recirculation". It is replaced by `sensor.machine_type`; detect `R` from the
+recirculation damper output (1134, `disabled` = no damper). Docs corrected.
+
+**Diagnostic script** now flags the sentinel instead of printing -3276.4,
+reports the identity verdict, lists the PH01/HA00 writes, and takes `--display`.
 
 ---
 

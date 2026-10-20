@@ -8,13 +8,26 @@
           "port": "Port",
           "hostid": "Modbus slave ID",
           "scan_interval": "Scan interval",
-          "model": "Model (30 = HRDS+30, 50 = HRDS+50)"
+          "model": "Model (30 = HRDS+30, 50 = HRDS+50)",
+          "has_display": "A wired CNU2 display is connected",
+          "water_circuit": "Water register connected to",
+          "allow_winter_heating": "Allow winter heating (integration request in winter)",
+          "brine_temperature_entity": "Brine temperature guard sensor",
+          "brine_min_temperature": "Brine guard minimum temperature"
+        },
+        "data_description": {
+          "water_circuit": "Brine (ground-source heat pump) circuits cannot heat and must not dehumidify in winter.",
+          "allow_winter_heating": "In winter the unit's integration request heats the air with water from the heating circuit. Off by default; ignored on a brine circuit.",
+          "brine_temperature_entity": "Optional. A temperature sensor on the brine supply (e.g. from the heat pump). When set, dehumidify and integration requests only start while it reads at least the minimum and has reported within 24 h, in every season. On a brine circuit it is required for dehumidifying in winter.",
+          "brine_min_temperature": "Lowest brine temperature at which a request may start."
         }
       }
     },
     "error": {
       "already_configured": "This host is already configured",
-      "invalid_host": "Invalid host or IP address"
+      "invalid_host": "Invalid host or IP address",
+      "cannot_connect": "Cannot reach the unit. Check host, port and Modbus slave ID",
+      "wrong_device": "The device at this address is not an HRDS+ (EVCO EPB9 controller)"
     }
   },
   "options": {
@@ -27,32 +40,88 @@
           "hostid": "Modbus slave ID",
           "scan_interval": "Scan interval",
           "model": "Model (30 = HRDS+30, 50 = HRDS+50)",
-          "airflow_max_m3h": "Supply fan max airflow (m³/h)"
+          "has_display": "A wired CNU2 display is connected",
+          "airflow_max_m3h": "Supply fan max airflow (m³/h)",
+          "water_circuit": "Water register connected to",
+          "allow_winter_heating": "Allow winter heating (integration request in winter)",
+          "brine_temperature_entity": "Brine temperature guard sensor",
+          "brine_min_temperature": "Brine guard minimum temperature"
+        },
+        "data_description": {
+          "water_circuit": "Brine (ground-source heat pump) circuits cannot heat and must not dehumidify in winter.",
+          "allow_winter_heating": "In winter the unit's integration request heats the air with water from the heating circuit. Off by default; ignored on a brine circuit.",
+          "brine_temperature_entity": "Optional. A temperature sensor on the brine supply (e.g. from the heat pump). When set, dehumidify and integration requests only start while it reads at least the minimum and has reported within 24 h, in every season. On a brine circuit it is required for dehumidifying in winter.",
+          "brine_min_temperature": "Lowest brine temperature at which a request may start."
         }
       }
+    },
+    "error": {
+      "cannot_connect": "Cannot reach the unit. Check host, port and Modbus slave ID",
+      "wrong_device": "The device at this address is not an HRDS+ (EVCO EPB9 controller)"
     }
   },
   "entity": {
     "climate": {
-      "hrds_climate": { "name": "Climate" }
+      "hrds_climate": {
+        "name": "Climate"
+      }
     },
     "sensor": {
-      "room_temperature": { "name": "Room temperature" },
-      "outdoor_temperature": { "name": "Outdoor temperature" },
-      "water_temperature": { "name": "Water temperature" },
-      "supply_temperature": { "name": "Supply air temperature" },
-      "room_humidity": { "name": "Room humidity" },
-      "air_quality": { "name": "Air quality" },
-      "actual_setpoint": { "name": "Active setpoint" },
-      "supply_fan_output": { "name": "Supply fan output" },
-      "compressor_output": { "name": "Compressor output" },
-      "supply_fan_rpm": { "name": "Supply fan speed" },
-      "exhaust_temperature": { "name": "Exhaust air temperature" },
-      "evaporator_temperature": { "name": "Evaporator temperature" },
-      "fan_manual_request": { "name": "Manual fan request (display)" },
-      "max_total_airflow": { "name": "Max total airflow" },
-      "supply_fan_max_airflow": { "name": "Supply fan max airflow" },
-      "supply_fan_airflow": { "name": "Supply fan airflow" },
+      "room_temperature": {
+        "name": "Room temperature"
+      },
+      "outdoor_temperature": {
+        "name": "Outdoor temperature"
+      },
+      "water_temperature": {
+        "name": "Water temperature"
+      },
+      "supply_temperature": {
+        "name": "Supply air temperature"
+      },
+      "room_humidity": {
+        "name": "Room humidity"
+      },
+      "air_quality": {
+        "name": "Air quality"
+      },
+      "actual_setpoint": {
+        "name": "Active setpoint"
+      },
+      "supply_fan_output": {
+        "name": "Supply fan output"
+      },
+      "compressor_output": {
+        "name": "Compressor output"
+      },
+      "supply_fan_rpm": {
+        "name": "Supply fan speed"
+      },
+      "exhaust_temperature": {
+        "name": "Exhaust air temperature"
+      },
+      "evaporator_temperature": {
+        "name": "Evaporator temperature"
+      },
+      "fan_manual_request": {
+        "name": "Manual fan request (display)"
+      },
+      "max_total_airflow": {
+        "name": "Max total airflow"
+      },
+      "supply_fan_max_airflow": {
+        "name": "Supply fan max airflow"
+      },
+      "supply_fan_airflow": {
+        "name": "Supply fan airflow"
+      },
+      "machine_type": {
+        "name": "Machine type (PG01)",
+        "state": {
+          "supply_fan_only": "Supply fan only",
+          "supply_and_exhaust_fan": "Supply and exhaust fan"
+        }
+      },
       "recirculation_damper": {
         "name": "Recirculation damper",
         "state": {
@@ -113,31 +182,378 @@
           "winter": "Winter",
           "auto": "Auto"
         }
+      },
+      "remote_onoff_input": {
+        "name": "Remote on/off input (HB03)",
+        "state": {
+          "unused": "Unused",
+          "normally_closed": "Normally closed",
+          "normally_open": "Normally open"
+        }
+      },
+      "season_owner": {
+        "name": "Season change owner (PC11)",
+        "state": {
+          "display": "Display",
+          "digital_input": "Digital input"
+        }
+      },
+      "temperature_unit": {
+        "name": "Temperature unit (PH05)",
+        "state": {
+          "celsius": "Celsius",
+          "fahrenheit": "Fahrenheit"
+        }
+      },
+      "fan_output_allocation": {
+        "name": "Supply fan output allocation (HC04)"
+      },
+      "damper_relay_allocation": {
+        "name": "Recirculation damper relay allocation (HD01)"
+      },
+      "damper_prestart_time": {
+        "name": "Damper pre-start time (PS01)"
+      },
+      "setup_check": {
+        "name": "Setup check",
+        "state": {
+          "ok": "OK",
+          "attention": "Needs attention"
+        }
+      },
+      "water_valve_pump": {
+        "name": "Water valve / pump output",
+        "state": {
+          "off": "Off",
+          "on": "On",
+          "disabled": "Not configured"
+        }
+      },
+      "water_condenser_valve": {
+        "name": "Water condenser valve",
+        "state": {
+          "off": "Off",
+          "on": "On",
+          "disabled": "Not configured"
+        }
+      },
+      "water_check": {
+        "name": "Water circuit check",
+        "state": {
+          "ok": "OK",
+          "attention": "Needs attention"
+        }
+      },
+      "inst_pm02": {
+        "name": "PM02 Return fan hours"
+      },
+      "inst_pm04": {
+        "name": "PM04 Compressor hours"
+      },
+      "inst_pm21": {
+        "name": "PM21 Compressor forced"
+      },
+      "inst_pm89": {
+        "name": "PM89 Pressure probe offset"
+      },
+      "inst_pe05": {
+        "name": "PE05 Compressor safety-time bypass"
+      },
+      "inst_ph11": {
+        "name": "PH11 Modbus address"
+      },
+      "inst_ph12": {
+        "name": "PH12 Modbus baud rate code"
+      },
+      "inst_ph13": {
+        "name": "PH13 Modbus parity code"
+      },
+      "inst_ph14": {
+        "name": "PH14 Modbus stop bits code"
+      },
+      "inst_ph06": {
+        "name": "PH06 Pressure unit (0 bar, 1 psi)"
+      },
+      "inst_ph16": {
+        "name": "PH16 CAN baud rate code"
+      },
+      "inst_ph17": {
+        "name": "PH17 CAN node"
+      },
+      "inst_ph19": {
+        "name": "PH19 Air quality probe min"
+      },
+      "inst_ph20": {
+        "name": "PH20 Air quality probe max"
+      },
+      "inst_ph21": {
+        "name": "PH21 Pressure probe min"
+      },
+      "inst_ph22": {
+        "name": "PH22 Pressure probe max"
+      },
+      "inst_ph24": {
+        "name": "PH24 Evaporation pressure probe min"
+      },
+      "inst_ph25": {
+        "name": "PH25 Evaporation pressure probe max"
+      },
+      "inst_ph26": {
+        "name": "PH26 Refrigerant code"
+      },
+      "inst_pg04": {
+        "name": "PG04 Heat exchanger type"
+      },
+      "inst_pg05": {
+        "name": "PG05 Expansion module"
+      },
+      "inst_ha01": {
+        "name": "HA01 AI1 allocation (fan potentiometer)"
+      },
+      "inst_ha04": {
+        "name": "HA04 AI4 allocation (evaporator temperature)"
+      },
+      "inst_ha05": {
+        "name": "HA05 AI5 allocation (water temperature)"
+      },
+      "inst_ha06": {
+        "name": "HA06 AI6 allocation (dehumidify request DI)"
+      },
+      "inst_ha07": {
+        "name": "HA07 AI7 allocation (integration request DI)"
+      },
+      "inst_ha08": {
+        "name": "HA08 AI1 Epj allocation"
+      },
+      "inst_ha09": {
+        "name": "HA09 AI2 Epj allocation"
+      },
+      "inst_ha10": {
+        "name": "HA10 AI1 expansion allocation"
+      },
+      "inst_ha11": {
+        "name": "HA11 AI2 expansion allocation"
+      },
+      "inst_ha12": {
+        "name": "HA12 AI3 expansion allocation"
+      },
+      "inst_ha13": {
+        "name": "HA13 AI4 expansion allocation"
+      },
+      "inst_ha14": {
+        "name": "HA14 AI5 expansion allocation"
+      },
+      "inst_ha15": {
+        "name": "HA15 AI6 expansion allocation"
+      },
+      "inst_ha16": {
+        "name": "HA16 AI7 expansion allocation"
+      },
+      "inst_ha17": {
+        "name": "HA17 AI1 Evj allocation"
+      },
+      "inst_ha18": {
+        "name": "HA18 AI2 Evj allocation"
+      },
+      "inst_hb01": {
+        "name": "HB01 DI1 allocation (high pressure)"
+      },
+      "inst_hb02": {
+        "name": "HB02 DI2 allocation (low pressure)"
+      },
+      "inst_hb05": {
+        "name": "HB05 DI1 expansion allocation"
+      },
+      "inst_hb06": {
+        "name": "HB06 DI2 expansion allocation"
+      },
+      "inst_hb07": {
+        "name": "HB07 DI3 expansion allocation"
+      },
+      "inst_hc01": {
+        "name": "HC01 AO1 allocation (compressor)"
+      },
+      "inst_hc02": {
+        "name": "HC02 AO2 allocation"
+      },
+      "inst_hc03": {
+        "name": "HC03 AO3 allocation"
+      },
+      "inst_hc05": {
+        "name": "HC05 AO1 expansion allocation"
+      },
+      "inst_hc06": {
+        "name": "HC06 AO2 expansion allocation"
+      },
+      "inst_hcf1": {
+        "name": "HCF1 Supply fan PWM frequency"
+      },
+      "inst_hcf2": {
+        "name": "HCF2 Return fan PWM frequency"
+      },
+      "inst_hcf3": {
+        "name": "HCF3 Compressor PWM frequency"
+      },
+      "inst_hd02": {
+        "name": "HD02 DO2 allocation (serious alarm)"
+      },
+      "inst_hd03": {
+        "name": "HD03 DO3 allocation (VMC contact)"
+      },
+      "inst_hd04": {
+        "name": "HD04 DO4 allocation (water condensation valve)"
+      },
+      "inst_hd05": {
+        "name": "HD05 DO5 allocation (external water valve / pump)"
+      },
+      "inst_hd06": {
+        "name": "HD06 DO6 allocation (compressor)"
+      },
+      "inst_hd07": {
+        "name": "HD07 DO1 expansion allocation"
+      },
+      "inst_hd08": {
+        "name": "HD08 DO2 expansion allocation"
+      },
+      "inst_hd09": {
+        "name": "HD09 DO3 expansion allocation"
+      },
+      "inst_hd10": {
+        "name": "HD10 DO4 expansion allocation"
+      },
+      "inst_hd11": {
+        "name": "HD11 Open-collector expansion allocation"
+      },
+      "inst_pt01": {
+        "name": "PT01 Test mode enabled"
+      },
+      "inst_pt02": {
+        "name": "PT02 Supply fan speed in test mode"
+      },
+      "inst_pt03": {
+        "name": "PT03 Return fan speed in test mode"
+      },
+      "inst_pt04": {
+        "name": "PT04 External damper in test mode"
       }
     },
     "binary_sensor": {
-      "dehumidify_request": { "name": "Dehumidify requested" },
-      "recirculation_active": { "name": "Recirculation active" },
-      "alarm_active": { "name": "Alarm active" },
-      "temp_probe_ok": { "name": "Room temperature probe OK" },
-      "humidity_probe_ok": { "name": "Room humidity probe OK" },
-      "has_recirculation": { "name": "Has recirculation fan" },
-      "active_cooling_available": { "name": "Active cooling available" },
-      "alarm_compressor_lowpressure": { "name": "Alarm: compressor low-pressure / frost" },
-      "alarm_compressor_highpressure": { "name": "Alarm: compressor high-pressure" },
-      "alarm_water_antifreeze": { "name": "Alarm: water antifreeze" },
-      "alarm_dirty_filter": { "name": "Alarm: dirty filter" }
+      "dehumidify_request": {
+        "name": "Dehumidify requested"
+      },
+      "recirculation_active": {
+        "name": "Recirculation active"
+      },
+      "alarm_active": {
+        "name": "Alarm active"
+      },
+      "temp_probe_ok": {
+        "name": "Room temperature probe OK"
+      },
+      "humidity_probe_ok": {
+        "name": "Room humidity probe OK"
+      },
+      "active_cooling_available": {
+        "name": "Active cooling available"
+      },
+      "alarm_compressor_lowpressure": {
+        "name": "Alarm: compressor low-pressure / frost"
+      },
+      "alarm_compressor_highpressure": {
+        "name": "Alarm: compressor high-pressure"
+      },
+      "alarm_water_antifreeze": {
+        "name": "Alarm: water antifreeze"
+      },
+      "alarm_dirty_filter": {
+        "name": "Alarm: dirty filter"
+      },
+      "remote_contact_closed": {
+        "name": "Remote on/off contact closed"
+      },
+      "alarm_high_water_temperature": {
+        "name": "Alarm: high water temperature (AL03)"
+      },
+      "alarm_low_water_temperature": {
+        "name": "Alarm: low water temperature (AL04)"
+      },
+      "brine_temperature_guard": {
+        "name": "Brine temperature guard"
+      }
     },
     "switch": {
-      "unit_on_off": { "name": "Unit on/off (Modbus)" },
-      "dehumidify": { "name": "Dehumidify (Modbus)" },
-      "active_cooling": { "name": "Active cooling (Modbus)" },
-      "enable_onoff_bms": { "name": "Enable on/off via Modbus" },
-      "enable_dehumidify_bms": { "name": "Enable dehumidify via Modbus" },
-      "enable_cooling_bms": { "name": "Enable cooling via Modbus" },
-      "force_dehumidify_in_cooling": { "name": "Force dehumidify when cooling" },
-      "enable_integration": { "name": "Enable integration (active cooling)" },
-      "enable_free_cooling": { "name": "Enable free cooling/heating" }
+      "unit_on_off": {
+        "name": "Unit on/off (Modbus)"
+      },
+      "dehumidify": {
+        "name": "Dehumidify (Modbus)"
+      },
+      "active_cooling": {
+        "name": "Integration request (cool in summer, heat in winter)"
+      },
+      "enable_onoff_display": {
+        "name": "Enable on/off via display (PH01)"
+      },
+      "enable_onoff_bms": {
+        "name": "Enable on/off via Modbus"
+      },
+      "enable_dehumidify_bms": {
+        "name": "Enable dehumidify via Modbus"
+      },
+      "enable_cooling_bms": {
+        "name": "Enable cooling via Modbus"
+      },
+      "force_dehumidify_in_cooling": {
+        "name": "Force dehumidify when cooling"
+      },
+      "enable_integration": {
+        "name": "Enable integration (active cooling)"
+      },
+      "enable_free_cooling": {
+        "name": "Enable free cooling/heating"
+      },
+      "enable_time_programs": {
+        "name": "Time programs enabled (PH03)"
+      },
+      "operation_allowed": {
+        "name": "Allow operational requests"
+      },
+      "enable_onoff_by_di_request": {
+        "name": "Unit on by DI request (PC12)"
+      },
+      "inst_pc01": {
+        "name": "PC01 Room temperature sniffing cycles"
+      },
+      "inst_pc04": {
+        "name": "PC04 Both fans in sniffing cycle"
+      },
+      "inst_pf04": {
+        "name": "PF04 Stop supply fan during defrost"
+      },
+      "inst_pe33": {
+        "name": "PE33 Compressor speed (rps) control"
+      },
+      "inst_pu03": {
+        "name": "PU03 Dehumidify during high-temperature alarm"
+      },
+      "inst_pu04": {
+        "name": "PU04 Dehumidify during water-flow alarm"
+      },
+      "inst_pu09": {
+        "name": "PU09 Compressor as second step"
+      },
+      "inst_pa01": {
+        "name": "PA01 Fan hours alarm"
+      },
+      "inst_pa02": {
+        "name": "PA02 Compressor hours alarm"
+      },
+      "inst_pa52": {
+        "name": "PA52 Clock (RTC) alarm"
+      },
+      "inst_ph23": {
+        "name": "PH23 EVCO LED"
+      }
     },
     "select": {
       "probe_source": {
@@ -159,28 +575,569 @@
           "with_water": "With water",
           "without_water": "Without water"
         }
+      },
+      "season": {
+        "name": "Season",
+        "state": {
+          "summer": "Summer",
+          "winter": "Winter"
+        }
       }
     },
     "fan": {
-      "hrds_supply_fan": { "name": "Supply fan" }
+      "hrds_supply_fan": {
+        "name": "Supply fan"
+      }
     },
     "number": {
-      "humidity_setpoint": { "name": "Humidity setpoint" },
-      "summer_setpoint": { "name": "Summer setpoint" },
-      "winter_setpoint": { "name": "Winter setpoint" },
-      "fan_min_speed_dehumidify": { "name": "Fan min speed (dehumidify)" },
-      "fan_max_speed_dehumidify": { "name": "Fan max speed (dehumidify)" },
-      "fan_min_speed_cooling": { "name": "Fan min speed (cooling)" },
-      "fan_min_speed_vmc": { "name": "Fan min speed (VMC)" },
-      "fan_max_speed_cooling": { "name": "Fan max speed (cooling)" },
-      "fan_manual_speed": { "name": "Manual fan speed" },
-      "dehumidify_differential": { "name": "Dehumidify differential" },
-      "min_room_temp_dehumidify": { "name": "Min room temp for dehumidify" },
-      "min_room_temp_diff_dehumidify": { "name": "Min room temp differential" },
-      "fan_min_runtime": { "name": "Fan minimum runtime" },
-      "fan_post_run_time": { "name": "Fan post-run time" },
-      "humidity_setpoint_min": { "name": "Humidity setpoint minimum" },
-      "humidity_setpoint_max": { "name": "Humidity setpoint maximum" }
+      "humidity_setpoint": {
+        "name": "Humidity setpoint"
+      },
+      "summer_setpoint": {
+        "name": "Summer setpoint"
+      },
+      "winter_setpoint": {
+        "name": "Winter setpoint"
+      },
+      "fan_min_speed_dehumidify": {
+        "name": "Fan min speed (dehumidify)"
+      },
+      "fan_max_speed_dehumidify": {
+        "name": "Fan max speed (dehumidify)"
+      },
+      "fan_min_speed_cooling": {
+        "name": "Fan min speed (cooling)"
+      },
+      "fan_min_speed_vmc": {
+        "name": "Fan min speed (VMC)"
+      },
+      "fan_max_speed_cooling": {
+        "name": "Fan max speed (cooling)"
+      },
+      "fan_manual_speed": {
+        "name": "Manual fan speed"
+      },
+      "dehumidify_differential": {
+        "name": "Dehumidify differential"
+      },
+      "min_room_temp_dehumidify": {
+        "name": "Min room temp for dehumidify"
+      },
+      "min_room_temp_diff_dehumidify": {
+        "name": "Min room temp differential"
+      },
+      "fan_min_runtime": {
+        "name": "Fan minimum runtime"
+      },
+      "fan_post_run_time": {
+        "name": "Fan post-run time"
+      },
+      "humidity_setpoint_min": {
+        "name": "Humidity setpoint minimum"
+      },
+      "humidity_setpoint_max": {
+        "name": "Humidity setpoint maximum"
+      },
+      "ai2_allocation": {
+        "name": "AI2 allocation (HA02)"
+      },
+      "ai3_allocation": {
+        "name": "AI3 allocation (HA03)"
+      },
+      "inst_pm00": {
+        "name": "PM00 Fan hours alarm limit"
+      },
+      "inst_pm01": {
+        "name": "PM01 Supply fan hours (0 resets AL22)"
+      },
+      "inst_pm03": {
+        "name": "PM03 Compressor hours alarm limit"
+      },
+      "inst_pm80": {
+        "name": "PM80 Room temperature probe offset"
+      },
+      "inst_pm81": {
+        "name": "PM81 Outdoor temperature probe offset"
+      },
+      "inst_pm82": {
+        "name": "PM82 Water temperature probe offset"
+      },
+      "inst_pm83": {
+        "name": "PM83 Exhaust temperature probe offset"
+      },
+      "inst_pm84": {
+        "name": "PM84 Discharge temperature probe offset"
+      },
+      "inst_pm85": {
+        "name": "PM85 Defrost probe offset"
+      },
+      "inst_pm86": {
+        "name": "PM86 Room humidity probe offset"
+      },
+      "inst_pm87": {
+        "name": "PM87 Air quality probe offset"
+      },
+      "inst_pm88": {
+        "name": "PM88 Fan potentiometer offset"
+      },
+      "inst_pm91": {
+        "name": "PM91 Free-cooling probe offset"
+      },
+      "inst_pm92": {
+        "name": "PM92 Evaporator probe offset"
+      },
+      "inst_pc02": {
+        "name": "PC02 Sniffing wait time"
+      },
+      "inst_pc03": {
+        "name": "PC03 Sniffing active time"
+      },
+      "inst_pc05": {
+        "name": "PC05 Season change (0 manual, 1 manual+auto, 2 auto)"
+      },
+      "inst_pc06": {
+        "name": "PC06 Auto season probe (0 water, 1 room)"
+      },
+      "inst_pc07": {
+        "name": "PC07 Max water temperature for dehumidify / summer integration"
+      },
+      "inst_pc08": {
+        "name": "PC08 Min water temperature for winter integration"
+      },
+      "inst_pc09": {
+        "name": "PC09 Auto summer above room temperature"
+      },
+      "inst_pc10": {
+        "name": "PC10 Auto winter below room temperature"
+      },
+      "inst_pf26": {
+        "name": "PF26 Supply fan post-run speed"
+      },
+      "inst_pf02": {
+        "name": "PF02 Delay between the two fans"
+      },
+      "inst_pf05": {
+        "name": "PF05 Supply fan speed on air quality probe fault"
+      },
+      "inst_pf08": {
+        "name": "PF08 Supply fan max speed (VMC)"
+      },
+      "inst_pf11": {
+        "name": "PF11 Fan speed step"
+      },
+      "inst_pf12": {
+        "name": "PF12 Room temperature dead band"
+      },
+      "inst_pf13": {
+        "name": "PF13 Fan speed step interval (integration)"
+      },
+      "inst_pf15": {
+        "name": "PF15 Air quality setpoint min"
+      },
+      "inst_pf16": {
+        "name": "PF16 Air quality setpoint max"
+      },
+      "inst_pf17": {
+        "name": "PF17 Air quality setpoint"
+      },
+      "inst_pf18": {
+        "name": "PF18 Air quality dead band"
+      },
+      "inst_pf19": {
+        "name": "PF19 Air quality fan step interval"
+      },
+      "inst_pf20": {
+        "name": "PF20 Defrost fan speed step"
+      },
+      "inst_pf21": {
+        "name": "PF21 Defrost fan step interval"
+      },
+      "inst_pf23": {
+        "name": "PF23 Supply fan speed forced by DI"
+      },
+      "inst_pf29": {
+        "name": "PF29 Return fan min speed"
+      },
+      "inst_pf30": {
+        "name": "PF30 Return fan max speed"
+      },
+      "inst_pf31": {
+        "name": "PF31 Integration fan control (0 temperature, 1 max of manual/remote, 2 max of all)"
+      },
+      "inst_pf32": {
+        "name": "PF32 Return fan speed forced by DI"
+      },
+      "inst_pm22": {
+        "name": "PM22 Return fan manual setpoint"
+      },
+      "inst_pf33": {
+        "name": "PF33 Return fan speed on air quality probe fault"
+      },
+      "inst_pf34": {
+        "name": "PF34 Return fan post-run speed"
+      },
+      "inst_pe01": {
+        "name": "PE01 Compressor minimum off time"
+      },
+      "inst_pe02": {
+        "name": "PE02 Compressor minimum on time"
+      },
+      "inst_pe03": {
+        "name": "PE03 Minimum time between compressor starts"
+      },
+      "inst_pe04": {
+        "name": "PE04 Delay fan start to compressor start"
+      },
+      "inst_pe06": {
+        "name": "PE06 Compressor min output (dehumidify)"
+      },
+      "inst_pe07": {
+        "name": "PE07 Compressor max output (dehumidify)"
+      },
+      "inst_pe08": {
+        "name": "PE08 Compressor output step"
+      },
+      "inst_pe09": {
+        "name": "PE09 Compressor output step interval"
+      },
+      "inst_pe10": {
+        "name": "PE10 Defrost interval"
+      },
+      "inst_pe11": {
+        "name": "PE11 End of defrost setpoint"
+      },
+      "inst_pe12": {
+        "name": "PE12 Maximum defrost time"
+      },
+      "inst_pe13": {
+        "name": "PE13 Dripping time"
+      },
+      "inst_pe14": {
+        "name": "PE14 Defrost interval counting"
+      },
+      "inst_pe15": {
+        "name": "PE15 Defrost counting setpoint"
+      },
+      "inst_pe16": {
+        "name": "PE16 Condenser valve switch time"
+      },
+      "inst_pe17": {
+        "name": "PE17 High-pressure pre-alarm setpoint"
+      },
+      "inst_pe18": {
+        "name": "PE18 High-pressure pre-alarm differential"
+      },
+      "inst_pe19": {
+        "name": "PE19 Compressor step at high-pressure pre-alarm"
+      },
+      "inst_pe20": {
+        "name": "PE20 Step interval at high-pressure pre-alarm"
+      },
+      "inst_pe21": {
+        "name": "PE21 Compressor min output (integration)"
+      },
+      "inst_pe22": {
+        "name": "PE22 Compressor max output (integration)"
+      },
+      "inst_pe24": {
+        "name": "PE24 Compressor speed ramp"
+      },
+      "inst_pe25": {
+        "name": "PE25 Compressor ramp-down on alarm or off"
+      },
+      "inst_pe26": {
+        "name": "PE26 Ramp to and from minimum step"
+      },
+      "inst_pe27": {
+        "name": "PE27 Compressor max speed"
+      },
+      "inst_pe28": {
+        "name": "PE28 Compressor step 1 speed"
+      },
+      "inst_pe30": {
+        "name": "PE30 Minimum time at step 1"
+      },
+      "inst_pe31": {
+        "name": "PE31 Minimum time at step 2"
+      },
+      "inst_pe32": {
+        "name": "PE32 Maximum time below step 1"
+      },
+      "inst_pb01": {
+        "name": "Pb01 Water valve close delay"
+      },
+      "inst_pb02": {
+        "name": "Pb02 Valve sniffing active time (temperature alarm)"
+      },
+      "inst_pb03": {
+        "name": "Pb03 Valve sniffing wait time (temperature alarm)"
+      },
+      "inst_pb04": {
+        "name": "Pb04 Preheating setpoint"
+      },
+      "inst_pb05": {
+        "name": "Pb05 Preheating differential"
+      },
+      "inst_pb06": {
+        "name": "Pb06 Preheating maximum time"
+      },
+      "inst_pb07": {
+        "name": "Pb07 Anti-stagnation valve active time"
+      },
+      "inst_pb08": {
+        "name": "Pb08 Anti-stagnation valve wait time"
+      },
+      "inst_pu08": {
+        "name": "PU08 Cold-water-only dehumidify below water temperature"
+      },
+      "inst_pu10": {
+        "name": "PU10 Delay before compressor second step"
+      },
+      "inst_pu11": {
+        "name": "PU11 Evaporator temperature setpoint"
+      },
+      "inst_pu12": {
+        "name": "PU12 Evaporator dead band"
+      },
+      "inst_ps02": {
+        "name": "PS02 Outdoor damper pre-start time"
+      },
+      "inst_ps04": {
+        "name": "PS04 External damper min opening"
+      },
+      "inst_ps05": {
+        "name": "PS05 External damper max opening"
+      },
+      "inst_ps06": {
+        "name": "PS06 Free-cooling/heating activation setpoint"
+      },
+      "inst_ps07": {
+        "name": "PS07 Free-cooling/heating differential"
+      },
+      "inst_ps08": {
+        "name": "PS08 External damper step at high humidity"
+      },
+      "inst_ps09": {
+        "name": "PS09 External damper step interval"
+      },
+      "inst_pr01": {
+        "name": "Pr01 Rotary exchanger setpoint differential"
+      },
+      "inst_pr02": {
+        "name": "Pr02 Rotary exchanger differential"
+      },
+      "inst_pr03": {
+        "name": "Pr03 Exchanger defrost setpoint"
+      },
+      "inst_pr04": {
+        "name": "Pr04 Exchanger defrost dead band"
+      },
+      "inst_pr05": {
+        "name": "Pr05 Cross-flow bypass cycle time"
+      },
+      "inst_pr06": {
+        "name": "Pr06 Exchanger stop setpoint"
+      },
+      "inst_pr07": {
+        "name": "Pr07 Exchanger stop differential"
+      },
+      "inst_pr08": {
+        "name": "Pr08 Rotary exchanger defrost step"
+      },
+      "inst_pr09": {
+        "name": "Pr09 Rotary exchanger defrost interval"
+      },
+      "inst_pr10": {
+        "name": "Pr10 Rotary exchanger PWM frequency"
+      },
+      "inst_pa03": {
+        "name": "PA03 Hours alarm relay (0 none, 1 light, 2 serious)"
+      },
+      "inst_pa04": {
+        "name": "PA04 Probe alarm delay"
+      },
+      "inst_pa05": {
+        "name": "PA05 Probe alarm relay"
+      },
+      "inst_pa06": {
+        "name": "PA06 Air-flow alarm delay after reset"
+      },
+      "inst_pa07": {
+        "name": "PA07 Air-flow alarm delay"
+      },
+      "inst_pa08": {
+        "name": "PA08 Air-flow alarm relay"
+      },
+      "inst_pa09": {
+        "name": "PA09 Water-flow alarm delay after reset"
+      },
+      "inst_pa10": {
+        "name": "PA10 Water-flow alarm delay"
+      },
+      "inst_pa11": {
+        "name": "PA11 Water-flow alarms per hour before manual reset"
+      },
+      "inst_pa12": {
+        "name": "PA12 Water-flow alarm relay"
+      },
+      "inst_pa13": {
+        "name": "PA13 Filter alarm delay"
+      },
+      "inst_pa14": {
+        "name": "PA14 Filter alarm reset type"
+      },
+      "inst_pa15": {
+        "name": "PA15 Filter alarm relay"
+      },
+      "inst_pa16": {
+        "name": "PA16 High/low water temperature alarm delay"
+      },
+      "inst_pa17": {
+        "name": "PA17 High/low water temperature alarm differential"
+      },
+      "inst_pa18": {
+        "name": "PA18 High/low water temperature alarm relay"
+      },
+      "inst_pa19": {
+        "name": "PA19 High humidity warning setpoint"
+      },
+      "inst_pa21": {
+        "name": "PA21 High humidity time before alarm"
+      },
+      "inst_pa22": {
+        "name": "PA22 High humidity events"
+      },
+      "inst_pa23": {
+        "name": "PA23 Fan speed sensor alarm delay after reset"
+      },
+      "inst_pa24": {
+        "name": "PA24 Fan speed sensor alarm delay"
+      },
+      "inst_pa25": {
+        "name": "PA25 Fan max speed for speed sensor alarm"
+      },
+      "inst_pa26": {
+        "name": "PA26 Fan alarm relay"
+      },
+      "inst_pa27": {
+        "name": "PA27 Compressor thermal switch alarm delay"
+      },
+      "inst_pa28": {
+        "name": "PA28 Compressor thermal switch reset type"
+      },
+      "inst_pa29": {
+        "name": "PA29 Compressor thermal switch relay"
+      },
+      "inst_pa30": {
+        "name": "PA30 Low-pressure alarm bypass time"
+      },
+      "inst_pa31": {
+        "name": "PA31 Low-pressure alarm delay"
+      },
+      "inst_pa32": {
+        "name": "PA32 Low-pressure alarms per hour before manual reset"
+      },
+      "inst_pa33": {
+        "name": "PA33 High-pressure alarm setpoint"
+      },
+      "inst_pa34": {
+        "name": "PA34 High-pressure alarm differential"
+      },
+      "inst_pa35": {
+        "name": "PA35 High-pressure alarms per hour before manual reset"
+      },
+      "inst_pa36": {
+        "name": "PA36 Pressure alarm relay"
+      },
+      "inst_pa37": {
+        "name": "PA37 Discharge temperature alarm delay"
+      },
+      "inst_pa38": {
+        "name": "PA38 Discharge temperature alarm setpoint"
+      },
+      "inst_pa39": {
+        "name": "PA39 Discharge temperature alarm differential"
+      },
+      "inst_pa40": {
+        "name": "PA40 Discharge temperature alarms per hour"
+      },
+      "inst_pa41": {
+        "name": "PA41 Discharge temperature alarm relay"
+      },
+      "inst_pa42": {
+        "name": "PA42 Antifreeze alarm delay"
+      },
+      "inst_pa43": {
+        "name": "PA43 Antifreeze water temperature setpoint"
+      },
+      "inst_pa44": {
+        "name": "PA44 Antifreeze differential"
+      },
+      "inst_pa45": {
+        "name": "PA45 Antifreeze alarm relay"
+      },
+      "inst_pa46": {
+        "name": "PA46 Fire/smoke alarm type"
+      },
+      "inst_pa47": {
+        "name": "PA47 Fire/smoke alarm relay"
+      },
+      "inst_pa48": {
+        "name": "PA48 Generic warning delay"
+      },
+      "inst_pa49": {
+        "name": "PA49 Generic warning reset type"
+      },
+      "inst_pa50": {
+        "name": "PA50 Generic alarm delay"
+      },
+      "inst_pa51": {
+        "name": "PA51 Generic alarm reset type"
+      },
+      "inst_pa53": {
+        "name": "PA53 Clock alarm reset type"
+      },
+      "inst_pa55": {
+        "name": "PA55 Phase sequence alarm relay"
+      },
+      "inst_pa56": {
+        "name": "PA56 Expansion alarm relay"
+      },
+      "inst_pa57": {
+        "name": "PA57 High humidity alarm type (0 display, 1 blocking)"
+      },
+      "inst_pa58": {
+        "name": "PA58 Max dehumidify time forced by DI"
+      },
+      "inst_pa59": {
+        "name": "PA59 Alarm relay (0 always, 1 summer only)"
+      },
+      "inst_pa60": {
+        "name": "PA60 Auto-reset delay of high humidity block"
+      },
+      "inst_ph04": {
+        "name": "PH04 Unit state on holiday (0 off, 1 on)"
+      },
+      "inst_ph07": {
+        "name": "PH07 Summer setpoint min"
+      },
+      "inst_ph08": {
+        "name": "PH08 Summer setpoint max"
+      },
+      "inst_ph09": {
+        "name": "PH09 Winter setpoint min"
+      },
+      "inst_ph10": {
+        "name": "PH10 Winter setpoint max (factory 14 °C blocks auto heating)"
+      }
+    }
+  },
+  "selector": {
+    "water_circuit": {
+      "options": {
+        "heating_cooling": "Heating/cooling circuit (floor heating or cooling)",
+        "brine": "Brine circuit of a ground-source heat pump"
+      }
     }
   }
 }

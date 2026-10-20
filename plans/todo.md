@@ -60,6 +60,29 @@ verified on hardware.
       compressor, and whether setting PU13 to 0 lifts the interlock. This is the
       most likely cause of "the write was accepted but nothing happened".
 
+## Headless operation, identity, sentinel (added 2026-10-19)
+
+- [ ] **PH01 = 0 clears `off_by_display`.** On a unit that reads PH01 = 1 with no
+      display, connect with `has_display` off and confirm `unit_status` goes
+      `off_by_display` → `off_by_bms`, then that `climate.turn_on` really starts
+      it. Check whether PH01 needs a unit restart to take effect.
+- [ ] **HA00 = 0 on a unit that read 2** (the manual says the factory value is
+      6). Confirm it is accepted and whether AL28/AL34 appear afterwards.
+- [ ] **PH01 / HA00 are config parameters**: confirm that re-writing them only
+      when the read-back differs (never blindly each poll) does not wear the
+      controller's memory, and that the unit does not reset them on its own.
+- [ ] **Sentinel window** `0x7FF0..0x800F`: only `0x8004` and `0x7FFA` have been
+      seen. Confirm what a *failed* (wired but broken) probe reads, and whether
+      it also raises AL28/AL34.
+- [ ] **AL28/AL34 were not set** while the unit was OFF by display with no
+      probes (PackedAlarm_2/3 = 0). Confirm they appear once the unit is ON.
+- [ ] **PU13 with no room temperature**: does the interlock veto a Modbus
+      dehumidify when the room input is the sentinel? If yes, set PU13 to 0.
+- [ ] **Identity check**: the product-code prefix `EPB9` comes from one unit
+      (`EPB9ORSINDEU`). Confirm other HRDS+ variants (30/50, non-R, non-DC)
+      report an `EPB9…` code; loosen `EXPECTED_PRODUCT_PREFIX` if not. Also
+      confirm what a gateway that does not forward FC 43 returns.
+
 ## Climate entity behaviour
 
 - [ ] **Mode writes**: DRY = on + dehumidify + active_cooling **off**;
@@ -235,3 +258,25 @@ option is recommended.
       and the `PriorityChangeMode` (1878) ownership flag are not implemented.
 - [ ] **Manual fan request / remote request** (1114 / 1116, R/O) are not exposed.
 - [x] Recirculation damper status (1134) — now exposed as `sensor.recirculation_damper`.
+
+## Setup check / operation gate (added 2026-10-19)
+
+- [ ] Verify on hardware that every setup-check issue clears as described in the
+      README checklist (remote contact, PH03, HA02/HA03 = 0).
+- [ ] Confirm the `remote_contact_closed` bit (257 bit 0) meaning by opening the
+      contact.
+- [ ] Decide whether the gate should also refuse climate `hvac_mode` writes with
+      a friendlier message (currently surfaces the `ServiceValidationError`).
+
+## Installer device / season / water circuit (added 2026-10-19)
+
+- [ ] Confirm on hardware that writing HB04 = 3 switches `operating_mode` to
+      winter and 4 back to summer (no contact wired to DI4).
+- [ ] Watch `water_valve_pump` (1126) during a dehumidify request on the brine
+      installation: expect On with the request, Off after Pb01.
+- [ ] Verify the enum meaning of 1124 / 1126 (0/1/2 inferred from the
+      misaligned PDF table).
+- [ ] Spot-check installer scaling for rows not covered by the snapshot
+      (PM81 1617) and the PA20 address (1736 is not in the PDF table).
+- [ ] Check whether registers above 1900 (PT05-PT11, PH31-PH35, PA61/PA62)
+      are readable; add them to the installer device if they are.
