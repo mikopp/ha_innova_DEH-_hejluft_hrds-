@@ -379,9 +379,9 @@ for full probe specifications, wiring, and the HA00/PH01 configuration detail.
 
 ## Requirements
 
-* **Home Assistant 2026.9 or newer.**
+* **Home Assistant 2026.10 or newer.**
 * `pymodbus` 3.13.1 or newer (a minimum version in the manifest, as hassfest
-  requires for packages Home Assistant itself ships; HA 2026.9 ships 3.13.1).
+  requires for packages Home Assistant itself ships; HA 2026.10 ships 3.13.1).
 
 ### Availability
 

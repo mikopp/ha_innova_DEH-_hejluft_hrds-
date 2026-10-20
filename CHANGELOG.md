@@ -8,6 +8,8 @@ All notable changes to this project are documented here, newest first.
 
 ### fix: hassfest requirement, brand images, release packaging
 
+- **Minimum Home Assistant is now 2026.10** (`hacs.json`, README, CLAUDE.md).
+  HA 2026.10 still ships `pymodbus` 3.13.1, so the requirement below is unchanged.
 - **hassfest was failing** on `pymodbus==3.13.1`: it rejects an exact pin on a
   package Home Assistant itself depends on. The manifest now requires
   `pymodbus>=3.13.1`, which still resolves to the version HA ships.

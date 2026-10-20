@@ -2,7 +2,7 @@
 
 Home Assistant custom integration for the **Innova DEH+ / hej.luft HRDS+** air
 dehumidification module via **Modbus TCP**. Minimum Home Assistant version is
-**2026.9**; `pymodbus` is required as `>=3.13.1` (the version HA 2026.9 ships;
+**2026.10**; `pymodbus` is required as `>=3.13.1` (the version HA 2026.10 ships;
 hassfest rejects an exact `==` pin on a package HA depends on). It serves a similar purpose to the
 sibling `ha_comfoconnectpro` integration and shares its architecture.
 
