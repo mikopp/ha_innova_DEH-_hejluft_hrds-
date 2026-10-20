@@ -350,23 +350,13 @@ GitHub Actions (in `.github/workflows/`):
   branch with an open PR would run every workflow for both events. tests and e2e
   also run from `release.yaml` (`workflow_call`) on the tagged commit before the
   zip is built. tests/e2e cancel a superseded PR run (`concurrency`).
-* **Branch protection is a GitHub setting, not a file** — keep it as follows
-  (Settings -> Rules -> Rulesets, target the default branch, enforcement active):
-  require a pull request (0 approvals; the owner merges their own), require the
-  checks `ruff`, `hassfest`, `hacs`, `pytest`, `e2e (pinned)` to pass, block
-  force pushes and deletion, no bypass actors, squash merge only. Only people
-  with write access can merge, so keep the owner the sole collaborator with
-  write; Actions -> General -> workflow permissions "read", and approve fork PR
-  workflows manually.
-* **Only the owner merges or releases; apps only branch.** The Claude app and
-  Dependabot may push branches and open PRs, but apps with write access could
-  merge (0 approvals) or publish a release. Two more rulesets close that, each
-  with the Repository admin role as the only bypass actor: one on the default
-  branch with only "Restrict updates" (a merge updates `main`; kept apart from
-  the ruleset above so its checks have no bypass), and one on `refs/tags/v*`
-  with "Restrict creations/updates/deletions" (publishing a release creates
-  its tag). Never add an app to either bypass list. Do not turn on "Immutable
-  releases": `package` uploads the zip after the release is published.
+* **Branch protection is a GitHub setting, not a file**; the intended
+  settings are in [`.github/REPO_SETTINGS.md`](.github/REPO_SETTINGS.md).
+  Never add a "Restrict updates" rule on the default branch (it forces a
+  bypass on every merge) and never add an app to a bypass list.
+* **Only the owner merges or releases; apps only branch.** Never run
+  `gh pr merge` or publish a release: open the PR and leave the merge to the
+  owner.
 * Every workflow sets `permissions: contents: read` at the top; only
   `release.yaml`'s `package` job raises it to `contents: write`. Actions are
   pinned to commit SHAs (Dependabot bumps them), except that the hassfest pin
