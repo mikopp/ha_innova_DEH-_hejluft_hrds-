@@ -1,10 +1,6 @@
 {
     "domain": "innova_hrds",
     "name": "Innova HRDS+ / hej.luft Dehumidifier",
-    "categories": [
-        "climate.air_purifiers_humidifiers",
-        "climate.fans_ventilation"
-    ],
     "codeowners": [
         "@mikopp"
     ],

@@ -4,18 +4,6 @@ All notable changes to this project are documented here, newest first.
 
 ---
 
-## Unreleased
-
-### fix: manifest has `categories`
-
-* The HACS check warned "The integration manifest has no categories". The
-  manifest now lists `climate.air_purifiers_humidifiers` (where Home Assistant
-  files humidifiers and dehumidifiers) and `climate.fans_ventilation` (the unit
-  sits on the supply duct of a ventilation system, like `comfoconnect` and
-  `vallox`).
-
----
-
 ## 0.9.0 (2026-10-20): first public release (beta)
 
 First release. The integration is usable, but it is a beta and not 1.0 yet.

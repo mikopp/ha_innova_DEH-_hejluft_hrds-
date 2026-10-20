@@ -343,6 +343,13 @@ GitHub Actions (in `.github/workflows/`):
   with write access can merge, so keep the owner the sole collaborator with
   write; Actions -> General -> workflow permissions "read", and approve fork PR
   workflows manually.
+* **No manifest `categories` yet.** The hacs action warns "manifest has no
+  categories", but the hassfest action runs Home Assistant's *stable* image, and
+  2026.10.x has no `categories` key: hassfest fails with "not a valid option at
+  'categories'". Only core `dev` knows it. Add it (`climate.air_purifiers_humidifiers`,
+  `climate.fans_ventilation`) once hassfest passes with it, i.e. after the first
+  stable release that contains it; check `script/hassfest/manifest.py` of the
+  release tag for `categories`.
 * `lint.yaml` also runs `tests/wiring_check.py`. Dependabot bumps the HA
   image, `requirements_test.txt` and `tests/e2e/requirements.txt`; keep the
   image and `pytest-homeassistant-custom-component` on the same HA release.
