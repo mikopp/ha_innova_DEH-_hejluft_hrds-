@@ -7,7 +7,7 @@ from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import STATE_ON
-from homeassistant.helpers.restore_state import RestoreEntity
+from homeassistant.helpers.restore_state import ExtraStoredData, RestoreEntity
 
 from .const import BINARY_TYPES, OPERATION_TYPES, MyBinaryEntityDescription
 from .entity_common import HubBackedEntity, setup_platform_from_types
@@ -57,12 +57,29 @@ class HrdsSwitch(HubBackedEntity, SwitchEntity):
         await self._hub.setter_function_callback(self, False)
 
 
+class _GateOwner(ExtraStoredData):
+    """Which entity (unique id) a stored gate state belongs to."""
+
+    def __init__(self, unique_id: str | None) -> None:
+        self.unique_id = unique_id
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"unique_id": self.unique_id}
+
+
 class HrdsOperationSwitch(HubBackedEntity, SwitchEntity, RestoreEntity):
     """Integration-level gate: allow dehumidify, cooling and fan requests.
 
     Not backed by a register. Off by default so a freshly connected unit is never
     started before the user has reviewed the setup entities; the last choice is
     restored across restarts.
+
+    Home Assistant keys restored state by entity id, and a re-added entry gets
+    the same entity id as the one it replaces. The stored state therefore
+    carries the unique id (which contains the config entry id), and a state
+    left behind by another entry is not restored: a new entry starts closed.
+    A state stored without an owner (written before this check existed) is not
+    restored either, so the gate is closed once after the update.
     """
 
     entity_description: MyBinaryEntityDescription
@@ -71,10 +88,20 @@ class HrdsOperationSwitch(HubBackedEntity, SwitchEntity, RestoreEntity):
     async def async_added_to_hass(self) -> None:
         # Restore before the base class publishes the hub state, so the gate
         # never flickers off on startup.
-        if (last := await self.async_get_last_state()) is not None:
+        last = await self.async_get_last_state()
+        owner = await self.async_get_last_extra_data()
+        if (
+            last is not None
+            and owner is not None
+            and owner.as_dict().get("unique_id") == self.unique_id
+        ):
             self._attr_is_on = last.state == STATE_ON
         self._hub.operation_allowed = self._attr_is_on
         await super().async_added_to_hass()
+
+    @property
+    def extra_restore_state_data(self) -> ExtraStoredData:
+        return _GateOwner(self.unique_id)
 
     def _apply_hub_payload(self, payload: Any) -> None:
         self._attr_is_on = self._hub.operation_allowed

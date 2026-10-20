@@ -58,6 +58,24 @@ async def test_one_bad_address_does_not_blank_the_block(setup, clock):
     assert s.state("sensor", "unit_status").state == "off_by_bms"
 
 
+async def test_a_register_that_stops_answering_goes_unavailable(setup, clock):
+    """No stale reading: the entity must not keep its last value forever."""
+    s = setup
+    s.device.set_water_temperature(21.4)
+    await clock.poll()
+    assert float(s.state("sensor", "water_temperature").state) == 21.4
+
+    s.sim.illegal_addresses = {R.WATER_TEMP}
+    s.device.set_water_temperature(30.0)  # would show if the old value were kept
+    await clock.poll()
+    assert s.state("sensor", "water_temperature").state == STATE_UNAVAILABLE
+    assert s.state("sensor", "unit_status").state == "off_by_bms", "rest is intact"
+
+    s.sim.illegal_addresses = set()
+    await clock.poll()
+    assert float(s.state("sensor", "water_temperature").state) == 30.0
+
+
 async def test_rejected_write_raises(setup, clock):
     s = setup
     await allow_operation(s)

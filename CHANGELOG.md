@@ -4,6 +4,26 @@ All notable changes to this project are documented here, newest first.
 
 ---
 
+## 2026-10-20 (3)
+
+### fix: a register that stops answering goes unavailable
+
+* When the device stopped answering for one address (its block fell back to
+  per-register reads) the entity kept showing its last value forever. The
+  reading is now dropped, so the entity is `unavailable` until the address
+  answers again.
+
+### fix: a re-added entry does not inherit an open operation gate
+
+* Home Assistant restores state by entity id, and a re-added entry gets the
+  same entity id as the one it replaces, so *Allow operational requests* could
+  come back **on** for a brand-new entry. The gate now stores its unique id
+  (which contains the config entry id) and only restores a state it owns.
+* A state stored by an earlier version has no owner, so the gate is closed
+  once after this update; switch it on again.
+
+---
+
 ## 2026-10-20 (2)
 
 ### fix: setup and installer devices use `via_device_id`
