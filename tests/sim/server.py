@@ -46,6 +46,9 @@ class HrdsSimServer:
     * ``reject_writes`` - writes to these answer exception 04 (device failure);
     * ``delay`` - seconds to stall every request (past the client's 3 s timeout
       the request fails);
+    * ``max_count`` - reads of more registers than this are never answered,
+      like an RS-485 gateway (or unit) overloaded by a large block read; each
+      one is counted in ``oversized_reads``;
     * ``fc43`` - False to answer FC 43 without identification objects;
     * ``wrong_unit`` - answer only this unit id (simulate a wrong slave id).
     """
@@ -62,9 +65,14 @@ class HrdsSimServer:
         self.illegal_addresses: set[int] = set()
         self.reject_writes: set[int] = set()
         self.delay = 0.0
+        self.max_count: Optional[int] = None
+        self.oversized_reads = 0
         self.fc43 = True
         self.identity_override: Optional[dict[int, str]] = None
         self.request_count = 0
+        # Every read request as (kind, address, count), for tests that check
+        # which registers the integration asks for.
+        self.read_log: list[tuple[str, int, int]] = []
         self._server: Optional[ModbusTcpServer] = None
         self._delays: set[asyncio.Future] = set()
 
@@ -104,6 +112,7 @@ class HrdsSimServer:
         self.illegal_addresses.clear()
         self.reject_writes.clear()
         self.delay = 0.0
+        self.max_count = None
         self.fc43 = True
         self.identity_override = None
         self.apply_identity()
@@ -120,16 +129,19 @@ class HrdsSimServer:
         self, function_code, start_address, address, count, registers, values
     ):
         self.request_count += 1
-        if self.delay:
-            waiter = asyncio.get_running_loop().create_future()
-            self._delays.add(waiter)
-            try:
-                await asyncio.wait_for(waiter, self.delay)
-            except (TimeoutError, asyncio.CancelledError):
-                pass
-            finally:
-                self._delays.discard(waiter)
-            if self._server is None:
+        if values is None:
+            kind = "input" if function_code in _INPUT_FC else "holding"
+            self.read_log.append((kind, address, count))
+        oversized = (
+            values is None and self.max_count is not None and count > self.max_count
+        )
+        if oversized:
+            self.oversized_reads += 1
+        if self.delay or oversized:
+            # An oversized read is never answered (the stall outlasts any
+            # client retry; stop() releases it).
+            await self._stall(self.delay if not oversized else 120)
+            if self._server is None or oversized:
                 return ExcCodes.DEVICE_BUSY
         span = range(address, address + count)
         if values is None:
@@ -150,6 +162,16 @@ class HrdsSimServer:
         except IllegalAddress:
             return ExcCodes.ILLEGAL_ADDRESS
         return None
+
+    async def _stall(self, seconds: float) -> None:
+        waiter = asyncio.get_running_loop().create_future()
+        self._delays.add(waiter)
+        try:
+            await asyncio.wait_for(waiter, seconds)
+        except (TimeoutError, asyncio.CancelledError):
+            pass
+        finally:
+            self._delays.discard(waiter)
 
     # ---- context manager -----------------------------------------------------
     async def __aenter__(self) -> "HrdsSimServer":

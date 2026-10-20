@@ -5,12 +5,13 @@ from __future__ import annotations
 import time
 
 import pytest
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.exceptions import HomeAssistantError
 
 from tests.sim import registers as R
 
-from .conftest import CLIMATE, allow_operation, set_hvac_mode
+from .conftest import CLIMATE, add_entry, allow_operation, set_hvac_mode
 
 
 async def test_offline_goes_unavailable_and_recovers(setup, clock):
@@ -183,3 +184,38 @@ async def test_water_circuit_problems(setup, clock):
         s.device.clear_alarm(alarm)
     await clock.poll()
     assert s.state("sensor", "water_check").state == "ok"
+
+
+async def test_gateway_that_drops_large_reads(hass, sim, clock, caplog):
+    """A unit/gateway that never answers reads above a few registers.
+
+    This is what a real HRDS+ behind an RS-485 gateway did with 120-register
+    reads: no reply at all, so the entry never loaded. The hub must find a
+    size that works, keep it, and not pay the timeout on every poll.
+    """
+    sim.max_count = 4
+    s = await add_entry(hass, sim)
+    assert s.entry.state is ConfigEntryState.LOADED
+    assert s.state("sensor", "unit_status").state == "off_by_bms"
+    assert "reading at most" in caplog.text
+
+    sim.oversized_reads = 0
+    sim.read_log.clear()
+    started = time.monotonic()
+    await clock.poll()
+    assert sim.oversized_reads == 0, "the smaller block size is kept"
+    assert max(count for _kind, _addr, count in sim.read_log) <= 4
+    assert time.monotonic() - started < 3, "no timeout on later polls"
+    assert s.state("sensor", "unit_status").state == "off_by_bms"
+    await hass.config_entries.async_unload(s.entry.entry_id)
+
+
+async def test_dead_link_is_not_mistaken_for_a_size_limit(setup, clock):
+    """No answer at all: fail the poll fast instead of shrinking the blocks."""
+    s = setup
+    hub = s.entry.runtime_data
+    block = hub._max_block
+    s.sim.delay = 3.5
+    await clock.poll()
+    assert s.state("sensor", "unit_status").state == STATE_UNAVAILABLE
+    assert hub._max_block == block

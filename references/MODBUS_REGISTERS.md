@@ -300,7 +300,11 @@ outdoor temp `500`, water temp `501`, supply/discharge temp `503`.
   analog registers, not bits.
 * **Wide, sparse address space (≈0x0100–0x077A).** A single block read of the
   whole range exceeds Modbus' 125-register-per-request limit. The hub must read
-  in **contiguous chunks** (≤125 regs) per function code, not one big block.
+  in **contiguous chunks** per function code, not one big block. Keep the
+  chunks small: a real unit behind an RS-485 gateway did not answer a
+  120-register read at all, while 10-register reads covered the whole map.
+  The integration reads at most 10 per request and halves that if a block
+  goes unanswered while a single register answers promptly.
 * **Enables are mandatory.** The integration should set PH02/PH27/PH28 on setup
   (or expose them), or writes will silently no-op.
 * **Fan/percent registers use ×0.01 scaling**; temps/setpoints ×0.1; humidity ×1.
@@ -657,7 +661,9 @@ Scaling was checked against a real unit's raw read-back. "shown R/O"
 means the integration deliberately does not write it (link settings,
 manufacturer I/O allocation, refrigerant, safety bypass, test mode).
 Passwords (`PSd*`), `PH15` (restore defaults) and `PH18` (clear alarm
-history) are not exposed. Addresses above 1900 are not polled.
+history) are not exposed. Addresses above 1900 are not read. The installer
+device is opt-in, and its registers are never part of the regular poll: they
+are read at setup and on the device's refresh button.
 
 | Addr HEX | Addr DEC | Code | Meaning | Scale | Range | Access |
 |----------|----------|------|---------|-------|-------|--------|

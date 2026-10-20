@@ -57,10 +57,8 @@ def test_devices_in_the_real_registry(headless):
     assert len(main) == 1
     assert main[0]["model_id"] == "EPB9ORSINDEU"
     assert main[0]["sw_version"] == "V01.00.09.02"
-    assert {d["name"] for d in children} == {
-        "HRDS headless setup",
-        "HRDS headless installer",
-    }
+    # The installer device is opt-in (options), so a new entry has none.
+    assert {d["name"] for d in children} == {"HRDS headless setup"}
     assert all(d["via_device_id"] == main[0]["id"] for d in children)
 
 

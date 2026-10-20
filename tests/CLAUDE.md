@@ -95,6 +95,10 @@ from the image's modbus manifest and installs that. A bare `pytest` skips
 * `python -m tests.sim --port 5020 --control-port 8020` runs it as a process;
   the HTTP control API (`sim/control.py`) injects alarms, probe faults, a power
   cycle, offline, slow replies, rejected writes, a wrong identity.
+* `HrdsSimServer.max_count` models a gateway overloaded by large reads: a read
+  of more registers never gets an answer (`oversized_reads` counts them), and
+  `read_log` records every read request, so a test can assert which registers
+  were asked for (e.g. that the poll never touches the installer menu).
 
 ## Guards
 * In-process: any test during which HA logs a deprecation naming this

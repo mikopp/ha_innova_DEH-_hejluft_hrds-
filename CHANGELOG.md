@@ -4,6 +4,26 @@ All notable changes to this project are documented here, newest first.
 
 ---
 
+## 0.9.1 (2026-10-20): fix setup on real hardware, installer device opt-in
+
+**Fixed:** 0.9.0 did not load on a real unit. The installer device added about
+240 registers to the poll, so the integration read them in 120-register
+blocks, which the unit / RS-485 gateway did not answer (`No valid reply to
+Modbus block read (holding @ 1602+120)`). Reads are now at most 10 registers.
+If a block still goes unanswered while a single register answers, the
+integration halves the block size by itself instead of failing.
+
+**Changed:** the installer device is now **opt-in** (*Installer device* in the
+integration options, off by default and for new installs). Its parameters are
+no longer part of the regular poll: they are read when the option is turned
+on, at each start, and with the new *Refresh installer parameters* button. A
+new *Installer parameters last read* sensor shows when. Turning the option off
+removes the device and its entities. If you used installer entities with
+0.9.0, turn the option on after updating; renamed or enabled installer
+entities have to be set up again.
+
+---
+
 ## 0.9.0 (2026-10-20): first public release (beta)
 
 First release. The integration is usable, but it is a beta and not 1.0 yet.

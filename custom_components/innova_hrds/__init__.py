@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -50,6 +51,7 @@ from .const import (
     C_DEHUMIDIFY,
     C_DT_INT16,
     C_ENABLE_FREE_COOLING,
+    C_INSTALLER_LAST_READ,
     C_MAX_BLOCK,
     C_MAX_GAP,
     C_MAX_TOTAL_AIRFLOW,
@@ -79,19 +81,26 @@ from .const import (
     CONF_BRINE_TEMPERATURE_ENTITY,
     CONF_HAS_DISPLAY,
     CONF_HOSTID,
+    CONF_INSTALLER_DEVICE,
     CONF_MODEL,
     CONF_WATER_CIRCUIT,
     DEFAULT_ALLOW_WINTER_HEATING,
     DEFAULT_BRINE_MIN_TEMPERATURE,
     DEFAULT_HAS_DISPLAY,
     DEFAULT_HOSTID,
+    DEFAULT_INSTALLER_DEVICE,
     DEFAULT_MODEL,
     DEFAULT_PORT,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_WATER_CIRCUIT,
+    DOMAIN,
     ENTITIES_DICT,
     HEADLESS_SETTINGS,
     HUMIDITY_TARGET_KEYS,
+    INSTALLER_DEVICE_EXTRA_KEYS,
+    INSTALLER_DEVICE_SUFFIX,
+    INSTALLER_KEYS,
+    INSTALLER_LOGIC_KEYS,
     MODEL_SPECS,
     OPERATIONAL_KEYS,
     ROOM_HUMIDITY_PROBE_CODES,
@@ -116,6 +125,10 @@ from .installer_params import installer_key
 
 _LOGGER = logging.getLogger(__name__)
 
+# A single-register read slower than this does not prove the link is fine
+# (the client timeout is 3 s; a healthy gateway answers in well under 1 s).
+C_PROBE_MAX_SECONDS = 1.5
+
 PLATFORMS = [
     Platform.SENSOR,
     Platform.BINARY_SENSOR,
@@ -124,6 +137,7 @@ PLATFORMS = [
     Platform.SELECT,
     Platform.CLIMATE,
     Platform.FAN,
+    Platform.BUTTON,
 ]
 
 
@@ -183,6 +197,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
     except (TypeError, ValueError):
         brine_min = DEFAULT_BRINE_MIN_TEMPERATURE
+    installer_enabled = bool(
+        entry.options.get(
+            CONF_INSTALLER_DEVICE,
+            entry.data.get(CONF_INSTALLER_DEVICE, DEFAULT_INSTALLER_DEVICE),
+        )
+    )
 
     # Refuse to write configuration registers into something that is not an
     # HRDS+ (wrong IP, wrong slave id behind a shared gateway).
@@ -211,6 +231,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         water_circuit,
         brine_entity,
         brine_min,
+        installer_enabled,
     )
 
     # Prime the cache before creating entities so they do not sit at `unknown`
@@ -218,6 +239,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # such instead of setting up permanently-stale entities.
     if not await hass.async_add_executor_job(hub._do_read_cycle):
         raise ConfigEntryNotReady(f"Cannot reach HRDS+ Modbus gateway at {host}:{port}")
+    # Installer parameters once per load (the water-check limits only, unless
+    # the installer device is on). A failure here only leaves them unknown.
+    await hass.async_add_executor_job(hub._do_read_installer)
 
     # runtime_data is keyed by the config entry, so two entries sharing a name
     # can no longer clobber each other's hub the way hass.data[DOMAIN][name] did.
@@ -241,8 +265,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     main_device = registry.async_get_or_create(
         config_entry_id=entry.entry_id, **main_info
     )
-    for info in build_device_infos(entry, hub, main_device.id)[1:]:
-        registry.async_get_or_create(config_entry_id=entry.entry_id, **info)
+    _, setup_info, installer_info = build_device_infos(entry, hub, main_device.id)
+    registry.async_get_or_create(config_entry_id=entry.entry_id, **setup_info)
+    if installer_enabled:
+        registry.async_get_or_create(config_entry_id=entry.entry_id, **installer_info)
+    elif installer_device := registry.async_get_device_by_identifier(
+        (DOMAIN, entry.entry_id + INSTALLER_DEVICE_SUFFIX), entry.entry_id
+    ):
+        # Turned off in the options: the device goes, and its entities with it.
+        registry.async_remove_device(installer_device.id)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
@@ -263,16 +294,19 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 def _build_blocks(
-    addresses: List[int], foreign: frozenset[int] = frozenset()
+    addresses: List[int],
+    foreign: frozenset[int] = frozenset(),
+    max_block: int = C_MAX_BLOCK,
 ) -> List[Tuple[int, int]]:
     """Group sorted addresses into (start, count) blocks for block reads.
 
     Adjacent addresses (gap <= C_MAX_GAP) are merged; each block is capped at
-    C_MAX_BLOCK registers so we never exceed the Modbus per-request limit.
+    ``max_block`` registers (C_MAX_BLOCK unless the hub learned a lower limit).
 
-    ``foreign`` holds the addresses that belong to the *other* function code. A
-    block is never allowed to span one: reading e.g. holding register 1105 with
-    FC 04 can return ILLEGAL DATA ADDRESS, which would fail the whole block.
+    ``foreign`` holds the addresses a block is never allowed to span: those of
+    the *other* function code (reading e.g. holding register 1105 with FC 04
+    can return ILLEGAL DATA ADDRESS, which would fail the whole block) and
+    those of keys not being read now (the poll leaves the installer menu out).
     """
     addresses = sorted({a for a in addresses if a is not None})
     if not addresses:
@@ -280,7 +314,7 @@ def _build_blocks(
     blocks: List[Tuple[int, int]] = []
     start = prev = addresses[0]
     for addr in addresses[1:]:
-        fits = addr - prev <= C_MAX_GAP and addr - start + 1 <= C_MAX_BLOCK
+        fits = addr - prev <= C_MAX_GAP and addr - start + 1 <= max_block
         spans_foreign = any(a in foreign for a in range(prev + 1, addr))
         if fits and not spans_foreign:
             prev = addr
@@ -309,6 +343,7 @@ class HrdsModbusHub:
         water_circuit: str = DEFAULT_WATER_CIRCUIT,
         brine_entity: Optional[str] = None,
         brine_min_temperature: float = DEFAULT_BRINE_MIN_TEMPERATURE,
+        installer_enabled: bool = DEFAULT_INSTALLER_DEVICE,
     ) -> None:
         self._hass = hass
         self._name = name
@@ -350,20 +385,31 @@ class HrdsModbusHub:
         self.show_temperature_target = True
         self.show_humidity_target = True
 
-        # Pre-compute the block reads per register type, keeping each function
-        # code's blocks clear of the other's addresses.
-        input_addrs = [
-            get_entity_reg(p)[0]
-            for p in ENTITIES_DICT.values()
-            if get_entity_type(p) == C_REG_TYPE_INPUT_REGISTERS
-        ]
-        holding_addrs = [
-            get_entity_reg(p)[0]
-            for p in ENTITIES_DICT.values()
-            if get_entity_type(p) == C_REG_TYPE_HOLDING_REGISTERS
-        ]
-        self._input_blocks = _build_blocks(input_addrs, frozenset(holding_addrs))
-        self._holding_blocks = _build_blocks(holding_addrs, frozenset(input_addrs))
+        # The installer menu is opt-in, and never part of the regular poll:
+        # it is read at setup and on its refresh button only.
+        self.installer_enabled = installer_enabled
+        self._poll_keys = frozenset(ENTITIES_DICT) - INSTALLER_KEYS
+        # Every address of each function code; a block of one must not span an
+        # address of the other.
+        self._all_addrs = {
+            fc: frozenset(
+                get_entity_reg(p)[0]
+                for p in ENTITIES_DICT.values()
+                if get_entity_type(p) == rt
+            )
+            for fc, rt in (
+                ("input", C_REG_TYPE_INPUT_REGISTERS),
+                ("holding", C_REG_TYPE_HOLDING_REGISTERS),
+            )
+        }
+        # Lowered (for the hub's lifetime) when the link does not answer a
+        # block of this size but does answer a single register.
+        self._max_block = C_MAX_BLOCK
+
+    @property
+    def installer_keys_to_read(self) -> frozenset[str]:
+        """Installer registers read at setup and on refresh."""
+        return INSTALLER_KEYS if self.installer_enabled else INSTALLER_LOGIC_KEYS
 
     @property
     def name(self) -> str:
@@ -425,6 +471,9 @@ class HrdsModbusHub:
             hidden |= HUMIDITY_TARGET_KEYS
         if not self.brine_entity:
             hidden.add(C_BRINE_GUARD)
+        if not self.installer_enabled:
+            # The two water-check limits are still read, but not shown.
+            hidden |= INSTALLER_KEYS | INSTALLER_DEVICE_EXTRA_KEYS
         self.hidden_keys = frozenset(hidden)
 
     # ---- brine temperature guard -----------------------------------------
@@ -615,18 +664,70 @@ class HrdsModbusHub:
                 # Uses the previous cycle's read-back, so on the very first
                 # cycle (empty data) every required setting is written.
                 self._sync_required_settings_locked()
-                raw_input = self._read_blocks(self._input_blocks, fc="input")
-                raw_holding = self._read_blocks(self._holding_blocks, fc="holding")
+                raw = self._read_keys_locked(self._poll_keys)
             finally:
                 self._client.close()
 
-        if raw_input is None or raw_holding is None:
+        if raw is None:
             self.last_update_success = False
             return False
-        self._decode_all(raw_input, raw_holding)
+        self._decode_all(*raw, self._poll_keys)
         self._compute_derived()
         self.last_update_success = True
         return True
+
+    def _do_read_keys(self, keys: frozenset[str]) -> bool:
+        """Read just these entity keys (installer menu, a write read-back)."""
+        with self._lock:
+            if not self._client.connect():
+                _LOGGER.warning("Modbus connect to HRDS+ failed")
+                return False
+            try:
+                raw = self._read_keys_locked(keys)
+            finally:
+                self._client.close()
+        if raw is None:
+            return False
+        self._decode_all(*raw, keys)
+        return True
+
+    def _do_read_installer(self) -> bool:
+        if not self._do_read_keys(self.installer_keys_to_read):
+            _LOGGER.warning("Reading the installer parameters failed")
+            return False
+        if self.installer_enabled:
+            self.data[C_INSTALLER_LAST_READ] = dt_util.utcnow()
+        self._compute_derived()
+        return True
+
+    async def async_refresh_installer(self) -> None:
+        """Read the installer parameters now (the refresh button)."""
+        ok = await self._hass.async_add_executor_job(self._do_read_installer)
+        for cb in self._sensors:
+            cb()
+        if not ok:
+            raise HomeAssistantError("Reading the installer parameters failed")
+
+    def _read_keys_locked(
+        self, keys: frozenset[str]
+    ) -> Optional[Tuple[Dict[int, int], Dict[int, int]]]:
+        """(input, holding) {address: raw} for these keys, or None on a link failure."""
+        wanted: Dict[str, set[int]] = {"input": set(), "holding": set()}
+        for key in keys:
+            props = ENTITIES_DICT[key]
+            fc = (
+                "input"
+                if get_entity_type(props) == C_REG_TYPE_INPUT_REGISTERS
+                else "holding"
+            )
+            wanted[fc].add(get_entity_reg(props)[0])
+        raw_input = self._read_blocks("input", wanted["input"])
+        if raw_input is None:
+            return None
+        raw_holding = self._read_blocks("holding", wanted["holding"])
+        if raw_holding is None:
+            return None
+        return raw_input, raw_holding
 
     def _read(self, fc: str, address: int, count: int):
         """One block read: the reply, or None if the link failed.
@@ -656,11 +757,28 @@ class HrdsModbusHub:
         self._client.close()
         return None
 
-    def _read_blocks(self, blocks, fc: str) -> Optional[Dict[int, int]]:
-        """Read every block of a register type into an {address: raw} map."""
+    def _read_blocks(self, fc: str, addresses: set[int]) -> Optional[Dict[int, int]]:
+        """Read these addresses of a register type into an {address: raw} map."""
+        # A block never spans an address that is not being read now: one of
+        # the other function code, or one of another group (the regular poll
+        # must not touch the installer menu, nor the installer read the rest).
+        foreign = (
+            self._all_addrs["holding" if fc == "input" else "input"]
+            | self._all_addrs[fc]
+        ) - addresses
         values: Dict[int, int] = {}
-        for start, count in blocks:
+        blocks = _build_blocks(list(addresses), foreign, self._max_block)
+        index = 0
+        while index < len(blocks):
+            start, count = blocks[index]
+            index += 1
             resp = self._read(fc, start, count)
+            if resp is None and self._shrink_blocks(fc, start, count):
+                # Carry on from this block with the smaller blocks.
+                remaining = [a for a in addresses if a >= start]
+                blocks = _build_blocks(remaining, foreign, self._max_block)
+                index = 0
+                continue
             if resp is None:
                 _LOGGER.warning(
                     "No valid reply to Modbus block read (%s @ %s+%s)",
@@ -682,6 +800,37 @@ class HrdsModbusHub:
             for offset, reg in enumerate(resp.registers):
                 values[start + offset] = reg
         return values
+
+    def _shrink_blocks(self, fc: str, start: int, count: int) -> bool:
+        """After a block got no reply: was it the size? If so, plan smaller.
+
+        Some RS-485 gateways (or the unit) silently drop requests above some
+        register count. A single register answering at the same address tells
+        that apart from a dead link; then the cap is halved for every block and
+        kept, so the timeout is paid once, not on every poll.
+
+        The probe must answer promptly: on a slow link pymodbus' own retry
+        accepts the late answer to its first attempt, which would make a slow
+        gateway look like a size limit and shrink the blocks to nothing.
+        """
+        if count <= 1 or not self._client.connect():
+            return False
+        started = time.monotonic()
+        if self._read(fc, start, 1) is None:
+            return False  # the link is down, not the request too large
+        if time.monotonic() - started > C_PROBE_MAX_SECONDS:
+            self._client.close()  # a late answer may still be on its way
+            return False
+        self._max_block = max(1, min(self._max_block, count) // 2)
+        _LOGGER.warning(
+            "No reply to a %s-register Modbus read (%s @ %s) but a single register "
+            "answers; reading at most %s registers per request from now on",
+            count,
+            fc,
+            start,
+            self._max_block,
+        )
+        return True
 
     def _read_block_individually(
         self, values: Dict[int, int], start: int, count: int, fc: str
@@ -755,9 +904,13 @@ class HrdsModbusHub:
 
     # ---- decoding ---------------------------------------------------------
     def _decode_all(
-        self, raw_input: Dict[int, int], raw_holding: Dict[int, int]
+        self,
+        raw_input: Dict[int, int],
+        raw_holding: Dict[int, int],
+        keys: frozenset[str],
     ) -> None:
-        for key, props in ENTITIES_DICT.items():
+        for key in keys:
+            props = ENTITIES_DICT[key]
             reg, dt = get_entity_reg(props)
             source = (
                 raw_input
@@ -940,6 +1093,15 @@ class HrdsModbusHub:
                 f"Modbus write to {entity_key} (register {reg}) failed. If this "
                 "persists, check that the PH02/PH27/PH28 enables are set."
             )
+        if entity_key in INSTALLER_KEYS:
+            # Not in the regular poll: read back just this one register.
+            await self._hass.async_add_executor_job(
+                self._do_read_keys, frozenset({entity_key})
+            )
+            self._compute_derived()
+            for cb in self._sensors:
+                cb()
+            return
         # Debounced: the unit needs a moment to mirror a command into its status
         # registers, and one HVAC mode change issues several writes.
         self.async_schedule_refresh()

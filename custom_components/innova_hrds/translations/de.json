@@ -45,13 +45,15 @@
           "water_circuit": "Wasserregister angeschlossen an",
           "allow_winter_heating": "Heizen im Winter erlauben (Integrationsanforderung im Winter)",
           "brine_temperature_entity": "Sensor für den Sole-Temperaturwächter",
-          "brine_min_temperature": "Mindesttemperatur des Sole-Temperaturwächters"
+          "brine_min_temperature": "Mindesttemperatur des Sole-Temperaturwächters",
+          "installer_device": "Installateur-Gerät (vollständiges Installateurmenü)"
         },
         "data_description": {
           "water_circuit": "Ein Solekreis (Erdwärmepumpe) kann nicht heizen und darf im Winter nicht entfeuchten.",
           "allow_winter_heating": "Im Winter heizt die Integrationsanforderung die Luft mit Wasser aus dem Heizkreis. Standardmäßig aus; bei Solekreis ohne Wirkung.",
           "brine_temperature_entity": "Optional. Ein Temperatursensor am Sole-Vorlauf (z. B. von der Wärmepumpe). Ist er gesetzt, starten Entfeuchtungs- und Integrationsanforderungen nur, solange er mindestens die Mindesttemperatur meldet und sich in den letzten 24 h gemeldet hat – in jeder Saison. Bei Solekreis ist er Voraussetzung für Entfeuchten im Winter.",
-          "brine_min_temperature": "Niedrigste Soletemperatur, bei der eine Anforderung starten darf."
+          "brine_min_temperature": "Niedrigste Soletemperatur, bei der eine Anforderung starten darf.",
+          "installer_device": "Fügt das Installateur-Gerät mit den Parametern des Installateurmenüs hinzu. Sie werden nicht regelmäßig abgefragt, sondern beim Einschalten dieser Option, bei jedem Start und mit „Installateurparameter aktualisieren“ gelesen. Ausschalten entfernt das Gerät."
         }
       }
     },
@@ -435,6 +437,9 @@
       },
       "inst_pt04": {
         "name": "PT04 Außenluftklappe im Testmodus"
+      },
+      "installer_last_read": {
+        "name": "Installateurparameter zuletzt gelesen"
       }
     },
     "binary_sensor": {
@@ -1129,6 +1134,11 @@
       },
       "inst_ph10": {
         "name": "PH10 Max. Sollwert Winter (werkseitig 14 °C sperrt Auto-Heizen)"
+      }
+    },
+    "button": {
+      "refresh_installer": {
+        "name": "Installateurparameter aktualisieren"
       }
     }
   },

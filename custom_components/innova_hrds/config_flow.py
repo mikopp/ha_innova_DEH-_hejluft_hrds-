@@ -29,12 +29,14 @@ from .const import (
     CONF_BRINE_TEMPERATURE_ENTITY,
     CONF_HAS_DISPLAY,
     CONF_HOSTID,
+    CONF_INSTALLER_DEVICE,
     CONF_MODEL,
     CONF_WATER_CIRCUIT,
     DEFAULT_ALLOW_WINTER_HEATING,
     DEFAULT_BRINE_MIN_TEMPERATURE,
     DEFAULT_HAS_DISPLAY,
     DEFAULT_HOSTID,
+    DEFAULT_INSTALLER_DEVICE,
     DEFAULT_MODEL,
     DEFAULT_NAME,
     DEFAULT_PORT,
@@ -229,6 +231,13 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                         default=options.get(
                             CONF_HAS_DISPLAY,
                             data.get(CONF_HAS_DISPLAY, DEFAULT_HAS_DISPLAY),
+                        ),
+                    ): cv.boolean,
+                    vol.Optional(
+                        CONF_INSTALLER_DEVICE,
+                        default=options.get(
+                            CONF_INSTALLER_DEVICE,
+                            data.get(CONF_INSTALLER_DEVICE, DEFAULT_INSTALLER_DEVICE),
                         ),
                     ): cv.boolean,
                     vol.Required(

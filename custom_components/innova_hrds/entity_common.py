@@ -16,6 +16,7 @@ from .const import (
     DEFAULT_NAME,
     DOMAIN,
     ENTITIES_DICT,
+    INSTALLER_DEVICE_EXTRA_KEYS,
     INSTALLER_DEVICE_SUFFIX,
     INSTALLER_KEYS,
     SETUP_DEVICE_SUFFIX,
@@ -155,7 +156,7 @@ def device_info_for(key: str, devices: tuple) -> DeviceInfo:
     main, setup, installer = devices
     if key in SETUP_KEYS:
         return setup
-    if key in INSTALLER_KEYS:
+    if key in INSTALLER_KEYS or key in INSTALLER_DEVICE_EXTRA_KEYS:
         return installer
     return main
 

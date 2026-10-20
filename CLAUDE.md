@@ -34,7 +34,13 @@ not backed by a single register, and are declared directly in `init()`
 * **The address space is wide and sparse** (~0x0100–0x077A). A single block read
   would exceed Modbus' 125-register limit, so the hub reads in **contiguous
   chunks** (`_build_blocks` in `__init__.py`, capped at `C_MAX_BLOCK`, merging
-  gaps up to `C_MAX_GAP`).
+  gaps up to `C_MAX_GAP`). Keep the cap small: the real unit behind its RS-485
+  gateway never answered a 120-register read (0.9.0 did not load), so it is
+  10, which the diagnostic read the whole map with. If a block still gets no
+  reply while a single register answers *promptly* (`C_PROBE_MAX_SECONDS`;
+  pymodbus' retry can pick up a late answer and fake a working link), the hub
+  halves the cap for its lifetime (`_shrink_blocks`); a dead link fails the
+  poll instead.
 * **"by BMS" enables are mandatory.** Writes are ignored unless PH02/PH27/PH28
   are set. `_sync_required_settings_locked` re-asserts them **every poll**, driven
   by the polled read-back rather than a one-shot flag, so a device power-cycle
@@ -145,7 +151,16 @@ Classification rules (`_classify` in `const.py`):
   `unique_id` always uses the config entry id, so moving a key between devices
   keeps its entity. All devices are registered in `async_setup_entry`.
   `wiring_check.py` guards the sets.
-* **Installer device:** the rest of the installer menu lives in
+* **Installer device:** opt-in (`installer_device` option, default off, only in
+  the options flow, not at first install). Its registers are **never part of
+  the regular poll** (`_poll_keys` excludes `INSTALLER_KEYS`, and a block never
+  spans another group's address): they are read at setup (so turning the
+  option on reads them, via the reload), on `button.refresh_installer`
+  (`button.py`, `BUTTON_TYPES`), and one register is read back after a write.
+  `sensor.installer_last_read` (timestamp) shows the last read. With the
+  option off the device is removed with its entities, and only
+  `INSTALLER_LOGIC_KEYS` (PC07/PU08, used by the water check) are read once at
+  setup. The rest of the installer menu lives in
   `installer_params.py` (one row per parameter: code, register, kind
   n/s/r, scale, range, unit, en/de name, enabled-by-default). `const.py`
   appends the rows to `ENTITIES_DICT` as `inst_<code>` keys (`INSTALLER_KEYS`),

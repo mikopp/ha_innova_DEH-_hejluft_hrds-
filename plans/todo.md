@@ -33,10 +33,12 @@ verified on hardware.
 
 - [ ] **Direct PDU addressing — no −1 offset.** Confirm `address=1105` really hits
       `Status_OnOff_byBMS` and not an off-by-one neighbour.
-- [ ] **Block-read chunking** (`C_MAX_BLOCK=120`, `C_MAX_GAP=8` in `__init__.py`).
-      Confirm the real gateway accepts these block sizes without timeouts across
-      the sparse map; tune if needed. Blocks no longer span an address belonging
-      to the other function code, and a block that errors now falls back to
+- [ ] **Block-read chunking** (`C_MAX_BLOCK=10`, `C_MAX_GAP=8` in `const.py`).
+      120 failed on the real unit/gateway (no reply to `holding @ 1602+120`, so
+      0.9.0 never loaded); 10 is what `diagnose_hrds.py` read the whole map
+      with. The hub halves it on its own if a block is not answered. Find out
+      the real limit (gateway or controller) and raise the cap if it is safe.
+      Blocks no longer span an address belonging to the other function code, and a block that errors now falls back to
       per-register reads, so a single "illegal data address" no longer blanks
       every entity — but it is still worth knowing which addresses do that.
 - [ ] **Modbus slave id / port** defaults (1 / 502) match the deployed gateway.

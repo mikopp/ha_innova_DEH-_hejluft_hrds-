@@ -40,7 +40,7 @@ async def test_user_flow_creates_entry(hass, sim):
 
 
 async def test_setup_and_installer_devices_hang_off_the_main_device(hass, sim):
-    s = await add_entry(hass, sim)
+    s = await add_entry(hass, sim, installer_device=True)
     devices = dr.async_entries_for_config_entry(dr.async_get(hass), s.entry.entry_id)
     main = [d for d in devices if d.via_device_id is None]
     children = [d for d in devices if d.via_device_id is not None]
