@@ -137,7 +137,7 @@ Classification rules (`_classify` in `const.py`):
   `_sync_required_settings_locked` writes bypass the gate (they call the client
   directly). Do not add a request-type write path that skips `write_entity_value`.
 * **Device grouping:** `SETUP_KEYS` entities go on the `-setup` child device
-  (`SETUP_DEVICE_SUFFIX`, `via_device` the main one); `CONFIG_KEYS` /
+  (`SETUP_DEVICE_SUFFIX`, linked to the main one with `via_device_id`); `CONFIG_KEYS` /
   `DIAGNOSTIC_KEYS` become entity categories (`entity_category_for`). A new
   entity belongs in exactly one of the three groups, or none (operational).
   `unique_id` always uses the config entry id, so moving a key between devices
@@ -305,45 +305,9 @@ options flow, default 502), as are the unit id (`hostid`) and model.
 
 ## Tests
 
-Two layers, both against a **simulated HRDS+** (`tests/sim/`) that speaks real
-Modbus TCP (pymodbus 3.13 `SimDevice`), so the integration's own client,
-block plan, decoding, guards and writes all run for real:
-
-* **In-process** (`tests/ha/`, `tests.yaml`): the real Home Assistant core via
-  `pytest-homeassistant-custom-component` (pinned to the latest HA release in
-  `requirements_test.txt`). Fast, measures coverage (fail under 90 %).
-  `pip install -r requirements_test.txt && pytest tests/sim tests/ha tests/test_wiring.py`
-  `tests/ha/test_versions.py` fails when the in-process Home Assistant release
-  (year.month) differs from the image tag in `.github/ha-versions/Dockerfile`, or
-  when the pinned `pymodbus` differs from the one HA's modbus manifest requires.
-  `e2e.yaml` installs the simulator's `pymodbus` from the image's own manifest;
-  Dependabot ignores `pymodbus` (it follows HA, never bumped alone).
-* **Docker e2e** (`tests/e2e/`, `e2e.yaml`): the official HA image from
-  `.github/ha-versions/Dockerfile`, one container per session, onboarded and
-  driven over REST/websocket like the `homeassistent-config` repo's harness.
-  Simulators run as host processes (`python -m tests.sim --port 5020
-  --control-port 8020 [--overlay display_with_probes]`) and are steered through
-  their HTTP control API (`tests/sim/control.py`: alarms, probe faults, power
-  cycle, offline, slow replies, rejected writes, wrong identity, fan model).
-  `pip install -r tests/e2e/requirements.txt && pytest tests/e2e -p no:homeassistant`
-  (needs Docker; logs land in `tests/e2e/.artifacts/`).
-
-Rules:
-
-* The simulator does **not** import `const.py`: its addresses and behaviour
-  come from `references/MODBUS_REGISTERS.md` (`tests/sim/registers.py`,
-  `tests/sim/device.py`), so a wrong address in the integration fails a test
-  instead of being mirrored. When the device docs change, change the model.
-* Seeds are real-device dumps in `tests/devices/<model>_<display|headless>_<state>.json`
-  (`diagnose_hrds.py --json` output); every file there is smoke-tested
-  automatically. Overlays (`tests/sim/overlays/`) patch a seed for setups
-  without a dump yet.
-* The PM20 -> fan output mapping is unconfirmed, so the simulator offers
-  `fan_model` = `rescale` (default) / `clamp` / `direct`; fan tests cover all
-  three.
-* A behaviour change needs a scenario in `tests/ha` (and in `tests/e2e` when it
-  is user-visible). `tests/ha/snapshots/` holds per-profile entity-state
-  snapshots: `pytest tests/ha/test_seeds.py --snapshot-update`, then review.
+Everything about the tests, including the rule for which of the two layers a
+test belongs in, is in [`tests/CLAUDE.md`](tests/CLAUDE.md). Run
+`python3 tests/wiring_check.py` for any entity change (see above).
 
 ## Linting
 
@@ -360,8 +324,9 @@ GitHub Actions (in `.github/workflows/`):
 * `hacs.yaml` — HACS repository validation (also daily); ignores `brands` (the
   images ship locally in `brand/`, see below, rather than in the HACS brands repo).
 * `tests.yaml` — in-process tests + coverage (see **Tests**).
-* `e2e.yaml` — the integration in a real HA container against simulators;
-  nightly also against the `beta` image (allowed to fail).
+* `e2e.yaml` — the integration in a real HA container against simulators,
+  only for what an in-process HA cannot show (see `tests/CLAUDE.md`); nightly
+  also against the `beta` image (allowed to fail).
 * **Triggers** (so nothing runs twice): lint, hassfest, hacs, tests and e2e run
   on `pull_request` and on `push` to `main` only (plus `workflow_dispatch`;
   hacs daily, e2e nightly incl. `beta`). A plain `push:` is never used, since a

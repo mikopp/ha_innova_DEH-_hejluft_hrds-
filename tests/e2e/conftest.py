@@ -1,14 +1,16 @@
 """Real Home Assistant in Docker + simulated HRDS+ units as host processes.
 
-Like the config repo's harness: one Home Assistant container for the whole
-session, talked to over REST and websocket only. Three simulators run next to
-it (all on the host network):
+This layer is deliberately small: it only holds tests that need a real Home
+Assistant (see tests/CLAUDE.md and tests/e2e/CLAUDE.md). Every test says why
+with ``@pytest.mark.needs_real_ha("<reason>")``; collection fails without it.
+
+One Home Assistant container serves the whole session, talked to over REST
+and websocket only. Two simulators run next to it (host network):
 
 =========  =========  ======  =======  ======================================
 name       address    Modbus  control  used for
 =========  =========  ======  =======  ======================================
-headless   127.0.0.1  5020    8020     entry ``127.0.0.1`` (no display/probes)
-display    127.0.0.1  5021    8021     entry ``localhost`` (display + probes)
+headless   127.0.0.1  5020    8020     the main entry (no display/probes)
 spare      127.0.0.2  5022    8022     config-flow failures, throw-away entry
 =========  =========  ======  =======  ======================================
 
@@ -43,9 +45,37 @@ POLL = SCAN_INTERVAL * 3 + 10  # generous wait for "after the next poll"
 
 SIMULATORS = {
     "headless": ("127.0.0.1", 5020, 8020, []),
-    "display": ("127.0.0.1", 5021, 8021, ["--overlay", "display_with_probes"]),
     "spare": ("127.0.0.2", 5022, 8022, []),
 }
+
+# Why a test may live in this directory (documented in tests/CLAUDE.md).
+REAL_HA_REASONS = {
+    "install-path": "HA installs the manifest requirement and loads the files",
+    "http-surface": "flows and services as REST/websocket JSON",
+    "real-time": "the real scheduler polls, no time manipulation",
+    "persistence": "state written to disk and read back after a real restart",
+    "boot-order": "HA starting before the unit is reachable, then retrying",
+    "runtime-logs": "the real HA log is free of errors and deprecations",
+    "ha-drift": "the same checks against the beta image, nightly",
+}
+HERE = Path(__file__).resolve().parent
+
+
+def pytest_collection_modifyitems(items):
+    """A test in tests/e2e must justify needing a real Home Assistant."""
+    for item in items:
+        if not Path(str(item.path)).is_relative_to(HERE):
+            continue
+        marker = item.get_closest_marker("needs_real_ha")
+        reason = marker.args[0] if marker and marker.args else None
+        if reason not in REAL_HA_REASONS:
+            raise pytest.UsageError(
+                f"{item.nodeid}: tests in tests/e2e need "
+                "@pytest.mark.needs_real_ha('<reason>') with one of "
+                f"{sorted(REAL_HA_REASONS)}. If it can run in-process "
+                "(tests/ha) it does not belong here - see tests/CLAUDE.md."
+            )
+
 
 # Options-flow form with every field, as the UI would submit it.
 BASE_OPTIONS = {
@@ -174,6 +204,37 @@ def ha(sims, tmp_path_factory) -> Iterator[HomeAssistant]:
         _docker("rm", "-f", CONTAINER, check=False)
 
 
+@pytest.fixture(scope="session")
+def restart_ha(ha):
+    """Restart the Home Assistant container for real and wait until it runs.
+
+    ``while_down`` runs while the container is stopped, so a test can change the
+    unit (power-cycle it, switch it off) without racing Home Assistant's polls.
+    """
+
+    def _restart(while_down=None) -> None:
+        ha.close()
+        _docker("stop", "--timeout", "60", CONTAINER)
+        if while_down is not None:
+            while_down()
+        _docker("start", CONTAINER)
+        ha.wait_ready()
+        ha.wait_running()
+
+    return _restart
+
+
+@pytest.fixture(scope="session")
+def ha_log(ha):
+    """The container's whole log (it spans restarts), as text."""
+
+    def _read() -> str:
+        logs = _docker("logs", CONTAINER, check=False)
+        return logs.stdout + logs.stderr
+
+    return _read
+
+
 # ---- config entries --------------------------------------------------------------
 @dataclass
 class Entry:
@@ -281,13 +342,6 @@ def headless(ha, sims) -> Entry:
     return create_entry(ha, sims["headless"], "127.0.0.1", name=name)
 
 
-@pytest.fixture(scope="session")
-def display(ha, sims) -> Entry:
-    return create_entry(
-        ha, sims["display"], "localhost", name="HRDS display", has_display=True
-    )
-
-
 def _reset(entry: Entry) -> None:
     """Fresh unit, gate closed, required settings re-asserted, log cleared."""
     try:
@@ -312,10 +366,3 @@ def hl(headless) -> Iterator[Entry]:
         headless.service("climate", "set_hvac_mode", "hrds_climate", hvac_mode="off")
     except ServiceError:
         pass
-
-
-@pytest.fixture
-def disp(display) -> Iterator[Entry]:
-    """The display entry, reset before the test."""
-    _reset(display)
-    yield display

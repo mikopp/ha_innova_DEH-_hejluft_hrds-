@@ -6,10 +6,13 @@
 # tests/sim, so config flow, polling, decoding, guards and writes run for
 # real. Fast (about a minute) and the only layer that measures coverage.
 #   * tests/sim       - the device model on its own
-#   * tests/ha        - config flow, setup, operation, fan, failures, display,
-#                       one smoke run per real-device dump in tests/devices
+#   * tests/ha        - the default home of behaviour tests: config flow, setup,
+#                       operation, fan, failures, display, restart (fresh start
+#                       on the same registries), deprecation guard, one smoke
+#                       run per real-device dump in tests/devices
 #   * tests/test_wiring.py - tests/wiring_check.py (no-HA consistency checks)
-# The Docker layer (real HA container) is e2e.yaml.
+# The Docker layer (real HA container, only what needs one) is e2e.yaml; the
+# rule for which layer a test belongs in is tests/CLAUDE.md.
 name: Tests
 
 on:

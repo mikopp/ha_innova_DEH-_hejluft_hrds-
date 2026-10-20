@@ -63,6 +63,26 @@ def _allow_local_sockets(socket_enabled):
     return
 
 
+@pytest.fixture(autouse=True)
+def _no_ha_deprecations(caplog: pytest.LogCaptureFixture):
+    """Fail a test when HA reports a deprecated call made by this integration.
+
+    HA logs these as warnings (``homeassistant.helpers.frame``) and keeps
+    working until the removal release, so nothing else would notice them.
+    """
+    yield
+    records = caplog.get_records("setup") + caplog.get_records("call")
+    offending = [
+        record.getMessage()
+        for record in records
+        if record.name == "homeassistant.helpers.frame"
+        and "innova_hrds" in record.getMessage()
+    ]
+    assert not offending, "deprecated Home Assistant API used:\n" + "\n".join(
+        sorted(set(offending))
+    )
+
+
 class Clock:
     """Fire HA time listeners as if time had moved on, without freezing it."""
 
