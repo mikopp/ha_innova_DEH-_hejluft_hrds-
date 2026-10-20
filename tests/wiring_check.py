@@ -294,7 +294,7 @@ def main() -> int:
 
     print("== setup issue texts ==")
     check(
-        len(const.SETUP_ISSUE_TEXTS) == 14
+        len(const.SETUP_ISSUE_TEXTS) == 15
         and all(all(t) for t in const.SETUP_ISSUE_TEXTS.values()),
         "every setup issue slug has an English and a German text",
     )

@@ -1007,8 +1007,13 @@ class HrdsModbusHub:
             issues.append("unit_off_by_scheduler")
         elif status == "off_by_rtc":
             issues.append("unit_off_by_clock")
-        elif status == "off_by_display" and self._has_display:
-            issues.append("unit_off_by_display")
+        elif status == "off_by_display":
+            if self._has_display:
+                issues.append("unit_off_by_display")
+            elif "headless_settings_pending" not in issues:
+                # PH01 is already 0, yet the unit keeps its stored display OFF
+                # until the first Modbus ON (seen on a real unit).
+                issues.append("unit_waiting_for_first_on")
 
         # An allocated analog input that reads the unwired sentinel is a probe
         # the unit waits for but cannot get.

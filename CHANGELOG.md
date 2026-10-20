@@ -31,6 +31,11 @@ shows in the entity's *Attributes*. The README setup step lists the same advice.
 has a new `to_fix` attribute: each open setup item in plain words with what to
 do about it (English or German). `issues` keeps the short codes.
 
+**Added:** *Unit status* is now on the setup device, and a headless unit that
+still reads *off by display* gets the setup issue `unit_waiting_for_first_on`.
+On a real unit PH01 = 0 and a power cycle did not clear that state; the first
+Modbus ON did.
+
 **Removed:** `switch.enable_integration` (PG02, 1798). PG02 is an installer
 setting that says whether the unit has the integration function, already shown
 read-only as `binary_sensor.active_cooling_available` (now "Unit has

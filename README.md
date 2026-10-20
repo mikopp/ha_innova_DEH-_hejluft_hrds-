@@ -414,6 +414,7 @@ show attributes, so this sensor is the one place to look.
    | `headless_settings_pending` | Without a display, PH01 and HA00 must be 0. Same: written on the next poll. |
    | `unit_off_by_digital_input` | The remote on/off contact (OFF/OFF terminals, HB03) is open, so the unit is forced off. Close it (the factory bridge) or set HB03 accordingly. |
    | `unit_off_by_scheduler` / `unit_off_by_clock` | A time program or the internal clock holds the unit off. Check PH03 (**Time programs enabled**); switch it off for Modbus-only control. |
+   | `unit_waiting_for_first_on` | Without a display, *Unit status* still reads *off by display* although PH01 is 0: the unit keeps a stored OFF until the first Modbus ON. Turn on *Allow operational requests*, then switch on *Unit on/off (Modbus)* once (main device). |
    | `unit_off_by_display` | Only reported when the display option is ticked: the display has switched the unit off. |
    | `room_temperature_probe_missing` | *T/H probe temperature input* (HA02) says a probe is on AI2, but nothing is wired. The unit will wait for a room temperature. Set `select.ai2_allocation` to *Unused* or wire the probe. |
    | `room_humidity_probe_missing` | Same for *T/H probe humidity input* (`select.ai3_allocation`, HA03) and the humidity probe. |

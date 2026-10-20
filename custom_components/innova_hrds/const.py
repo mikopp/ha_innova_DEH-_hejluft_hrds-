@@ -1110,6 +1110,16 @@ SETUP_ISSUE_TEXTS: Dict[str, tuple[str, str]] = {
         "Unit held off by the remote on/off contact: close it or set HB03",
         "Gerät durch den Fern-Ein/Aus-Kontakt ausgeschaltet: Kontakt schließen oder HB03 anpassen",
     ),
+    "unit_waiting_for_first_on": (
+        "The unit still shows 'off by display' although no display is used: it "
+        "keeps that stored OFF until the first Modbus ON. Turn on 'Allow "
+        "operational requests', then switch on 'Unit on/off (Modbus)' once on the "
+        "main device",
+        "Das Gerät zeigt noch 'Aus durch Display', obwohl kein Display genutzt "
+        "wird: es behält dieses gespeicherte AUS bis zum ersten Modbus-EIN. "
+        "'Betriebsanforderungen erlauben' einschalten, dann auf dem Hauptgerät "
+        "einmal 'Gerät ein/aus (Modbus)' einschalten",
+    ),
     "unit_off_by_scheduler": (
         "Unit held off by a time program: turn off 'Time programs enabled' (PH03)",
         "Gerät durch ein Zeitprogramm ausgeschaltet: 'Zeitprogramme' (PH03) ausschalten",
@@ -1185,6 +1195,7 @@ SETUP_KEYS = frozenset(
     {
         C_OPERATION_ALLOWED,
         C_SETUP_CHECK,
+        C_UNIT_STATUS,
         C_ENABLE_ONOFF_DISPLAY,
         C_PROBE_SOURCE,
         C_ENABLE_ONOFF_BMS,
