@@ -30,6 +30,18 @@ module (sold in Austria by https://www.hejluft.at/ as the **HRDS+**) over **Modb
 > [Reporting issues](#reporting-issues). The aim for 1.0 is in
 > [Road to 1.0](#road-to-10).
 
+> ## Quick start
+>
+> 1. [Install](#1-install) the integration with HACS and restart Home Assistant.
+> 2. [Add it](#2-add-the-integration) under *Settings → Devices & Services*,
+>    with the address of your Modbus-TCP gateway.
+> 3. [Check the setup](#3-check-the-setup): open the **HRDS+ setup** device and
+>    make sure **Setup check** reads `ok`.
+> 4. **[Turn on *Allow operational requests*](#4-switch-on-allow-operational-requests).**
+>    It is **off after every fresh install**, and until you switch it on the
+>    integration refuses to start the unit, dehumidify, cool or run the fan from
+>    Home Assistant. Readings and settings work without it.
+
 ## What it does
 
 The integration talks to the unit's control board via Modbus TCP and exposes:
@@ -266,9 +278,22 @@ without the installer device.)
   history*. The full list with addresses and scaling is in
   [`references/MODBUS_REGISTERS.md` §16](references/MODBUS_REGISTERS.md).
 
-## Installation
+## Install and set up
 
-### HACS (custom repository)
+### Before you start
+
+* An Innova DEH+ / hej.luft HRDS+ with the Modbus RTU/RS-485 control board and a
+  Modbus-RTU-to-TCP gateway reachable on your network. You need the gateway's
+  IP address or hostname, its port (usually 502) and the unit's Modbus slave ID
+  (factory: 1).
+* Home Assistant 2026.10 or newer (see [Requirements](#requirements)).
+* Room temperature/humidity readings require the wired CNU2 display or external
+  probes (see [Probe requirements](#probe-requirements)). Without either, the
+  integration still works; Home Assistant then does the regulating.
+
+### 1. Install
+
+#### HACS (custom repository)
 
 [![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=mikopp&repository=ha_innova_DEH-_hejluft_hrds-&category=integration)
 
@@ -285,12 +310,12 @@ so the version Home Assistant shows is the release version. Updates appear in
 HACS when a new release is published. Releases 0.9.x are normal (not
 "pre-release") releases, so they are offered without enabling HACS' beta versions.
 
-### Manual
+#### Manual
 
 Copy `custom_components/innova_hrds/` into your Home Assistant
 `config/custom_components/` directory and restart.
 
-## Configuration
+### 2. Add the integration
 
 Add the integration from **Settings → Devices & Services → Add Integration →
 Innova HRDS+**, then provide:
@@ -313,6 +338,8 @@ Before anything is written, the integration checks that the address really is an
 HRDS+: the controller must identify itself as EVCO `EPB9…` over Modbus (FC 43)
 and its status registers must make sense. Anything else is refused with
 *"not an HRDS+"*, so a wrong IP or slave ID cannot have settings written into it.
+If the form says *"Cannot reach the unit"*, check the host, the port and the
+Modbus slave ID.
 
 On connection the integration sets the registers the unit needs in order to obey
 Modbus: the "by BMS" enables **PH02/PH27/PH28**, and, unless a display is
@@ -322,10 +349,12 @@ sensors). It re-checks them every poll, so a power cycle that resets them heals
 itself, and a manual change to one of them is undone on the next poll. If you
 *do* have a display, tick the option and the integration leaves PH01/HA00 alone.
 
-## Device layout and first-use checklist
+### 3. Check the setup
 
 All setup happens through the integration, after it has connected. Nothing needs
-to be changed on the unit beforehand. The device page is split by purpose:
+to be changed on the unit beforehand. Open **Settings → Devices & Services →
+Innova HRDS+** and look at the **HRDS+ setup** device first. The device page is
+split by purpose:
 
 | Where | What is there | When you touch it |
 |-------|---------------|-------------------|
@@ -339,16 +368,28 @@ Entity ids follow the device name, so setup entities are prefixed with the setup
 device name (for example `sensor.hrds_setup_setup_check`); the tables below omit
 the prefix.
 
-### Operational requests are off until you allow them
+**What to check, in this order:**
 
-A fresh install starts with **`switch.allow_operational_requests`** (on the setup
-device) **off**. While it is off, the integration refuses any request that makes the unit
-act - turning it on, dehumidify, active cooling, or a non-zero fan speed - with
-an error saying so. Turning things off, and every configuration write, always
-works. Your choice is remembered across restarts. Turn it on once the checklist
-below is clean.
+1. **Setup check** (on the setup device) reads `ok` or `attention`. If it reads
+   `attention`, the `issues` attribute says what; the table under
+   [First-use checklist](#first-use-checklist) explains each one. A factory
+   unit usually shows `free_cooling_without_outdoor_probe` until you switch off
+   **Enable free cooling** (no outdoor probe is fitted).
+2. **Probe settings** match what is wired. Without a display and without
+   probes, *T/H probe source (HA00)* is *None / external probes* and both *T/H
+   probe temperature / humidity input* selects are *Unused*; the integration
+   sets HA00 for you. Select a probe type only where a probe is really wired,
+   otherwise the unit raises alarm AL28 / AL34.
+3. **Unit facts** are right: *Machine type*, *Recirculation damper relay
+   allocation* (not `disabled` on an `R` model), *Remote on/off input* and
+   *Remote on/off contact closed*, *Time programs enabled* (switch it off for
+   Modbus-only control), *Temperature unit* (°C).
+4. **Season and water circuit** fit your installation: `select.season`, and the
+   integration options *Water register connected to* and *Allow winter heating*.
+5. **Minimum room temperature (PU13)** in the Configuration section of the main
+   device: the unit refuses to dehumidify below it.
 
-### First-use checklist
+#### First-use checklist
 
 1. Open the **HRDS+ setup** device. The **Setup check** sensor reads `ok` or
    `attention`; its `issues` attribute lists what to look at:
@@ -384,7 +425,54 @@ below is clean.
 5. On a water circuit fed by a pump the HRDS+ switches (brine in particular):
    watch `sensor.water_valve_pump` turn *On* with the first request and the
    **Water circuit check** stay `ok` (see [Water circuit](#water-circuit-and-brine)).
-6. When the setup check is `ok`, turn on **Allow operational requests**.
+6. When the setup check is `ok`, continue with
+   [step 4](#4-switch-on-allow-operational-requests) and turn on **Allow
+   operational requests**.
+
+### 4. Switch on Allow operational requests
+
+> **This is the switch that makes the unit operational.** After a fresh install
+> **`switch.hrds_setup_allow_operational_requests`** (on the **HRDS+ setup**
+> device) is **off**. While it is off, Home Assistant cannot make the unit act.
+
+What it blocks, and what it does not:
+
+| Blocked while the switch is off | Always works |
+|---|---|
+| Turning the unit **on**, **dehumidify** (climate *Dry*, `switch.dehumidify`), **active cooling / integration** (climate *Cool* / *Heat*, `switch.active_cooling`), and any **non-zero fan speed** | Turning things **off** (climate *Off*, switches off, fan 0), reading every sensor, and every configuration write (setpoints, selects, setup entities) |
+
+A blocked request fails with *"Operational requests are not allowed yet. Review
+the setup entities, then turn on 'Allow operational requests'."* That message
+means this switch is still off.
+
+To turn it on, open the **HRDS+ setup** device and toggle **Allow operational
+requests**, or call the service:
+
+```yaml
+action: switch.turn_on
+target:
+  entity_id: switch.hrds_setup_allow_operational_requests
+```
+
+Good to know:
+
+* It is the integration's own safety gate, not a register on the unit, and it
+  is not tied to the setup check: you decide when you have looked at the setup
+  entities. Turn it on once the setup check is `ok`.
+* Your choice is remembered across restarts and reloads.
+* Turning it off again does not stop a running unit; it only refuses new
+  requests. To stop the unit, set the climate to *Off*.
+
+### 5. First run
+
+1. Set the climate entity to **Dry** (or turn on `switch.dehumidify`).
+2. Watch **Unit status**: a unit waiting for its first request reads *Off
+   (Modbus)* and changes to *On*. The recirculation fan (`R` units) starts
+   with the request.
+3. If it does not start, look at the **Setup check** `issues`, at the error
+   Home Assistant showed for the request (a refused request names the reason),
+   and at the Home Assistant log. See [Reporting issues](#reporting-issues) if
+   you need help.
 
 ### Airflow calibration (Options)
 
@@ -674,13 +762,6 @@ Writes that the unit rejects now raise an error instead of silently succeeding.
 In an automation a failed service call **aborts the remaining steps**, so if you
 issue several writes in sequence, either put the critical one first or mark the
 rest `continue_on_error: true`.
-
-## Prerequisites
-
-* An Innova DEH+ / hej.luft HRDS+ with the Modbus RTU/RS-485 control board and a
-  Modbus-RTU-to-TCP gateway reachable on your network.
-* Room temperature/humidity readings require the wired CNU2 display or external
-  probes (see [Probe requirements](#probe-requirements) above).
 
 ## Disclaimer
 
