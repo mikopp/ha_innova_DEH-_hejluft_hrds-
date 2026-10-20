@@ -29,6 +29,8 @@ All notable changes to this project are documented here, newest first.
 - `release.yaml` runs the HACS check with `ignore: brands` like `hacs.yaml`.
 - `tests/wiring_check.py` also checks the brand image sizes and that no manifest
   requirement is an exact pin.
+- Removed `strings.json`: it was an exact copy of `translations/en.json`, and a
+  custom integration only needs the `translations/` files (hassfest reads those).
 
 ## 2026-10-19
 
