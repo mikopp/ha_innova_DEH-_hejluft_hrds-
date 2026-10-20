@@ -15,7 +15,11 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    ignore:
+      - dependency-name: "pymodbus"  # follows the pinned Home Assistant
   - package-ecosystem: "pip"
     directory: "/tests/e2e"
     schedule:
       interval: "weekly"
+    ignore:
+      - dependency-name: "pymodbus"  # follows the pinned Home Assistant

@@ -71,10 +71,14 @@ pytest tests/sim tests/ha tests/test_wiring.py
 
 # real HA (needs Docker; logs in tests/e2e/.artifacts/)
 pip install -r tests/e2e/requirements.txt
+pip install "pymodbus==<the version the image's HA ships>"   # for the simulator
 pytest tests/e2e -p no:homeassistant
 ```
-A bare `pytest` skips `tests/e2e`. `HRDS_E2E_IMAGE` overrides the pinned HA
-image (`.github/ha-versions/Dockerfile`).
+`tests/e2e/requirements.txt` does not list `pymodbus` on purpose: the simulator
+on the host must run the pymodbus Home Assistant ships, so `e2e.yaml` reads it
+from the image's modbus manifest and installs that. A bare `pytest` skips
+`tests/e2e`. `HRDS_E2E_IMAGE` overrides the pinned HA image
+(`.github/ha-versions/Dockerfile`).
 
 ## The simulator (`sim/`)
 * It does **not** import `const.py`: addresses and behaviour come from
@@ -100,6 +104,13 @@ image (`.github/ha-versions/Dockerfile`).
   session, restarts included, and fails on errors, tracebacks and deprecations
   from the integration (a short allowlist covers errors the tests cause on
   purpose).
+* Version alignment (`ha/test_versions.py`): fails when the in-process Home
+  Assistant release (year.month) differs from the image tag in
+  `.github/ha-versions/Dockerfile`, or when the pinned `pymodbus` differs from
+  the one HA's modbus manifest requires. Dependabot bumps the two layers in
+  separate PRs, so bump `requirements_test.txt` and the Dockerfile together.
+  Dependabot ignores `pymodbus`: it follows Home Assistant and is never bumped
+  alone.
 * Snapshots (`ha/snapshots/`): `pytest tests/ha/test_seeds.py --snapshot-update`,
   then review the diff.
 
