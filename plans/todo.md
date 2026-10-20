@@ -284,3 +284,16 @@ option is recommended.
       (PM81 1617) and the PA20 address (1736 is not in the PDF table).
 - [ ] Check whether registers above 1900 (PT05-PT11, PH31-PH35, PA61/PA62)
       are readable; add them to the installer device if they are.
+
+## Release housekeeping (added 2026-10-20)
+
+- [ ] **Manifest `categories`.** HACS warns "manifest has no categories". The
+      value belongs in `manifest.json`: `["climate.air_purifiers_humidifiers",
+      "climate.fans_ventilation"]`. It cannot go in yet because the hassfest
+      action runs `hassfest:latest`, which Home Assistant only updates for beta
+      and stable releases, and the key reached core `dev` on 2026-10-17: hassfest
+      fails with "not a valid option at 'categories'". Add it, with the CHANGELOG
+      line, once `hassfest:latest` knows the key (check `script/hassfest/manifest.py`
+      of the newest release tag for `categories`). Alternative if it should not
+      wait: add it now and strip the key from the CI checkout in `hassfest.yaml`
+      and the `hassfest` job of `release.yaml` until then.

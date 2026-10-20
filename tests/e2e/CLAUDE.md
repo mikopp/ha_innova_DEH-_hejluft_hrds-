@@ -25,6 +25,13 @@ Start the module docstring with "Needs a real HA because: ...".
 | `test_restart.py` | `persistence`, `boot-order` | the restart contract with real container restarts |
 | `test_zz_log_hygiene.py` | `runtime-logs` | the session's log is free of errors/deprecations from the integration (runs last) |
 
+## Config
+`pytest.ini` here configures `pytest tests/e2e` and replaces the root
+`pyproject.toml` for this layer. The runner has neither pytest-asyncio nor the
+Home Assistant plugins, so the root file's `asyncio_mode` would warn as an
+unknown option. A new ini option for this layer goes in `pytest.ini`; one for the
+in-process layer in `pyproject.toml`.
+
 ## How it works
 * One container per session (`conftest.py::ha`), onboarded once. Two simulators
   on the host (`headless` for the main entry, `spare` for flow failures and
