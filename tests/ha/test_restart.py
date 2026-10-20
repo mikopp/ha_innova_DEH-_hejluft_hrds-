@@ -19,7 +19,9 @@ import pytest
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant, State
 from homeassistant.helpers import entity_registry as er
-from pytest_homeassistant_custom_component.common import mock_restore_cache
+from pytest_homeassistant_custom_component.common import (
+    mock_restore_cache_with_extra_data,
+)
 
 from custom_components.innova_hrds.const import DOMAIN
 from tests.sim import registers as R
@@ -36,19 +38,33 @@ REQUIRED_SETTINGS = {
 OPERATIONAL_REGISTERS = {R.BMS_ON, R.INT_REQUEST, R.DEU_REQUEST, R.FAN_MANUAL}
 
 
+def restore_gate(hass: HomeAssistant, entity_id: str, state: str, owner: str) -> None:
+    """Put the gate's last state in place, as stored by the entity ``owner``.
+
+    The gate stores its own unique id next to the state; ``owner`` is that id.
+    """
+    mock_restore_cache_with_extra_data(
+        hass, [(State(entity_id, state), {"unique_id": owner})]
+    )
+
+
+def gate_id(s: Setup) -> str:
+    return f"{s.entry.entry_id}-operation_allowed"
+
+
 async def restart(
     hass: HomeAssistant, s: Setup, restore: dict[str, str] | None = None
 ) -> None:
     """Unload and set up the entry again.
 
-    ``restore`` is what Home Assistant would hand back from its last-state
-    storage ({entity_id: state}); it has to be put in place between unload and
-    setup, like a real restart does.
+    ``restore`` is the gate's last state as Home Assistant would hand it back
+    from its last-state storage ({entity_id: state}); it has to be put in place
+    between unload and setup, like a real restart does.
     """
     assert await hass.config_entries.async_unload(s.entry.entry_id)
     await hass.async_block_till_done()
-    if restore:
-        mock_restore_cache(hass, [State(k, v) for k, v in restore.items()])
+    for entity_id, state in (restore or {}).items():
+        restore_gate(hass, entity_id, state, gate_id(s))
     await hass.config_entries.async_setup(s.entry.entry_id)
     await hass.async_block_till_done()
 
@@ -143,14 +159,14 @@ async def test_gate_defaults_off_and_is_restored(hass, sim):
     assert s.entry.runtime_data.operation_allowed is False
     assert await hass.config_entries.async_unload(s.entry.entry_id)
 
-    mock_restore_cache(hass, [State(entity_id, "on")])
+    restore_gate(hass, entity_id, "on", gate_id(s))
     await hass.config_entries.async_setup(s.entry.entry_id)
     await hass.async_block_till_done()
     assert s.state("switch", "operation_allowed").state == "on"
     assert s.entry.runtime_data.operation_allowed is True
 
     assert await hass.config_entries.async_unload(s.entry.entry_id)
-    mock_restore_cache(hass, [State(entity_id, "off")])
+    restore_gate(hass, entity_id, "off", gate_id(s))
     await hass.config_entries.async_setup(s.entry.entry_id)
     await hass.async_block_till_done()
     assert s.state("switch", "operation_allowed").state == "off"
@@ -158,11 +174,53 @@ async def test_gate_defaults_off_and_is_restored(hass, sim):
     await hass.config_entries.async_unload(s.entry.entry_id)
 
 
+async def test_gate_of_another_entry_is_not_restored(hass, sim):
+    """A re-added entry gets the same entity id as the one it replaces.
+
+    Home Assistant would hand it the old entry's "on"; a new entry must start
+    closed, or it could start a unit nobody has reviewed yet.
+    """
+    s = await add_entry(hass, sim)
+    entity_id = s.entity_id("switch", "operation_allowed")
+    old_owner = gate_id(s)
+    assert await hass.config_entries.async_remove(s.entry.entry_id) == {
+        "require_restart": False
+    }
+    await hass.async_block_till_done()
+
+    # What Home Assistant still holds under that entity id: the removed
+    # entry's "on".
+    restore_gate(hass, entity_id, "on", old_owner)
+    s = await add_entry(hass, sim)
+    assert s.entity_id("switch", "operation_allowed") == entity_id
+    assert gate_id(s) != old_owner
+    assert assert_gate_closed(s)
+    await hass.config_entries.async_unload(s.entry.entry_id)
+
+
+def assert_gate_closed(s: Setup) -> bool:
+    assert s.state("switch", "operation_allowed").state == "off"
+    assert s.entry.runtime_data.operation_allowed is False
+    return True
+
+
+async def test_gate_stored_before_it_had_an_owner_is_closed(hass, sim):
+    """Updating from a version that stored no owner closes the gate once."""
+    s = await add_entry(hass, sim)
+    entity_id = s.entity_id("switch", "operation_allowed")
+    assert await hass.config_entries.async_unload(s.entry.entry_id)
+    mock_restore_cache_with_extra_data(hass, [(State(entity_id, "on"), {})])
+    await hass.config_entries.async_setup(s.entry.entry_id)
+    await hass.async_block_till_done()
+    assert assert_gate_closed(s)
+    await hass.config_entries.async_unload(s.entry.entry_id)
+
+
 async def test_restored_gate_allows_requests_straight_away(hass, sim, clock):
     s = await add_entry(hass, sim)
     entity_id = s.entity_id("switch", "operation_allowed")
     assert await hass.config_entries.async_unload(s.entry.entry_id)
-    mock_restore_cache(hass, [State(entity_id, "on")])
+    restore_gate(hass, entity_id, "on", gate_id(s))
     await hass.config_entries.async_setup(s.entry.entry_id)
     await hass.async_block_till_done()
 

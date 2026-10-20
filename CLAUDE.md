@@ -133,7 +133,9 @@ Classification rules (`_classify` in `const.py`):
 * **Operation gate:** `OPERATIONAL_KEYS` (on/off, dehumidify, active cooling,
   manual fan) refuse non-zero writes in `write_entity_value` until
   `hub.operation_allowed` is set via `switch.allow_operational_requests`
-  (`HrdsOperationSwitch`, `OPERATION_TYPES`, default off, `RestoreEntity`). The
+  (`HrdsOperationSwitch`, `OPERATION_TYPES`, default off, `RestoreEntity`;
+  the restored state carries the entity's unique id and is ignored when it
+  belongs to another entry, since a re-added entry reuses the entity id). The
   `_sync_required_settings_locked` writes bypass the gate (they call the client
   directly). Do not add a request-type write path that skips `write_entity_value`.
 * **Device grouping:** `SETUP_KEYS` entities go on the `-setup` child device

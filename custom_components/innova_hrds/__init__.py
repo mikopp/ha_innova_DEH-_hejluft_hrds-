@@ -765,6 +765,10 @@ class HrdsModbusHub:
                 else raw_holding
             )
             if reg not in source:
+                # The device stopped answering for this one address (the block
+                # fell back to per-register reads). Drop the old reading so the
+                # entity goes unavailable instead of showing it forever.
+                self.data.pop(key, None)
                 continue
             raw = ModbusTcpClient.convert_from_registers(
                 registers=[source[reg]], data_type=dt
