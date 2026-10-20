@@ -1,16 +1,19 @@
 # End-to-end tests: the integration in a real Home Assistant container.
 #
-# Runs on pull requests, on main after a merge, nightly, and from release.yaml
-# on the tagged commit. Same approach as the homeassistent-config repo: one Home Assistant container
-# for the session, onboarded once, driven only over REST and websocket, with
-# polling asserts. On top of that, simulated HRDS+ units (tests/sim) run as
-# processes on the runner, so the integration talks real Modbus TCP to a
-# device that reacts: headless and display units, both operation modes, fan
-# speeds, alarms, probe faults, offline and slow links. Their control API
-# (tests/sim/control.py) injects the failures.
+# Deliberately small: only what an in-process Home Assistant (tests.yaml) cannot
+# show. Every test names why (tests/CLAUDE.md): HA installing the integration
+# itself, flows and services as HTTP/JSON, the real scheduler, the setup
+# surviving real restarts, booting before the unit is up, and the real log.
+# Behaviour scenarios (modes, fan, alarms, display, ...) live in tests/ha.
+#
+# Runs on pull requests, on main after a merge, nightly (also against the HA
+# beta image) and from release.yaml on the tagged commit. One container per
+# session, onboarded once, driven over REST/websocket (like the
+# homeassistent-config repo); simulated HRDS+ units (tests/sim) run as processes
+# on the runner and speak real Modbus TCP.
 #
 # The image is pinned in .github/ha-versions/Dockerfile (latest release,
-# bumped by Dependabot); the nightly run also tries the beta image.
+# bumped by Dependabot).
 name: E2E (Home Assistant in Docker)
 
 on:
