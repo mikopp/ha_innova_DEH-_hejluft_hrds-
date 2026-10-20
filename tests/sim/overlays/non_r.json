@@ -1,0 +1,4 @@
+{
+  "description": "Non-R variant: no recirculation fan, damper output disabled.",
+  "input": {"1134": 2, "1112": 0}
+}

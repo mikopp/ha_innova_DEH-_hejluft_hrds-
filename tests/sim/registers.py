@@ -1,0 +1,108 @@
+"""Register addresses the simulator models (direct PDU addresses).
+
+Taken from ``references/MODBUS_REGISTERS.md``, not from the integration's
+``const.py`` (see the package docstring for why).
+"""
+
+# --- input registers (FC 04) -------------------------------------------------
+REMOTE_CONTACT = 257  # packed; bit 0 = remote on/off contact closed
+ROOM_TEMP = 499  # AI_TreturnRoom, x0.1 degC, INT16
+OUTDOOR_TEMP = 500
+WATER_TEMP = 501
+EXHAUST_TEMP = 502
+SUPPLY_TEMP = 503
+ROOM_HUMIDITY = 505  # AI_HretRoom, %RH
+AIR_QUALITY = 506
+FAN_OUTPUT = 639  # outAO_SupplyFan, x0.01 %
+COMPRESSOR_OUTPUT = 641  # x0.01 %
+ALARMS_1 = 768  # bit n = AL(n+1)
+ALARMS_2 = 769  # bit n = AL(n+17)
+ALARMS_3 = 770  # bit n = AL(n+33)
+ANY_ALARM = 1103
+UNIT_STATUS = 1104
+MODE_STATUS = 1110
+ACTUAL_SETPOINT = 1111
+RECIRCULATION = 1112
+FAN_MANUAL_REQUEST = 1114  # mirror of PM20, x0.01 %
+FAN_RPM = 1117
+FAN_STATUS = 1119
+DEHUM_REQUEST = 1121
+COMPRESSOR_STATUS = 1122
+CONDENSER_VALVE = 1124
+WATER_VALVE_PUMP = 1126
+DAMPER = 1134
+SEASON_READBACK = 1583  # 0 summer, 1 winter, 2 auto
+
+# --- holding registers (FC 03/06/16) -----------------------------------------
+BMS_ON = 1105
+INT_REQUEST = 1139  # integration / active cooling
+DEU_REQUEST = 1140  # dehumidify
+SUMMER_SETPOINT = 1584  # x0.1 degC
+WINTER_SETPOINT = 1585
+HUMIDITY_SETPOINT = 1586
+FAN_HOURS = 1604  # PM01, write 0 resets AL22
+FAN_MANUAL = 1614  # PM20, x0.01 %
+PC07_MAX_WATER = 1633  # x0.1 degC
+PF07_FAN_MIN_VMC = 1644  # x0.01 %
+PF09_FAN_MAX_INT = 1646
+PF10_FAN_MAX_DEU = 1647
+PS01_DAMPER_PRESTART = 1698  # s
+PH01_ONOFF_DISPLAY = 1777
+PH02_ONOFF_BMS = 1778
+PG02_INTEGRATION = 1798
+HA00_PROBE_SOURCE = 1803
+HA02_AI2 = 1805
+HA03_AI3 = 1806
+HB04_SEASON = 1825
+PF27_FAN_MIN_INT = 1852
+PF28_FAN_MIN_DEU = 1853
+PH27_INT_BMS = 1869
+PH28_DEU_BMS = 1870
+PU13_MIN_ROOM_TEMP = 1889  # x0.1 degC
+PH29_HUM_MIN = 1892
+PH30_HUM_MAX = 1893
+
+# Alarm reset registers 0x030B-0x031A: writing 1 to (774 + n) resets ALn.
+ALARM_RESET_BASE = 774
+ALARM_RESET_RANGE = range(775, 795)
+
+# Writes that only take effect while their "by BMS" enable is set (handbook /
+# MODBUS_REGISTERS.md section 3).
+ENABLE_FOR = {
+    BMS_ON: PH02_ONOFF_BMS,
+    DEU_REQUEST: PH28_DEU_BMS,
+    INT_REQUEST: PH27_INT_BMS,
+}
+
+# Settings a power cycle drops back to their factory value.
+VOLATILE_SETTINGS = (
+    PH01_ONOFF_DISPLAY,
+    PH02_ONOFF_BMS,
+    PH27_INT_BMS,
+    PH28_DEU_BMS,
+    HA00_PROBE_SOURCE,
+    BMS_ON,
+    DEU_REQUEST,
+    INT_REQUEST,
+)
+
+# Unwired analog input (MODBUS_REGISTERS.md section 14.7).
+PROBE_SENTINEL = 0x8004
+
+ROOM_TEMP_PROBE_CODES = (45,)
+ROOM_HUMIDITY_PROBE_CODES = (53, 54)
+
+SEASON_SUMMER = 4  # HB04 values
+SEASON_WINTER = 3
+
+
+def alarm_bit(code: str) -> tuple[int, int]:
+    """(register, bit) of alarm ``ALnn``."""
+    n = int(code.upper().removeprefix("AL"))
+    if 1 <= n <= 16:
+        return ALARMS_1, n - 1
+    if 17 <= n <= 32:
+        return ALARMS_2, n - 17
+    if 33 <= n <= 48:
+        return ALARMS_3, n - 33
+    raise ValueError(f"unknown alarm {code!r}")

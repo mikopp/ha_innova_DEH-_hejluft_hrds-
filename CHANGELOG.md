@@ -15,6 +15,30 @@ All notable changes to this project are documented here, newest first.
 * The *Allow operational requests* switch restores its last state before
   publishing, so it no longer flickers off on startup.
 
+### fix: a slow gateway could show wrong values
+
+* After a read timed out, pymodbus handed the late answer to the next
+  request, so every following block decoded another block's registers (a
+  running unit could show `off_by_display`). Replies must now have exactly the
+  requested length; a missing or mismatched reply drops the connection and
+  the entities go `unavailable` instead. A dead link now fails in seconds
+  instead of retrying every register one by one.
+* A write just before unload no longer leaves its refresh timer running.
+
+### test: simulator, in-process and Docker e2e tests in CI
+
+* `tests/sim`: a simulated HRDS+ seeded from real-device dumps
+  (`tests/devices/`), serving Modbus TCP with the documented behaviour (BMS
+  enables, display/OFF priority, season/AL25, setpoint clamps, request
+  sequence, three fan-output hypotheses, alarms, probe faults, power cycle)
+  and transport faults (offline, slow, rejected addresses/writes, identity).
+* `tests/ha` (workflow `tests.yaml`): the real Home Assistant core with the
+  integration's real client against the simulator; coverage gate 90 %.
+* `tests/e2e` (workflow `e2e.yaml`): the integration in the official Home
+  Assistant container, driven over REST/websocket; headless and display
+  units, both operation modes, fan speeds, failures. Nightly also on `beta`.
+* `tests/out.json` moved to `tests/devices/hrds_30+_headless_factory_state.json`.
+
 ## 2026-10-19
 
 ### feat: brine temperature guard

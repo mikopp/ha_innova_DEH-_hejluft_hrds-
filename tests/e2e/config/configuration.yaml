@@ -1,0 +1,43 @@
+# Home Assistant configuration for the Docker e2e tests.
+#
+# Kept minimal (no default_config) so the container starts fast. The test run
+# stages this directory together with custom_components/innova_hrds into a
+# temporary /config (tests/e2e/stage.py); nothing is written back here.
+homeassistant:
+  name: HRDS e2e
+  latitude: 48.3
+  longitude: 14.3
+  elevation: 260
+  unit_system: metric
+  time_zone: Europe/Vienna
+  country: AT
+  currency: EUR
+
+http:
+api:
+config:
+onboarding:
+websocket_api:
+input_number:
+  # Drives the brine temperature guard (sensor.brine_supply below).
+  brine_temperature:
+    name: Brine temperature
+    min: -10
+    max: 30
+    step: 0.5
+    initial: 15
+    unit_of_measurement: "°C"
+
+template:
+  - sensor:
+      - name: Brine supply
+        unique_id: brine_supply
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state: "{{ states('input_number.brine_temperature') }}"
+
+logger:
+  default: warning
+  logs:
+    custom_components.innova_hrds: debug
+    homeassistant.config_entries: info

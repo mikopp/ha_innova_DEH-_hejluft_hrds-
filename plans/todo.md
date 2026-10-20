@@ -99,6 +99,10 @@ verified on hardware.
 
 ## Fan mode — implemented, needs hardware verification
 
+> The test simulator (`tests/sim/device.py`) models all three hypotheses below
+> as `fan_model` = `rescale` (default) / `clamp` / `direct`. Once the hardware
+> answer is known, make that one the default and drop the others.
+
 The climate entity now exposes **fan_mode** (off / low / medium / high):
 
 | Mode   | Manual fan speed written to reg 1614 |

@@ -1,9 +1,11 @@
 # Release checks.
 #
-# Triggered when a GitHub Release is published. It re-runs the two validators
-# that matter for a shippable artifact:
+# Triggered when a GitHub Release is published. It re-runs the checks that
+# matter for a shippable artifact:
 #   1. hassfest  -> manifest/translations are valid
 #   2. hacs      -> repository is installable via HACS (only runs if hassfest passes)
+#   3. tests     -> in-process tests against the simulated unit (tests.yaml)
+#   4. e2e       -> the integration in a real Home Assistant container (e2e.yaml)
 # The bump of the version inside manifest.json is handled separately by
 # .github/scripts/update_hacs_manifest.py (see that file).
 name: Release checks
@@ -27,3 +29,9 @@ jobs:
       - uses: hacs/action@d556e736723344f83838d08488c983a15381059a # 22.5.0
         with:
           category: integration
+
+  tests:
+    uses: ./.github/workflows/tests.yaml
+
+  e2e:
+    uses: ./.github/workflows/e2e.yaml
