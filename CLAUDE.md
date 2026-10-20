@@ -313,6 +313,11 @@ block plan, decoding, guards and writes all run for real:
   `pytest-homeassistant-custom-component` (pinned to the latest HA release in
   `requirements_test.txt`). Fast, measures coverage (fail under 90 %).
   `pip install -r requirements_test.txt && pytest tests/sim tests/ha tests/test_wiring.py`
+  `tests/ha/test_versions.py` fails when the in-process Home Assistant release
+  (year.month) differs from the image tag in `.github/ha-versions/Dockerfile`, or
+  when the pinned `pymodbus` differs from the one HA's modbus manifest requires.
+  `e2e.yaml` installs the simulator's `pymodbus` from the image's own manifest;
+  Dependabot ignores `pymodbus` (it follows HA, never bumped alone).
 * **Docker e2e** (`tests/e2e/`, `e2e.yaml`): the official HA image from
   `.github/ha-versions/Dockerfile`, one container per session, onboarded and
   driven over REST/websocket like the `homeassistent-config` repo's harness.

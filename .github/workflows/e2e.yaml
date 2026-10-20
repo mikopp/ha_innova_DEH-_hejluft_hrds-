@@ -71,6 +71,15 @@ jobs:
           cat /tmp/pull.log | tail -3
           if [ "$(cat /tmp/pull.rc)" != "0" ]; then docker pull "$HRDS_E2E_IMAGE"; fi
 
+      # The simulator runs on the runner, so give it the pymodbus the image's
+      # Home Assistant ships (read from its modbus manifest; the image does not
+      # necessarily have it installed yet).
+      - name: Install the image's pymodbus
+        run: |
+          req=$(docker run --rm "$HRDS_E2E_IMAGE" python -c "import json, pathlib, homeassistant.components.modbus as m; print(next(r for r in json.loads(pathlib.Path(m.__file__).with_name('manifest.json').read_text())['requirements'] if r.startswith('pymodbus')))")
+          echo "pymodbus requirement of $HRDS_E2E_IMAGE: $req"
+          pip install "$req"
+
       - name: check_config
         run: |
           python -m tests.e2e.stage /tmp/ha-check

@@ -3,5 +3,7 @@
 # keep it on the latest one (Dependabot bumps it together with
 # .github/ha-versions/Dockerfile). 0.13.373 = Home Assistant 2026.10.2.
 pytest-homeassistant-custom-component==0.13.373
-# The version Home Assistant ships (the manifest requires >=3.13.1; tests use the exact one).
+# Exactly what Home Assistant ships (the manifest requires >=3.13.1). Not
+# installed by the line above; tests/ha/test_versions.py fails if it drifts.
+# Dependabot ignores it: it moves only together with Home Assistant.
 pymodbus==3.13.1
