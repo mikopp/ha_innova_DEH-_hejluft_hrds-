@@ -635,9 +635,10 @@ def step_settings(
     if unit_status == "off_by_display" and not has_display:
         say(
             INFO,
-            "unit status is 'off_by_display' because PH01=1 with no display; "
-            "the integration clears PH01 on connect, after which the unit "
-            "reports 'off_by_bms' and can be started from HA.",
+            "unit status is 'off_by_display' with no display. The integration "
+            "clears PH01 on connect, but a real unit kept this stored OFF even "
+            "after PH01=0 and a power cycle; the first Modbus ON (Unit on/off) "
+            "cleared it. Expect 'off_by_bms' only on units that follow the manual.",
         )
     elif unit_status in (
         "off_by_display",
@@ -890,7 +891,7 @@ def step_headless(dev: Dev, rows: dict, extras: dict) -> dict[str, Any]:
     for key, code in (
         (const.C_ENABLE_ONOFF_BMS, "PH02 on/off"),
         (const.C_ENABLE_DEHUM_BMS, "PH28 dehumidify"),
-        (const.C_ENABLE_COOLING_BMS, "PH27 integration"),
+        (const.C_ENABLE_INT_BMS, "PH27 integration"),
     ):
         v = g(key)
         say(

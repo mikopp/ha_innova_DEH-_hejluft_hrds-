@@ -220,7 +220,7 @@
         "name": "Setup check",
         "state": {
           "ok": "OK",
-          "attention": "Needs attention"
+          "attention": "Needs attention (see attributes)"
         }
       },
       "water_valve_pump": {
@@ -459,7 +459,7 @@
         "name": "Room humidity probe OK"
       },
       "active_cooling_available": {
-        "name": "Active cooling available"
+        "name": "Unit has integration function (PG02)"
       },
       "alarm_compressor_lowpressure": {
         "name": "Alarm: compressor low-pressure / frost"
@@ -503,16 +503,13 @@
         "name": "Enable on/off via Modbus"
       },
       "enable_dehumidify_bms": {
-        "name": "Enable dehumidify via Modbus"
+        "name": "Enable dehumidify (DEU) via Modbus (PH28)"
       },
-      "enable_cooling_bms": {
-        "name": "Enable cooling via Modbus"
+      "enable_integration_bms": {
+        "name": "Enable integration (INT) via Modbus (PH27)"
       },
       "force_dehumidify_in_cooling": {
         "name": "Force dehumidify when cooling"
-      },
-      "enable_integration": {
-        "name": "Enable integration (active cooling)"
       },
       "enable_free_cooling": {
         "name": "Enable free cooling/heating"

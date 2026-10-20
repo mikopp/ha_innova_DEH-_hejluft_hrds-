@@ -64,10 +64,12 @@ verified on hardware.
 
 ## Headless operation, identity, sentinel (added 2026-10-19)
 
-- [ ] **PH01 = 0 clears `off_by_display`.** On a unit that reads PH01 = 1 with no
-      display, connect with `has_display` off and confirm `unit_status` goes
-      `off_by_display` → `off_by_bms`, then that `climate.turn_on` really starts
-      it. Check whether PH01 needs a unit restart to take effect.
+- [x] **PH01 = 0 does not clear `off_by_display` by itself** (2026-10-20, real
+      unit, EPB9ORSINDEU V01.00.09.02). PH01 = 0, HA00 = 0, PH02 = 1 and a power
+      cycle still read `off_by_display`; the first Modbus ON (`switch.unit_on_off`)
+      moved it to `on` at once. The setup check now reports
+      `unit_waiting_for_first_on` for this. Still open: does a Modbus OFF then read
+      `off_by_bms`, and does it stay so across a power cycle.
 - [ ] **HA00 = 0 on a unit that read 2** (the manual says the factory value is
       6). Confirm it is accepted and whether AL28/AL34 appear afterwards.
 - [ ] **PH01 / HA00 are config parameters**: confirm that re-writing them only

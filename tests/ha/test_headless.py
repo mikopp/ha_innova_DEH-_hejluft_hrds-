@@ -47,6 +47,31 @@ async def test_setup_check_lists_real_issues_until_fixed(setup, clock):
     assert _issues(s) == []
 
 
+async def test_headless_unit_stuck_off_by_display_says_how_to_start_it(setup, clock):
+    s = setup
+    s.device.latch_display_off()
+    await clock.poll()
+    assert s.state("sensor", "unit_status").state == "off_by_display"
+    assert "unit_waiting_for_first_on" in _issues(s)
+    assert any(
+        "Unit on/off (Modbus)" in text
+        for text in s.state("sensor", "setup_check").attributes["to_fix"]
+    )
+    await allow_operation(s)
+    await s.service("switch", "turn_on", "unit_on_off")
+    await clock.settle()
+    assert s.state("sensor", "unit_status").state == "on"
+    assert "unit_waiting_for_first_on" not in _issues(s)
+
+
+async def test_setup_switches_say_when_to_turn_them_off(setup):
+    free_cooling = setup.state("switch", "enable_free_cooling").attributes["hint"]
+    assert free_cooling.startswith("Turn this OFF unless an outdoor temperature probe")
+    assert "hint" in setup.state("switch", "enable_integration_bms").attributes
+    # Switches without guidance carry no empty attribute.
+    assert "hint" not in setup.state("switch", "enable_time_programs").attributes
+
+
 async def test_setpoints_hidden_without_room_probe(setup):
     s = setup
     for key in ("summer_setpoint", "winter_setpoint", "humidity_setpoint"):

@@ -152,7 +152,7 @@ holding registers. They are read-only from the integration.
 | Entity | What it means |
 |--------|--------------|
 | `sensor.machine_type` | PG01 fan arrangement: *supply fan only* or *supply and exhaust fan*. **Not** a recirculation flag: an `R` unit reads *supply fan only*. |
-| `binary_sensor.active_cooling_available` | ON: active cooling is enabled on this unit (PG02 = 1) |
+| `binary_sensor.active_cooling_available` | ON: the unit has the integration (INT) function (PG02 = 1). Read-only: an installer setting, not a Modbus permission |
 
 Whether the unit has a recirculation fan (`R`) is shown by
 `sensor.recirculation_damper`: *Disabled* means no damper is wired (non-`R`),
@@ -184,10 +184,9 @@ Each sensor maps to a single bit of a packed alarm register. **ON = alarm is act
 | `switch.enable_onoff_by_di_request` | 1894 | **Setup device.** PC12 — a DEU/INT request on the digital inputs starts the unit even with the OFF contact open |
 | `switch.enable_onoff_display` | 1777 | PH01 — on/off by wired display. Forced **off** while `has_display` is off (the default); turning it on by hand is undone on the next poll |
 | `switch.enable_onoff_bms` | 1778 | PH02 — auto-set on startup; expose to inspect/reset |
-| `switch.enable_dehumidify_bms` | 1870 | PH28 — auto-set on startup |
-| `switch.enable_cooling_bms` | 1869 | PH27 — auto-set on startup |
+| `switch.enable_dehumidify_bms` | 1870 | PH28 — permits the DEU (dehumidify) request over Modbus; auto-set on startup |
+| `switch.enable_integration_bms` | 1869 | PH27 — permits the INT (integration) request over Modbus; auto-set on startup |
 | `switch.force_dehumidify_in_cooling` | 1692 | PU05; couple dehumidify to a cooling request |
-| `switch.enable_integration` | 1798 | PG02; master enable for active cooling |
 | `switch.enable_free_cooling` | 1799 | PG03; while off, outdoor temperature drives nothing |
 
 ### Numbers
@@ -368,13 +367,28 @@ Entity ids follow the device name, so setup entities are prefixed with the setup
 device name (for example `sensor.hrds_setup_setup_check`); the tables below omit
 the prefix.
 
+**What is left to fix:** while *Setup check* reads *Needs attention (see
+attributes)*, open it (click the row, then *Attributes*). `to_fix` lists each
+open item in plain words, in the Home Assistant language, with what to do about
+it; `issues` has the same items as short codes (explained in the
+[First-use checklist](#first-use-checklist)). The device page itself cannot
+show attributes, so this sensor is the one place to look.
+
 **What to check, in this order:**
 
 1. **Setup check** (on the setup device) reads `ok` or `attention`. If it reads
    `attention`, the `issues` attribute says what; the table under
    [First-use checklist](#first-use-checklist) explains each one. A factory
    unit usually shows `free_cooling_without_outdoor_probe` until you switch off
-   **Enable free cooling** (no outdoor probe is fitted).
+   **Enable free cooling (PG03)** (no outdoor probe is fitted). Each setup
+   switch carries a `hint` attribute (open the entity, *Attributes*) that says
+   when to leave it on or turn it off:
+
+   | Switch | Leave | Why |
+   |--------|-------|-----|
+   | Enable free cooling/heating (PG03) | **Off** unless an outdoor probe is wired | It acts on the outdoor temperature (bypass relay). With no probe there is no valid reading, so the unit may behave unpredictably. Also off when a central ventilation system handles free cooling. |
+   | Enable on/off via display (PH01) | **Off** without a CNU2 display | Otherwise the unit stays off waiting for the display. |
+   | Enable on/off, dehumidify (DEU), integration (INT) via Modbus (PH02, PH28, PH27) | **On** | The unit ignores the matching requests without them. The integration sets them again on every poll, so switching one off by hand is undone. |
 2. **Probe settings** match what is wired. Without a display and without
    probes, *T/H probe source (HA00)* is *None / external probes* and both *T/H
    probe temperature / humidity input* selects are *Unused*; the integration
@@ -400,6 +414,7 @@ the prefix.
    | `headless_settings_pending` | Without a display, PH01 and HA00 must be 0. Same: written on the next poll. |
    | `unit_off_by_digital_input` | The remote on/off contact (OFF/OFF terminals, HB03) is open, so the unit is forced off. Close it (the factory bridge) or set HB03 accordingly. |
    | `unit_off_by_scheduler` / `unit_off_by_clock` | A time program or the internal clock holds the unit off. Check PH03 (**Time programs enabled**); switch it off for Modbus-only control. |
+   | `unit_waiting_for_first_on` | Without a display, *Unit status* still reads *off by display* although PH01 is 0: the unit keeps a stored OFF until the first Modbus ON. Turn on *Allow operational requests*, then switch on *Unit on/off (Modbus)* once (main device). |
    | `unit_off_by_display` | Only reported when the display option is ticked: the display has switched the unit off. |
    | `room_temperature_probe_missing` | *T/H probe temperature input* (HA02) says a probe is on AI2, but nothing is wired. The unit will wait for a room temperature. Set `select.ai2_allocation` to *Unused* or wire the probe. |
    | `room_humidity_probe_missing` | Same for *T/H probe humidity input* (`select.ai3_allocation`, HA03) and the humidity probe. |

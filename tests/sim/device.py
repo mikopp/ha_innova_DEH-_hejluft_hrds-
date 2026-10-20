@@ -92,6 +92,7 @@ class HrdsDevice:
             self.unit_id = self._seed.unit
             self.has_display = bool(self._seed.meta.get("display", False))
             self.display_on = self.has_display
+            self._latched_display_off = False
             # R variant = has a damper output (1134 not "disabled").
             self.r_variant = self.input.get(R.DAMPER, 2) != 2
             self.pump_configured = self.input.get(R.WATER_VALVE_PUMP, 0) != 2
@@ -225,6 +226,16 @@ class HrdsDevice:
             self.pump_fault = fault
             self._recompute()
 
+    def latch_display_off(self) -> None:
+        """The stored display OFF a real unit keeps after PH01 = 0 (headless).
+
+        Seen on hardware: PH01 = 0 and a power cycle did not clear it; the
+        first Modbus ON did.
+        """
+        with self._lock:
+            self._latched_display_off = True
+            self._recompute()
+
     def set_display_on(self, on: bool) -> None:
         with self._lock:
             self.display_on = on
@@ -244,6 +255,11 @@ class HrdsDevice:
             self.has_display and self.display_on
         ):
             return 0  # off_by_display: OFF from the display (absent or off) wins
+        if self._latched_display_off:
+            if h.get(R.PH02_ONOFF_BMS) == 1 and h.get(R.BMS_ON) == 1:
+                self._latched_display_off = False
+            else:
+                return 0  # stored display OFF, cleared by the first Modbus ON
         if h.get(R.PH02_ONOFF_BMS) == 1:
             return 5 if h.get(R.BMS_ON) == 1 else 2  # on / off_by_bms
         if h.get(R.PH01_ONOFF_DISPLAY) == 1:

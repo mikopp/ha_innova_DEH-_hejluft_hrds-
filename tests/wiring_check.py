@@ -292,6 +292,18 @@ def main() -> int:
     )
     check("default" not in const.PROBE_SOURCE, "PROBE_SOURCE map has no sentinel key")
 
+    print("== setup issue texts ==")
+    check(
+        len(const.SETUP_ISSUE_TEXTS) == 15
+        and all(all(t) for t in const.SETUP_ISSUE_TEXTS.values()),
+        "every setup issue slug has an English and a German text",
+    )
+    print("== switch hints ==")
+    check(
+        set(const.SWITCH_HINTS) <= set(const.BINARY_TYPES),
+        "every switch hint belongs to a register-backed switch",
+    )
+
     print("== headless / identity / probe sentinel ==")
     # PG01 is the fan arrangement, not "has recirculation"; reading it as the
     # latter made an `R` unit report "no recirculation".

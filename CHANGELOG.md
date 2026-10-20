@@ -15,6 +15,33 @@ on update; automations that set `number.*ai2_allocation` / `*ai3_allocation`
 must use the new selects. A code other than the documented ones shows as
 unknown, and the setup check reports `probe_input_unrecognised`.
 
+**Changed:** the device has two requests, DEU and INT, and the setup switches
+now say so. `enable_cooling_bms` (PH27, 1869) is the permission for the INT
+request, not a cooling mode, and is now `switch.enable_integration_bms`
+("Enable integration (INT) via Modbus (PH27)"); PH28 is labelled DEU. Existing
+installs keep the entity and its entity id; only the name changes.
+
+**Added:** the setup switches for free cooling (PG03), the display on/off
+(PH01) and the three Modbus enables carry a `hint` attribute (English or
+German, following the Home Assistant language) that says when to leave them on
+or turn them off. Home Assistant has no tooltip for entities; the attribute
+shows in the entity's *Attributes*. The README setup step lists the same advice.
+
+**Added:** the *Setup check* sensor reads *Needs attention (see attributes)* and
+has a new `to_fix` attribute: each open setup item in plain words with what to
+do about it (English or German). `issues` keeps the short codes.
+
+**Added:** *Unit status* is now on the setup device, and a headless unit that
+still reads *off by display* gets the setup issue `unit_waiting_for_first_on`.
+On a real unit PH01 = 0 and a power cycle did not clear that state; the first
+Modbus ON did.
+
+**Removed:** `switch.enable_integration` (PG02, 1798). PG02 is an installer
+setting that says whether the unit has the integration function, already shown
+read-only as `binary_sensor.active_cooling_available` (now "Unit has
+integration function (PG02)"). The switch is removed from the entity registry
+on the next start.
+
 ---
 
 ## 0.9.1 (2026-10-20): fix setup on real hardware, installer device opt-in

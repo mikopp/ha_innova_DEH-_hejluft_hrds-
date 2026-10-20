@@ -303,7 +303,7 @@
       "value": "on",
       "unit": ""
     },
-    "enable_cooling_bms": {
+    "enable_integration_bms": {
       "reg": 1869,
       "type": 3,
       "raw": 1,
@@ -445,13 +445,6 @@
     },
     "force_dehumidify_in_cooling": {
       "reg": 1692,
-      "type": 3,
-      "raw": 1,
-      "value": "on",
-      "unit": ""
-    },
-    "enable_integration": {
-      "reg": 1798,
       "type": 3,
       "raw": 1,
       "value": "on",

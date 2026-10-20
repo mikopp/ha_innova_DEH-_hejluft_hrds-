@@ -287,9 +287,8 @@ C_OPERATION_ALLOWED = "operation_allowed"
 C_ENABLE_ONOFF_DISPLAY = "enable_onoff_display"
 C_ENABLE_ONOFF_BMS = "enable_onoff_bms"
 C_ENABLE_DEHUM_BMS = "enable_dehumidify_bms"
-C_ENABLE_COOLING_BMS = "enable_cooling_bms"
+C_ENABLE_INT_BMS = "enable_integration_bms"
 C_FORCE_DEHUM_IN_COOLING = "force_dehumidify_in_cooling"
-C_ENABLE_INTEGRATION = "enable_integration"
 C_ENABLE_FREE_COOLING = "enable_free_cooling"
 # Read-write selects
 C_PROBE_SOURCE = "probe_source"
@@ -628,14 +627,14 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "REG": 1870,
         "DT": C_DT_UINT16,
         "SWITCH": {"off": 0, "on": 1},
-        "NAME": "Enable dehumidify via Modbus",
+        "NAME": "Enable dehumidify (DEU) via Modbus (PH28)",
     },
-    C_ENABLE_COOLING_BMS: {
+    C_ENABLE_INT_BMS: {
         "RT": C_REG_TYPE_HOLDING_REGISTERS,
         "REG": 1869,
         "DT": C_DT_UINT16,
         "SWITCH": {"off": 0, "on": 1},
-        "NAME": "Enable cooling via Modbus",
+        "NAME": "Enable integration (INT) via Modbus (PH27)",
     },
     # --- Hardware-variant read-only sensors (holding registers, RW=0) ---
     # PG01_MachineType (1797): fan arrangement (supply only / supply + exhaust).
@@ -657,7 +656,7 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "DT": C_DT_UINT16,
         "SWITCH": {"off": 0, "on": 1},
         "RW": 0,
-        "NAME": "Active cooling available",
+        "NAME": "Unit has integration function (PG02)",
     },
     # --- Installer configuration, exposed so the user can see how the unit is set
     # up and change what matters without a service tool. Read-only entries are
@@ -988,13 +987,6 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "SWITCH": {"off": 0, "on": 1},
         "NAME": "Force dehumidify when cooling (PU05)",
     },
-    C_ENABLE_INTEGRATION: {
-        "RT": C_REG_TYPE_HOLDING_REGISTERS,
-        "REG": 1798,
-        "DT": C_DT_UINT16,
-        "SWITCH": {"off": 0, "on": 1},
-        "NAME": "Enable integration / active cooling (PG02)",
-    },
     # When off, outdoor temperature (reg 500) is decoration, not a control input.
     C_ENABLE_FREE_COOLING: {
         "RT": C_REG_TYPE_HOLDING_REGISTERS,
@@ -1058,9 +1050,125 @@ for _code, _reg, _kind, _factor, _min, _max, _unit, _en, _de, _on in INSTALLER_P
         _props["RW"] = 0
     ENTITIES_DICT[installer_key(_code)] = _props
 
+# Guidance shown as the `hint` attribute of a setup switch: when to leave it on
+# or turn it off. Home Assistant has no tooltip for entities; the attribute is
+# what the more-info dialog shows. {key: (English, German)}
+SWITCH_HINTS: Dict[str, tuple[str, str]] = {
+    C_ENABLE_FREE_COOLING: (
+        "Turn this OFF unless an outdoor temperature probe is wired. It lets the "
+        "unit act on the outdoor temperature (bypass relay); with no probe there is "
+        "no valid reading, so the unit may behave unpredictably. Also leave it off "
+        "if a central ventilation system already handles free cooling. The Setup "
+        "check lists it under 'to_fix' while it is on without a probe.",
+        "AUS schalten, solange kein Außentemperaturfühler angeschlossen ist. Die "
+        "Funktion lässt das Gerät auf die Außentemperatur reagieren (Bypass-Relais); "
+        "ohne Fühler gibt es keinen gültigen Messwert, das Gerät kann sich dann "
+        "unvorhersehbar verhalten. Ebenfalls aus lassen, wenn eine zentrale "
+        "Lüftungsanlage das Free-Cooling übernimmt. Die Einrichtungsprüfung listet "
+        "sie unter 'to_fix', solange sie ohne Fühler an ist.",
+    ),
+    C_ENABLE_ONOFF_DISPLAY: (
+        "Leave OFF without a CNU2 display: the unit would otherwise stay off "
+        "waiting for it. The integration keeps it off unless the display option is "
+        "ticked.",
+        "Ohne CNU2-Display AUS lassen: sonst bleibt das Gerät aus und wartet auf "
+        "das Display. Die Integration hält es aus, solange die Display-Option nicht "
+        "aktiv ist.",
+    ),
+    C_ENABLE_ONOFF_BMS: (
+        "Leave ON. The unit ignores on/off from Home Assistant without it; the "
+        "integration sets it again on every poll.",
+        "AN lassen. Ohne diese Freigabe ignoriert das Gerät Ein/Aus aus Home "
+        "Assistant; die Integration setzt sie bei jeder Abfrage erneut.",
+    ),
+    C_ENABLE_DEHUM_BMS: (
+        "Leave ON. The unit ignores the dehumidify (DEU) request without it; the "
+        "integration sets it again on every poll.",
+        "AN lassen. Ohne diese Freigabe ignoriert das Gerät die Entfeuchtungs-"
+        "anforderung (DEU); die Integration setzt sie bei jeder Abfrage erneut.",
+    ),
+    C_ENABLE_INT_BMS: (
+        "Leave ON. The unit ignores the integration (INT) request without it; the "
+        "integration sets it again on every poll.",
+        "AN lassen. Ohne diese Freigabe ignoriert das Gerät die Integrations-"
+        "anforderung (INT); die Integration setzt sie bei jeder Abfrage erneut.",
+    ),
+}
+
+# What to do about each setup issue slug (Setup check `issues`), shown as the
+# `to_fix` attribute: {slug: (English, German)}.
+SETUP_ISSUE_TEXTS: Dict[str, tuple[str, str]] = {
+    "modbus_enables_pending": (
+        "Modbus enables not set yet (PH02/PH27/PH28): written on the next poll",
+        "Modbus-Freigaben noch nicht gesetzt (PH02/PH27/PH28): werden bei der nächsten Abfrage geschrieben",
+    ),
+    "headless_settings_pending": (
+        "Settings for running without a display not set yet (PH01, HA00): written on the next poll",
+        "Einstellungen für Betrieb ohne Display noch nicht gesetzt (PH01, HA00): werden bei der nächsten Abfrage geschrieben",
+    ),
+    "unit_off_by_digital_input": (
+        "Unit held off by the remote on/off contact: close it or set HB03",
+        "Gerät durch den Fern-Ein/Aus-Kontakt ausgeschaltet: Kontakt schließen oder HB03 anpassen",
+    ),
+    "unit_waiting_for_first_on": (
+        "The unit still shows 'off by display' although no display is used: it "
+        "keeps that stored OFF until the first Modbus ON. Turn on 'Allow "
+        "operational requests', then switch on 'Unit on/off (Modbus)' once on the "
+        "main device",
+        "Das Gerät zeigt noch 'Aus durch Display', obwohl kein Display genutzt "
+        "wird: es behält dieses gespeicherte AUS bis zum ersten Modbus-EIN. "
+        "'Betriebsanforderungen erlauben' einschalten, dann auf dem Hauptgerät "
+        "einmal 'Gerät ein/aus (Modbus)' einschalten",
+    ),
+    "unit_off_by_scheduler": (
+        "Unit held off by a time program: turn off 'Time programs enabled' (PH03)",
+        "Gerät durch ein Zeitprogramm ausgeschaltet: 'Zeitprogramme' (PH03) ausschalten",
+    ),
+    "unit_off_by_clock": (
+        "Unit held off by the internal clock: turn off 'Time programs enabled' (PH03)",
+        "Gerät durch die interne Uhr ausgeschaltet: 'Zeitprogramme' (PH03) ausschalten",
+    ),
+    "unit_off_by_display": (
+        "Unit switched off by the display: switch it on at the display",
+        "Gerät am Display ausgeschaltet: am Display einschalten",
+    ),
+    "room_temperature_probe_missing": (
+        "Room temperature probe expected but not wired: set 'T/H probe temperature input' (HA02) to Unused, or wire the probe",
+        "Raumtemperaturfühler erwartet, aber nicht angeschlossen: HA02 auf 'Nicht verwendet' setzen oder Fühler anschließen",
+    ),
+    "room_humidity_probe_missing": (
+        "Room humidity probe expected but not wired: set 'T/H probe humidity input' (HA03) to Unused, or wire the probe",
+        "Raumfeuchtefühler erwartet, aber nicht angeschlossen: HA03 auf 'Nicht verwendet' setzen oder Fühler anschließen",
+    ),
+    "probe_input_unrecognised": (
+        "A probe input (HA02/HA03) holds an unknown code: pick an option or check the wiring",
+        "Ein Fühlereingang (HA02/HA03) hat einen unbekannten Code: Option wählen oder Verdrahtung prüfen",
+    ),
+    "time_programs_enabled": (
+        "Time programs may switch the unit off: turn off 'Time programs enabled' (PH03) for Modbus-only control",
+        "Zeitprogramme können das Gerät ausschalten: für reine Modbus-Steuerung 'Zeitprogramme' (PH03) ausschalten",
+    ),
+    "free_cooling_without_outdoor_probe": (
+        "Free cooling is on but no outdoor probe is wired: turn off 'Enable free cooling/heating' (PG03)",
+        "Free-Cooling ist an, aber kein Außenfühler angeschlossen: 'Free-Cooling/Heating freigeben' (PG03) ausschalten",
+    ),
+    "temperature_unit_fahrenheit": (
+        "The unit is set to Fahrenheit: set 'Temperature unit' (PH05) to Celsius",
+        "Das Gerät steht auf Fahrenheit: 'Temperatureinheit' (PH05) auf Celsius stellen",
+    ),
+    "water_pump_output_not_configured": (
+        "Relay K5 (water valve / pump) is not configured: check HD05 and the wiring",
+        "Relais K5 (Wasserventil/Pumpe) ist nicht konfiguriert: HD05 und Verdrahtung prüfen",
+    ),
+    "winter_dehumidify_on_brine": (
+        "Brine circuit without a temperature guard allows winter dehumidifying (coil can freeze): set 'Winter dehumidification' (PU02) to Disabled or configure a brine guard",
+        "Solekreis ohne Temperaturwächter erlaubt Winter-Entfeuchtung (Register kann einfrieren): 'Winter-Entfeuchtung' (PU02) deaktivieren oder Soleüberwachung einrichten",
+    ),
+}
+
 # Registers written (in order) when the integration is set up, to make sure
 # Modbus control is actually permitted by the unit.
-BMS_ENABLE_KEYS = (C_ENABLE_ONOFF_BMS, C_ENABLE_DEHUM_BMS, C_ENABLE_COOLING_BMS)
+BMS_ENABLE_KEYS = (C_ENABLE_ONOFF_BMS, C_ENABLE_DEHUM_BMS, C_ENABLE_INT_BMS)
 
 # Settings that must hold when no CNU2 display is fitted: {key: (decoded, raw)}.
 # Without them the unit sits OFF-by-display and expects room T/H from a display
@@ -1087,15 +1195,15 @@ SETUP_KEYS = frozenset(
     {
         C_OPERATION_ALLOWED,
         C_SETUP_CHECK,
+        C_UNIT_STATUS,
         C_ENABLE_ONOFF_DISPLAY,
         C_PROBE_SOURCE,
         C_ENABLE_ONOFF_BMS,
         C_ENABLE_DEHUM_BMS,
-        C_ENABLE_COOLING_BMS,
+        C_ENABLE_INT_BMS,
         C_AI2_ALLOCATION,
         C_AI3_ALLOCATION,
         C_TIME_PROGRAMS,
-        C_ENABLE_INTEGRATION,
         C_ENABLE_FREE_COOLING,
         C_REMOTE_ONOFF_INPUT,
         C_REMOTE_CONTACT_CLOSED,
