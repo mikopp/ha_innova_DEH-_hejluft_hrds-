@@ -94,6 +94,11 @@ class FanEntityDescription(EntityDescription):
     pass
 
 
+@dataclass
+class ButtonEntityDescription(EntityDescription):
+    pass
+
+
 class ClimateEntityFeature(enum.IntFlag):
     TARGET_TEMPERATURE = 1
     TARGET_HUMIDITY = 2
@@ -114,6 +119,7 @@ class SensorDeviceClass(enum.StrEnum):
     AQI = "aqi"
     ENUM = "enum"
     VOLUME_FLOW_RATE = "volume_flow_rate"
+    TIMESTAMP = "timestamp"
 
 
 class SensorStateClass(enum.StrEnum):
@@ -161,6 +167,10 @@ def install_stubs() -> None:
         "homeassistant.components.binary_sensor",
         BinarySensorDeviceClass=types.SimpleNamespace(PROBLEM="problem"),
         BinarySensorEntityDescription=BinarySensorEntityDescription,
+    )
+    _stub(
+        "homeassistant.components.button",
+        ButtonEntityDescription=ButtonEntityDescription,
     )
     _stub(
         "homeassistant.components.climate",
@@ -232,6 +242,7 @@ TYPED_DICT_PLATFORM = {
     "BINARY_TYPES": "switch",
     "SELECT_TYPES": "select",
     "NUMBER_TYPES": "number",
+    "BUTTON_TYPES": "button",
 }
 
 
@@ -343,6 +354,21 @@ def main() -> int:
                 key not in const.ENTITIES_DICT,
                 f"{dict_name}['{key}'] is composite, so it must take that branch",
             )
+
+    print("== installer menu stays out of the regular poll ==")
+    hub_source = (COMP / "__init__.py").read_text()
+    check(
+        "frozenset(ENTITIES_DICT) - INSTALLER_KEYS" in hub_source,
+        "the poll reads every key except the installer menu",
+    )
+    check(
+        const.INSTALLER_LOGIC_KEYS <= const.INSTALLER_KEYS,
+        "INSTALLER_LOGIC_KEYS are installer keys",
+    )
+    check(
+        not const.DEFAULT_INSTALLER_DEVICE,
+        "the installer device is off by default",
+    )
 
     print("== every entity is classified ==")
     classified: set[str] = set()

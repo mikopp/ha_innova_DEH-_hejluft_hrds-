@@ -16,6 +16,7 @@ from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntityDescription,
 )
+from homeassistant.components.button import ButtonEntityDescription
 from homeassistant.components.climate import (
     ClimateEntityDescription,
     ClimateEntityFeature,
@@ -71,6 +72,10 @@ DEFAULT_BRINE_MIN_TEMPERATURE = 10.0
 BRINE_GUARD_MAX_AGE_HOURS = 24
 # The unit is driven over Modbus; a wired CNU2 display is the exception.
 DEFAULT_HAS_DISPLAY = False
+# Opt-in: the installer device (installer_params.py). Its registers are never
+# part of the regular poll, only read on its refresh button.
+CONF_INSTALLER_DEVICE = "installer_device"
+DEFAULT_INSTALLER_DEVICE = False
 DEFAULT_MODEL = "30"
 MODELS = ["30", "50"]
 MODEL_SPECS: Dict[str, Dict[str, float]] = {
@@ -111,8 +116,12 @@ C_DT_INT16 = ModbusTcpClient.DATATYPE.INT16
 C_DT_UINT16 = ModbusTcpClient.DATATYPE.UINT16
 
 # Maximum registers per Modbus request and the largest gap we will bridge when
-# grouping scattered addresses into a single block read.
-C_MAX_BLOCK = 120
+# grouping scattered addresses into a single block read. Modbus allows 125, but
+# a real HRDS+ behind an RS-485 gateway did not answer a 120-register read at
+# all, while 10-register reads covered the whole map (tests/devices dump). The
+# hub halves this further if a block goes unanswered but a single register
+# does (``_shrink_blocks``).
+C_MAX_BLOCK = 10
 C_MAX_GAP = 8
 
 # ------------------------------------------------------------------
@@ -1003,6 +1012,17 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
 INSTALLER_KEYS: frozenset[str] = frozenset(
     installer_key(row[0]) for row in INSTALLER_PARAMS
 )
+# Installer values the hub's own checks use (water check); read once at setup
+# even without the installer device.
+INSTALLER_LOGIC_KEYS: frozenset[str] = frozenset(
+    {installer_key("PC07"), installer_key("PU08")}
+)
+# Button on the installer device: the only regular way its registers are read.
+C_INSTALLER_REFRESH = "refresh_installer"
+# Timestamp sensor on the installer device: when its registers were last read.
+C_INSTALLER_LAST_READ = "installer_last_read"
+# Installer-device entities that are not installer parameters.
+INSTALLER_DEVICE_EXTRA_KEYS = frozenset({C_INSTALLER_REFRESH, C_INSTALLER_LAST_READ})
 for _code, _reg, _kind, _factor, _min, _max, _unit, _en, _de, _on in INSTALLER_PARAMS:
     _props: Dict[str, Any] = {
         "RT": C_REG_TYPE_HOLDING_REGISTERS,
@@ -1133,6 +1153,10 @@ def entity_category_for(key: str) -> EntityCategory | None:
     """Entity category of a key; setup items stay uncategorised on their device."""
     if key in SETUP_KEYS:
         return None
+    if key == C_INSTALLER_REFRESH:
+        return EntityCategory.CONFIG
+    if key == C_INSTALLER_LAST_READ:
+        return EntityCategory.DIAGNOSTIC
     if key in INSTALLER_KEYS:
         # Writable parameters under Configuration, fixed facts under Diagnostic.
         props = ENTITIES_DICT[key]
@@ -1155,6 +1179,10 @@ COMPUTED_SENSORS: Dict[str, Dict[str, Any]] = {
     # OPTIONS makes it an enum sensor; the list of open issues is an attribute.
     C_SETUP_CHECK: {"NAME": "Setup check", "OPTIONS": ["ok", "attention"]},
     C_WATER_CHECK: {"NAME": "Water circuit check", "OPTIONS": ["ok", "attention"]},
+    C_INSTALLER_LAST_READ: {
+        "NAME": "Installer parameters last read",
+        "DC": SensorDeviceClass.TIMESTAMP,
+    },
 }
 # Computed binary sensors, written by the hub like COMPUTED_SENSORS. The brine
 # guard is a problem indicator: on = the guard blocks requests. It is only
@@ -1207,6 +1235,11 @@ class MyNumberEntityDescription(NumberEntityDescription):
 
 
 @dataclass
+class MyButtonEntityDescription(ButtonEntityDescription):
+    """Describes an action button (not backed by a register)."""
+
+
+@dataclass
 class MyFanEntityDescription(FanEntityDescription):
     """Describes the composite supply-fan entity."""
 
@@ -1233,6 +1266,7 @@ SELECT_TYPES: dict[str, MySelectEntityDescription] = {}
 NUMBER_TYPES: dict[str, MyNumberEntityDescription] = {}
 CLIMATE_TYPES: dict[str, MyClimateEntityDescription] = {}
 FAN_TYPES: dict[str, MyFanEntityDescription] = {}
+BUTTON_TYPES: dict[str, MyButtonEntityDescription] = {}
 # Composite switches that are not backed by a register.
 OPERATION_TYPES: dict[str, MyBinaryEntityDescription] = {}
 
@@ -1405,6 +1439,13 @@ def init() -> None:
         translation_key="hrds_supply_fan",
     )
 
+    BUTTON_TYPES[C_INSTALLER_REFRESH] = MyButtonEntityDescription(
+        key=C_INSTALLER_REFRESH,
+        name="Refresh installer parameters",
+        translation_key=C_INSTALLER_REFRESH,
+        entity_category=entity_category_for(C_INSTALLER_REFRESH),
+    )
+
     OPERATION_TYPES[C_OPERATION_ALLOWED] = MyBinaryEntityDescription(
         key=C_OPERATION_ALLOWED,
         name="Allow operational requests",
@@ -1497,6 +1538,7 @@ def init() -> None:
             )
             continue
         unit, device_class, state_class = _unit_mapping(props.get("UNIT"))
+        device_class = props.get("DC", device_class)
         SENSOR_TYPES[key] = MySensorEntityDescription(
             key=key,
             name=props["NAME"],

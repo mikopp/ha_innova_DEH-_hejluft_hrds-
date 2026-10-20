@@ -66,6 +66,7 @@ def test_setup_survives_restart(hl, restart_ha):
         water_circuit="brine",
         brine_temperature_entity=BRINE_SENSOR,
         brine_min_temperature=12.0,
+        installer_device=True,
     )
     renamed = hl.eid("unit_status")
     disabled = next(
@@ -103,6 +104,7 @@ def test_setup_survives_restart(hl, restart_ha):
         assert values["water_circuit"] == "brine"
         assert values["brine_temperature_entity"] == BRINE_SENSOR
         assert values["brine_min_temperature"] == 12.0
+        assert values["installer_device"] is True
 
         # ... and still in force: a cold brine sensor refuses the start.
         ha.call_service("input_number", "set_value", BRINE_INPUT, value=6)

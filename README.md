@@ -66,8 +66,9 @@ The integration talks to the unit's control board via Modbus TCP and exposes:
 * **Water-circuit diagnostics** — valve/pump output, condenser valve, water
   alarms and a *Water circuit check* summary. Read-only: the unit runs its own
   water valve and pump.
-* An **installer** child device with the complete installer menu (about 240
-  parameters), kept off the main device page.
+* An optional **installer** child device with the complete installer menu
+  (about 240 parameters), kept off the main device page. Off by default; turn
+  it on in the integration options.
 
 See [`references/README.md`](references/README.md) for the full capability list
 and [`references/MODBUS_REGISTERS.md`](references/MODBUS_REGISTERS.md) for the
@@ -236,8 +237,19 @@ so you can see it without opening the display. See the
 
 Everything else from the handbook's installer menu (§5.3) that has a Modbus
 address sits on a separate **`HRDS+ installer`** device, so it does not crowd
-the main page. It is not needed for setup or normal use. Entity ids carry the
-parameter code, for example `number.hrds_installer_pc07_max_water_temperature...`.
+the main page. It is not needed for setup or normal use, so it is **off by
+default**: turn on *Installer device* in the integration options (Settings →
+Devices & services → HRDS+ → Configure). Turning it off again removes the
+device and its entities. Entity ids carry the parameter code, for example
+`number.hrds_installer_pc07_max_water_temperature...`.
+
+The installer parameters are **not part of the regular poll**, which keeps the
+Modbus link light. They are read when the option is turned on, at each start of
+the integration, and when you press **Refresh installer parameters** on the
+installer device; *Installer parameters last read* on the same device shows when
+that last happened. After you change a parameter, just that one register is read
+back. (PC07 and PU08, which the water check uses, are read once at start even
+without the installer device.)
 
 * Writable parameters are under *Configuration*: fans (PF), compressor (PE),
   water valves (Pb), dehumidification (PU), alarms (PA), season change (PC),
@@ -269,8 +281,8 @@ HACS installs the `innova_hrds.zip` asset attached to each
 [GitHub release](https://github.com/mikopp/ha_innova_deh-_hejluft_hrds-/releases);
 the release workflow stamps the release tag into `manifest.json` before zipping,
 so the version Home Assistant shows is the release version. Updates appear in
-HACS when a new release is published. Release 0.9.0 is a normal (not a
-"pre-release") release, so it is offered without enabling HACS' beta versions.
+HACS when a new release is published. Releases 0.9.x are normal (not
+"pre-release") releases, so they are offered without enabling HACS' beta versions.
 
 ### Manual
 

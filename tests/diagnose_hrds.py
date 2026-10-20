@@ -384,24 +384,36 @@ def step_identity(dev: Dev) -> dict[str, Any]:
 
 def step_read_all(dev: Dev) -> dict[str, dict[str, Any]]:
     head("4. Full read using the integration's own block plan")
-    in_addrs = [
-        const.get_entity_reg(p)[0]
-        for p in const.ENTITIES_DICT.values()
-        if const.get_entity_type(p) == IN
-    ]
-    hold_addrs = [
-        const.get_entity_reg(p)[0]
-        for p in const.ENTITIES_DICT.values()
-        if const.get_entity_type(p) == HOLD
-    ]
-    plans = {
-        IN: build_blocks(in_addrs, frozenset(hold_addrs)),
-        HOLD: build_blocks(hold_addrs, frozenset(in_addrs)),
+    # Same groups as the hub: the regular poll, and the installer menu (read
+    # on its own, at setup and on its refresh button). A block never spans an
+    # address of another group or of the other function code.
+    all_addrs = {
+        rt: frozenset(
+            const.get_entity_reg(p)[0]
+            for p in const.ENTITIES_DICT.values()
+            if const.get_entity_type(p) == rt
+        )
+        for rt in (IN, HOLD)
     }
+    groups = {
+        "poll": set(const.ENTITIES_DICT) - const.INSTALLER_KEYS,
+        "installer": set(const.INSTALLER_KEYS),
+    }
+    plans = []
+    for group, keys in groups.items():
+        for rt in (IN, HOLD):
+            addrs = {
+                const.get_entity_reg(const.ENTITIES_DICT[k])[0]
+                for k in keys
+                if const.get_entity_type(const.ENTITIES_DICT[k]) == rt
+            }
+            if addrs:
+                foreign = (all_addrs[IN] | all_addrs[HOLD]) - addrs
+                plans.append((group, rt, build_blocks(addrs, foreign)))
     raw: dict[tuple[int, int], int] = {}
     bad_blocks = 0
-    for rt, blocks in plans.items():
-        label = "input (FC04)" if rt == IN else "holding (FC03)"
+    for group, rt, blocks in plans:
+        label = f"{group} " + ("input (FC04)" if rt == IN else "holding (FC03)")
         print(f"  {label}: {len(blocks)} blocks: {blocks}")
         for start, count in blocks:
             regs, err = dev.read(rt, start, count)
@@ -413,7 +425,8 @@ def step_read_all(dev: Dev) -> dict[str, dict[str, Any]]:
             say(
                 WARN,
                 f"{label} block {start}+{count} failed ({err}); the "
-                "integration would retry register-by-register",
+                "integration would retry with smaller blocks or "
+                "register-by-register",
             )
             for addr in range(start, start + count):
                 r, _ = dev.read(rt, addr)

@@ -75,6 +75,8 @@ def entity_states(hass: HomeAssistant, s: Setup) -> dict[str, str]:
         entry.unique_id: hass.states.get(entry.entity_id).state
         for entry in er.async_entries_for_config_entry(registry, s.entry.entry_id)
         if hass.states.get(entry.entity_id) is not None
+        # A timestamp of the read itself: new on every start, by design.
+        and not entry.unique_id.endswith("-installer_last_read")
     }
 
 
@@ -272,6 +274,7 @@ async def test_options_are_authoritative_after_restart(
     await hass.config_entries.async_unload(s.entry.entry_id)
 
 
+@pytest.mark.parametrize("entry_options", [{"installer_device": True}])
 async def test_user_registry_changes_are_kept(hass, setup, clock):
     s = setup
     registry = er.async_get(hass)
@@ -304,10 +307,10 @@ async def test_user_registry_changes_are_kept(hass, setup, clock):
 @pytest.mark.parametrize(
     ("sim_options", "entry_options"),
     [
-        ({}, {}),
+        ({}, {"installer_device": True}),
         (
             {"overlays": ("display_with_probes",)},
-            {"has_display": True},
+            {"has_display": True, "installer_device": True},
         ),
     ],
     ids=["headless", "display"],

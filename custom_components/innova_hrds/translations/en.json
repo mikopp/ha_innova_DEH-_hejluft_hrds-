@@ -45,13 +45,15 @@
           "water_circuit": "Water register connected to",
           "allow_winter_heating": "Allow winter heating (integration request in winter)",
           "brine_temperature_entity": "Brine temperature guard sensor",
-          "brine_min_temperature": "Brine guard minimum temperature"
+          "brine_min_temperature": "Brine guard minimum temperature",
+          "installer_device": "Installer device (full installer menu)"
         },
         "data_description": {
           "water_circuit": "Brine (ground-source heat pump) circuits cannot heat and must not dehumidify in winter.",
           "allow_winter_heating": "In winter the unit's integration request heats the air with water from the heating circuit. Off by default; ignored on a brine circuit.",
           "brine_temperature_entity": "Optional. A temperature sensor on the brine supply (e.g. from the heat pump). When set, dehumidify and integration requests only start while it reads at least the minimum and has reported within 24 h, in every season. On a brine circuit it is required for dehumidifying in winter.",
-          "brine_min_temperature": "Lowest brine temperature at which a request may start."
+          "brine_min_temperature": "Lowest brine temperature at which a request may start.",
+          "installer_device": "Adds the installer device with the installer menu parameters. They are not part of the regular poll: they are read when this option is turned on, at each start, and when you press 'Refresh installer parameters'. Turning it off removes the device."
         }
       }
     },
@@ -435,6 +437,9 @@
       },
       "inst_pt04": {
         "name": "PT04 External damper in test mode"
+      },
+      "installer_last_read": {
+        "name": "Installer parameters last read"
       }
     },
     "binary_sensor": {
@@ -1129,6 +1134,11 @@
       },
       "inst_ph10": {
         "name": "PH10 Winter setpoint max (factory 14 °C blocks auto heating)"
+      }
+    },
+    "button": {
+      "refresh_installer": {
+        "name": "Refresh installer parameters"
       }
     }
   },
