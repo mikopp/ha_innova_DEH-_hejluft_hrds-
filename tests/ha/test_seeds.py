@@ -91,13 +91,6 @@ async def test_entity_states_snapshot(hass, clock, snapshot, overlays, options):
             key = entry.unique_id.removeprefix(f"{s.entry.entry_id}-")
             states[f"{entry.domain}.{key}"] = state.state
         assert entry.platform == DOMAIN
-        # TEMPORARY debug: where does syrupy look on the CI runner?
-        import os
-
-        loc = snapshot.extension.get_location(
-            test_location=snapshot.test_location, index=snapshot.index
-        )
-        print("SNAPSHOT_DEBUG", loc, os.path.exists(loc), os.getcwd())
         assert dict(sorted(states.items())) == snapshot
         await hass.config_entries.async_unload(s.entry.entry_id)
         await hass.async_block_till_done()

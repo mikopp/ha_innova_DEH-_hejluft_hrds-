@@ -50,19 +50,6 @@ jobs:
           --cov-report=term-missing
           --cov-report=xml
           --cov-fail-under=90
-      # TEMPORARY: why does syrupy report the committed snapshots as missing?
-      - name: Snapshot diagnostics
-        if: failure()
-        run: |
-          pwd; ls -la tests/ha tests/ha/snapshots
-          python - <<'PY'
-          import syrupy, pathlib
-          from syrupy.extensions.amber.serializer import AmberDataSerializer
-          f = "tests/ha/snapshots/test_seeds.ambr"
-          print("syrupy", getattr(syrupy, "__file__", "?"), pathlib.Path(f).stat().st_size)
-          c = AmberDataSerializer.read_file(f)
-          print("names:", [s.name for s in c], "tainted:", c.tainted)
-          PY
       - name: Upload coverage
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

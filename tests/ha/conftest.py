@@ -24,6 +24,10 @@ from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_fire_time_changed,
 )
+from pytest_homeassistant_custom_component.syrupy import (
+    HomeAssistantSnapshotExtension,
+)
+from syrupy.assertion import SnapshotAssertion
 
 from custom_components.innova_hrds.const import (
     CONF_HAS_DISPLAY,
@@ -33,6 +37,18 @@ from custom_components.innova_hrds.const import (
     DOMAIN,
 )
 from tests.sim import HrdsDevice, HrdsSimServer
+
+
+@pytest.fixture
+def snapshot(snapshot: SnapshotAssertion) -> SnapshotAssertion:
+    """Snapshots in ``snapshots/`` next to the test (Home Assistant's layout).
+
+    phcc and syrupy both define ``snapshot``; which one wins depends on the
+    order pytest loads the plugins, and that differs between machines (on
+    GitHub's runner syrupy's plain fixture won and looked in ``__snapshots__``).
+    A conftest fixture beats both, so the extension is applied explicitly.
+    """
+    return snapshot.use_extension(HomeAssistantSnapshotExtension)
 
 
 @pytest.fixture(autouse=True)
