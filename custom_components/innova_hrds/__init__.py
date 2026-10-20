@@ -107,7 +107,6 @@ from .const import (
     OPERATIONAL_KEYS,
     ROOM_HUMIDITY_PROBE_CODES,
     ROOM_TEMP_PROBE_CODES,
-    SETUP_ISSUE_SLUGS,
     TEMPERATURE_TARGET_KEYS,
     WATER_CIRCUIT_BRINE,
     get_entity_bitmask,
@@ -1085,8 +1084,6 @@ class HrdsModbusHub:
         """Write computed values: setup check and airflow (m³/h)."""
         self.setup_issues = self._compute_setup_issues()
         self.data[C_SETUP_CHECK] = "attention" if self.setup_issues else "ok"
-        for slug in SETUP_ISSUE_SLUGS:
-            self.data[f"issue_{slug}"] = "on" if slug in self.setup_issues else "off"
         self.water_issues = self._compute_water_issues()
         self.data[C_WATER_CHECK] = "attention" if self.water_issues else "ok"
         self.data[C_MAX_TOTAL_AIRFLOW] = self._airflow_max

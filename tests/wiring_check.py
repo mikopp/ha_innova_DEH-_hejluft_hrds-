@@ -292,6 +292,12 @@ def main() -> int:
     )
     check("default" not in const.PROBE_SOURCE, "PROBE_SOURCE map has no sentinel key")
 
+    print("== setup issue texts ==")
+    check(
+        len(const.SETUP_ISSUE_TEXTS) == 14
+        and all(all(t) for t in const.SETUP_ISSUE_TEXTS.values()),
+        "every setup issue slug has an English and a German text",
+    )
     print("== switch hints ==")
     check(
         set(const.SWITCH_HINTS) <= set(const.BINARY_TYPES),

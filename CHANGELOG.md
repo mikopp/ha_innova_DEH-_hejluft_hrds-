@@ -27,10 +27,9 @@ German, following the Home Assistant language) that says when to leave them on
 or turn them off. Home Assistant has no tooltip for entities; the attribute
 shows in the entity's *Attributes*. The README setup step lists the same advice.
 
-**Added:** the setup device lists what is left to fix: one *To fix: ...*
-problem sensor per setup issue (14 in all), named after the action, such as
-*To fix: free cooling is on but no outdoor probe (turn off PG03)*. The Setup
-check sensor keeps the slugs in its `issues` attribute.
+**Added:** the *Setup check* sensor reads *Needs attention (see attributes)* and
+has a new `to_fix` attribute: each open setup item in plain words with what to
+do about it (English or German). `issues` keeps the short codes.
 
 **Removed:** `switch.enable_integration` (PG02, 1798). PG02 is an installer
 setting that says whether the unit has the integration function, already shown

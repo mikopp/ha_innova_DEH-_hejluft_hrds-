@@ -220,7 +220,7 @@
         "name": "Setup check",
         "state": {
           "ok": "OK",
-          "attention": "Needs attention"
+          "attention": "Needs attention (see attributes)"
         }
       },
       "water_valve_pump": {
@@ -481,48 +481,6 @@
       },
       "alarm_low_water_temperature": {
         "name": "Alarm: low water temperature (AL04)"
-      },
-      "issue_modbus_enables_pending": {
-        "name": "To fix: Modbus enables not set yet (PH02/PH27/PH28)"
-      },
-      "issue_headless_settings_pending": {
-        "name": "To fix: display/probe settings for no display not set yet (PH01, HA00)"
-      },
-      "issue_unit_off_by_digital_input": {
-        "name": "To fix: unit held off by the remote on/off contact (HB03)"
-      },
-      "issue_unit_off_by_scheduler": {
-        "name": "To fix: unit held off by a time program (turn off PH03)"
-      },
-      "issue_unit_off_by_clock": {
-        "name": "To fix: unit held off by the internal clock (turn off PH03)"
-      },
-      "issue_unit_off_by_display": {
-        "name": "To fix: unit switched off by the display"
-      },
-      "issue_room_temperature_probe_missing": {
-        "name": "To fix: room temperature probe expected but not wired (set HA02 to Unused)"
-      },
-      "issue_room_humidity_probe_missing": {
-        "name": "To fix: room humidity probe expected but not wired (set HA03 to Unused)"
-      },
-      "issue_probe_input_unrecognised": {
-        "name": "To fix: probe input (HA02/HA03) has an unknown code"
-      },
-      "issue_time_programs_enabled": {
-        "name": "To fix: time programs may switch the unit off (turn off PH03)"
-      },
-      "issue_free_cooling_without_outdoor_probe": {
-        "name": "To fix: free cooling is on but no outdoor probe (turn off PG03)"
-      },
-      "issue_temperature_unit_fahrenheit": {
-        "name": "To fix: unit is set to Fahrenheit (PH05 must be °C)"
-      },
-      "issue_water_pump_output_not_configured": {
-        "name": "To fix: water valve / pump relay K5 not configured (HD05)"
-      },
-      "issue_winter_dehumidify_on_brine": {
-        "name": "To fix: winter dehumidifying on brine without a temperature guard (PU02)"
       },
       "brine_temperature_guard": {
         "name": "Brine temperature guard"

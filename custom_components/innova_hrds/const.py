@@ -1058,14 +1058,14 @@ SWITCH_HINTS: Dict[str, tuple[str, str]] = {
         "Turn this OFF unless an outdoor temperature probe is wired. It lets the "
         "unit act on the outdoor temperature (bypass relay); with no probe there is "
         "no valid reading, so the unit may behave unpredictably. Also leave it off "
-        "if a central ventilation system already handles free cooling. The setup "
-        "device flags it as a problem while it is on without a probe.",
+        "if a central ventilation system already handles free cooling. The Setup "
+        "check lists it under 'to_fix' while it is on without a probe.",
         "AUS schalten, solange kein Außentemperaturfühler angeschlossen ist. Die "
         "Funktion lässt das Gerät auf die Außentemperatur reagieren (Bypass-Relais); "
         "ohne Fühler gibt es keinen gültigen Messwert, das Gerät kann sich dann "
         "unvorhersehbar verhalten. Ebenfalls aus lassen, wenn eine zentrale "
-        "Lüftungsanlage das Free-Cooling übernimmt. Das Einrichtungsgerät zeigt "
-        "ein Problem an, solange sie ohne Fühler an ist.",
+        "Lüftungsanlage das Free-Cooling übernimmt. Die Einrichtungsprüfung listet "
+        "sie unter 'to_fix', solange sie ohne Fühler an ist.",
     ),
     C_ENABLE_ONOFF_DISPLAY: (
         "Leave OFF without a CNU2 display: the unit would otherwise stay off "
@@ -1095,6 +1095,67 @@ SWITCH_HINTS: Dict[str, tuple[str, str]] = {
     ),
 }
 
+# What to do about each setup issue slug (Setup check `issues`), shown as the
+# `to_fix` attribute: {slug: (English, German)}.
+SETUP_ISSUE_TEXTS: Dict[str, tuple[str, str]] = {
+    "modbus_enables_pending": (
+        "Modbus enables not set yet (PH02/PH27/PH28): written on the next poll",
+        "Modbus-Freigaben noch nicht gesetzt (PH02/PH27/PH28): werden bei der nächsten Abfrage geschrieben",
+    ),
+    "headless_settings_pending": (
+        "Settings for running without a display not set yet (PH01, HA00): written on the next poll",
+        "Einstellungen für Betrieb ohne Display noch nicht gesetzt (PH01, HA00): werden bei der nächsten Abfrage geschrieben",
+    ),
+    "unit_off_by_digital_input": (
+        "Unit held off by the remote on/off contact: close it or set HB03",
+        "Gerät durch den Fern-Ein/Aus-Kontakt ausgeschaltet: Kontakt schließen oder HB03 anpassen",
+    ),
+    "unit_off_by_scheduler": (
+        "Unit held off by a time program: turn off 'Time programs enabled' (PH03)",
+        "Gerät durch ein Zeitprogramm ausgeschaltet: 'Zeitprogramme' (PH03) ausschalten",
+    ),
+    "unit_off_by_clock": (
+        "Unit held off by the internal clock: turn off 'Time programs enabled' (PH03)",
+        "Gerät durch die interne Uhr ausgeschaltet: 'Zeitprogramme' (PH03) ausschalten",
+    ),
+    "unit_off_by_display": (
+        "Unit switched off by the display: switch it on at the display",
+        "Gerät am Display ausgeschaltet: am Display einschalten",
+    ),
+    "room_temperature_probe_missing": (
+        "Room temperature probe expected but not wired: set 'T/H probe temperature input' (HA02) to Unused, or wire the probe",
+        "Raumtemperaturfühler erwartet, aber nicht angeschlossen: HA02 auf 'Nicht verwendet' setzen oder Fühler anschließen",
+    ),
+    "room_humidity_probe_missing": (
+        "Room humidity probe expected but not wired: set 'T/H probe humidity input' (HA03) to Unused, or wire the probe",
+        "Raumfeuchtefühler erwartet, aber nicht angeschlossen: HA03 auf 'Nicht verwendet' setzen oder Fühler anschließen",
+    ),
+    "probe_input_unrecognised": (
+        "A probe input (HA02/HA03) holds an unknown code: pick an option or check the wiring",
+        "Ein Fühlereingang (HA02/HA03) hat einen unbekannten Code: Option wählen oder Verdrahtung prüfen",
+    ),
+    "time_programs_enabled": (
+        "Time programs may switch the unit off: turn off 'Time programs enabled' (PH03) for Modbus-only control",
+        "Zeitprogramme können das Gerät ausschalten: für reine Modbus-Steuerung 'Zeitprogramme' (PH03) ausschalten",
+    ),
+    "free_cooling_without_outdoor_probe": (
+        "Free cooling is on but no outdoor probe is wired: turn off 'Enable free cooling/heating' (PG03)",
+        "Free-Cooling ist an, aber kein Außenfühler angeschlossen: 'Free-Cooling/Heating freigeben' (PG03) ausschalten",
+    ),
+    "temperature_unit_fahrenheit": (
+        "The unit is set to Fahrenheit: set 'Temperature unit' (PH05) to Celsius",
+        "Das Gerät steht auf Fahrenheit: 'Temperatureinheit' (PH05) auf Celsius stellen",
+    ),
+    "water_pump_output_not_configured": (
+        "Relay K5 (water valve / pump) is not configured: check HD05 and the wiring",
+        "Relais K5 (Wasserventil/Pumpe) ist nicht konfiguriert: HD05 und Verdrahtung prüfen",
+    ),
+    "winter_dehumidify_on_brine": (
+        "Brine circuit without a temperature guard allows winter dehumidifying (coil can freeze): set 'Winter dehumidification' (PU02) to Disabled or configure a brine guard",
+        "Solekreis ohne Temperaturwächter erlaubt Winter-Entfeuchtung (Register kann einfrieren): 'Winter-Entfeuchtung' (PU02) deaktivieren oder Soleüberwachung einrichten",
+    ),
+}
+
 # Registers written (in order) when the integration is set up, to make sure
 # Modbus control is actually permitted by the unit.
 BMS_ENABLE_KEYS = (C_ENABLE_ONOFF_BMS, C_ENABLE_DEHUM_BMS, C_ENABLE_INT_BMS)
@@ -1120,32 +1181,10 @@ HEADLESS_SETTINGS: Dict[str, tuple[str, int]] = {
 # else - climate, fan, the request switches, live readings, alarms - is the
 # operational surface of the main device.
 # ------------------------------------------------------------------
-# One problem sensor per setup issue, so the setup device lists what is left to
-# fix (the Setup check sensor only carries the slugs as an attribute). Keys are
-# `issue_<slug>`; the hub switches them on from `_compute_setup_issues`.
-SETUP_ISSUE_SLUGS: tuple[str, ...] = (
-    "modbus_enables_pending",
-    "headless_settings_pending",
-    "unit_off_by_digital_input",
-    "unit_off_by_scheduler",
-    "unit_off_by_clock",
-    "unit_off_by_display",
-    "room_temperature_probe_missing",
-    "room_humidity_probe_missing",
-    "probe_input_unrecognised",
-    "time_programs_enabled",
-    "free_cooling_without_outdoor_probe",
-    "temperature_unit_fahrenheit",
-    "water_pump_output_not_configured",
-    "winter_dehumidify_on_brine",
-)
-SETUP_ISSUE_KEYS: tuple[str, ...] = tuple(f"issue_{slug}" for slug in SETUP_ISSUE_SLUGS)
-
 SETUP_KEYS = frozenset(
     {
         C_OPERATION_ALLOWED,
         C_SETUP_CHECK,
-        *SETUP_ISSUE_KEYS,
         C_ENABLE_ONOFF_DISPLAY,
         C_PROBE_SOURCE,
         C_ENABLE_ONOFF_BMS,
@@ -1259,16 +1298,6 @@ COMPUTED_BINARY_SENSORS: Dict[str, Dict[str, Any]] = {
         "DC": BinarySensorDeviceClass.PROBLEM,
     },
 }
-
-COMPUTED_BINARY_SENSORS.update(
-    {
-        key: {
-            "NAME": "To fix: " + slug.replace("_", " "),
-            "DC": BinarySensorDeviceClass.PROBLEM,
-        }
-        for key, slug in zip(SETUP_ISSUE_KEYS, SETUP_ISSUE_SLUGS)
-    }
-)
 
 # Requests that make the unit do something. They are refused until the user
 # turns on "Allow operational requests"; switching things OFF and all

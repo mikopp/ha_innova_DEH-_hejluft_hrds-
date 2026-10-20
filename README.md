@@ -367,11 +367,12 @@ Entity ids follow the device name, so setup entities are prefixed with the setup
 device name (for example `sensor.hrds_setup_setup_check`); the tables below omit
 the prefix.
 
-**What is left to fix** is listed on the setup device itself: one *To fix: ...*
-problem sensor per issue (for example *To fix: free cooling is on but no outdoor
-probe (turn off PG03)*). A row reads *Problem* while the issue is open and *OK*
-otherwise; the name says what to do. *Setup check* is `attention` while any of
-them is on, and still lists the slugs in its `issues` attribute.
+**What is left to fix:** while *Setup check* reads *Needs attention (see
+attributes)*, open it (click the row, then *Attributes*). `to_fix` lists each
+open item in plain words, in the Home Assistant language, with what to do about
+it; `issues` has the same items as short codes (explained in the
+[First-use checklist](#first-use-checklist)). The device page itself cannot
+show attributes, so this sensor is the one place to look.
 
 **What to check, in this order:**
 

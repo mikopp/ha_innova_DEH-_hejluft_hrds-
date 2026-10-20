@@ -7,7 +7,13 @@ from typing import Any
 
 from homeassistant.components.sensor import SensorEntity
 
-from .const import C_SETUP_CHECK, C_WATER_CHECK, SENSOR_TYPES, MySensorEntityDescription
+from .const import (
+    C_SETUP_CHECK,
+    C_WATER_CHECK,
+    SENSOR_TYPES,
+    SETUP_ISSUE_TEXTS,
+    MySensorEntityDescription,
+)
 from .entity_common import HubBackedEntity, setup_platform_from_types
 
 _LOGGER = logging.getLogger(__name__)
@@ -40,7 +46,14 @@ class HrdsSensor(HubBackedEntity, SensorEntity):
     def extra_state_attributes(self) -> dict[str, Any] | None:
         key = self.entity_description.key
         if key == C_SETUP_CHECK:
+            german = self.hass is not None and self.hass.config.language.startswith(
+                "de"
+            )
             return {
+                "to_fix": [
+                    SETUP_ISSUE_TEXTS.get(slug, (slug, slug))[1 if german else 0]
+                    for slug in self._hub.setup_issues
+                ],
                 "issues": list(self._hub.setup_issues),
                 "operation_allowed": self._hub.operation_allowed,
             }
