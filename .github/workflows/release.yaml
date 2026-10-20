@@ -18,12 +18,18 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: read
+
 jobs:
   hassfest:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: home-assistant/actions/hassfest@master
+      # home-assistant/actions has no release tags, so Dependabot cannot bump
+      # this pin: re-pin to the current master commit by hand now and then. The
+      # action only runs the ghcr.io/home-assistant/hassfest image (latest).
+      - uses: home-assistant/actions/hassfest@cd6f3635a740c84d8a14f6121a90068b8ece6bf6 # master
 
   hacs:
     runs-on: ubuntu-latest

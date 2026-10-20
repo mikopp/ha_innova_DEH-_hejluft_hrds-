@@ -343,9 +343,23 @@ GitHub Actions (in `.github/workflows/`):
   with write access can merge, so keep the owner the sole collaborator with
   write; Actions -> General -> workflow permissions "read", and approve fork PR
   workflows manually.
+* **Only the owner merges or releases; apps only branch.** The Claude app and
+  Dependabot may push branches and open PRs, but apps with write access could
+  merge (0 approvals) or publish a release. Two more rulesets close that, each
+  with the Repository admin role as the only bypass actor: one on the default
+  branch with only "Restrict updates" (a merge updates `main`; kept apart from
+  the ruleset above so its checks have no bypass), and one on `refs/tags/v*`
+  with "Restrict creations/updates/deletions" (publishing a release creates
+  its tag). Never add an app to either bypass list. Do not turn on "Immutable
+  releases": `package` uploads the zip after the release is published.
+* Every workflow sets `permissions: contents: read` at the top; only
+  `release.yaml`'s `package` job raises it to `contents: write`. Actions are
+  pinned to commit SHAs (Dependabot bumps them), except that the hassfest pin
+  tracks `master` (no release tags), so re-pin it by hand.
 * `lint.yaml` also runs `tests/wiring_check.py`. Dependabot bumps the HA
-  image, `requirements_test.txt` and `tests/e2e/requirements.txt`; keep the
-  image and `pytest-homeassistant-custom-component` on the same HA release.
+  image, `requirements_test.txt`, `requirements_lint.txt` (Ruff) and
+  `tests/e2e/requirements.txt`; keep the image and
+  `pytest-homeassistant-custom-component` on the same HA release.
 * `release.yaml` — on a published release: hassfest, hacs, the two test
   workflows above, then a `package` job (only if all pass) that stamps the tag into `manifest.json` (`.github/scripts/update_hacs_manifest.py`),
   zips `custom_components/innova_hrds` and attaches `innova_hrds.zip` to the
