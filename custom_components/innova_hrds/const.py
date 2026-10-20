@@ -1057,16 +1057,15 @@ SWITCH_HINTS: Dict[str, tuple[str, str]] = {
     C_ENABLE_FREE_COOLING: (
         "Turn this OFF unless an outdoor temperature probe is wired. It lets the "
         "unit act on the outdoor temperature (bypass relay); with no probe there is "
-        "no valid reading and the unit may raise the external-probe alarm (AL29). "
-        "Also leave it off if a central ventilation system already handles free "
-        "cooling. The setup check reports free_cooling_without_outdoor_probe while "
-        "it is on without a probe.",
+        "no valid reading, so the unit may behave unpredictably. Also leave it off "
+        "if a central ventilation system already handles free cooling. The setup "
+        "device flags it as a problem while it is on without a probe.",
         "AUS schalten, solange kein Außentemperaturfühler angeschlossen ist. Die "
         "Funktion lässt das Gerät auf die Außentemperatur reagieren (Bypass-Relais); "
-        "ohne Fühler gibt es keinen gültigen Messwert und das Gerät kann den "
-        "Alarm AL29 (externer Fühler) auslösen. Ebenfalls aus lassen, wenn eine "
-        "zentrale Lüftungsanlage das Free-Cooling übernimmt. Die Einrichtungsprüfung "
-        "meldet free_cooling_without_outdoor_probe, solange sie ohne Fühler an ist.",
+        "ohne Fühler gibt es keinen gültigen Messwert, das Gerät kann sich dann "
+        "unvorhersehbar verhalten. Ebenfalls aus lassen, wenn eine zentrale "
+        "Lüftungsanlage das Free-Cooling übernimmt. Das Einrichtungsgerät zeigt "
+        "ein Problem an, solange sie ohne Fühler an ist.",
     ),
     C_ENABLE_ONOFF_DISPLAY: (
         "Leave OFF without a CNU2 display: the unit would otherwise stay off "
@@ -1121,10 +1120,32 @@ HEADLESS_SETTINGS: Dict[str, tuple[str, int]] = {
 # else - climate, fan, the request switches, live readings, alarms - is the
 # operational surface of the main device.
 # ------------------------------------------------------------------
+# One problem sensor per setup issue, so the setup device lists what is left to
+# fix (the Setup check sensor only carries the slugs as an attribute). Keys are
+# `issue_<slug>`; the hub switches them on from `_compute_setup_issues`.
+SETUP_ISSUE_SLUGS: tuple[str, ...] = (
+    "modbus_enables_pending",
+    "headless_settings_pending",
+    "unit_off_by_digital_input",
+    "unit_off_by_scheduler",
+    "unit_off_by_clock",
+    "unit_off_by_display",
+    "room_temperature_probe_missing",
+    "room_humidity_probe_missing",
+    "probe_input_unrecognised",
+    "time_programs_enabled",
+    "free_cooling_without_outdoor_probe",
+    "temperature_unit_fahrenheit",
+    "water_pump_output_not_configured",
+    "winter_dehumidify_on_brine",
+)
+SETUP_ISSUE_KEYS: tuple[str, ...] = tuple(f"issue_{slug}" for slug in SETUP_ISSUE_SLUGS)
+
 SETUP_KEYS = frozenset(
     {
         C_OPERATION_ALLOWED,
         C_SETUP_CHECK,
+        *SETUP_ISSUE_KEYS,
         C_ENABLE_ONOFF_DISPLAY,
         C_PROBE_SOURCE,
         C_ENABLE_ONOFF_BMS,
@@ -1238,6 +1259,16 @@ COMPUTED_BINARY_SENSORS: Dict[str, Dict[str, Any]] = {
         "DC": BinarySensorDeviceClass.PROBLEM,
     },
 }
+
+COMPUTED_BINARY_SENSORS.update(
+    {
+        key: {
+            "NAME": "To fix: " + slug.replace("_", " "),
+            "DC": BinarySensorDeviceClass.PROBLEM,
+        }
+        for key, slug in zip(SETUP_ISSUE_KEYS, SETUP_ISSUE_SLUGS)
+    }
+)
 
 # Requests that make the unit do something. They are refused until the user
 # turns on "Allow operational requests"; switching things OFF and all

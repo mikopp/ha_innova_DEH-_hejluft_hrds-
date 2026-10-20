@@ -47,6 +47,21 @@ async def test_setup_check_lists_real_issues_until_fixed(setup, clock):
     assert _issues(s) == []
 
 
+async def test_setup_device_lists_each_open_issue(setup, clock):
+    s = setup
+    assert (
+        s.state("binary_sensor", "issue_free_cooling_without_outdoor_probe").state
+        == "on"
+    )
+    assert s.state("binary_sensor", "issue_time_programs_enabled").state == "off"
+    await s.service("switch", "turn_off", "enable_free_cooling")
+    await clock.settle()
+    assert (
+        s.state("binary_sensor", "issue_free_cooling_without_outdoor_probe").state
+        == "off"
+    )
+
+
 async def test_setup_switches_say_when_to_turn_them_off(setup):
     free_cooling = setup.state("switch", "enable_free_cooling").attributes["hint"]
     assert free_cooling.startswith("Turn this OFF unless an outdoor temperature probe")

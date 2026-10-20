@@ -482,6 +482,48 @@
       "alarm_low_water_temperature": {
         "name": "Alarm: niedrige Wassertemperatur (AL04)"
       },
+      "issue_modbus_enables_pending": {
+        "name": "Zu beheben: Modbus-Freigaben noch nicht gesetzt (PH02/PH27/PH28)"
+      },
+      "issue_headless_settings_pending": {
+        "name": "Zu beheben: Einstellungen für Betrieb ohne Display noch nicht gesetzt (PH01, HA00)"
+      },
+      "issue_unit_off_by_digital_input": {
+        "name": "Zu beheben: Gerät durch den Fern-Ein/Aus-Kontakt ausgeschaltet (HB03)"
+      },
+      "issue_unit_off_by_scheduler": {
+        "name": "Zu beheben: Gerät durch ein Zeitprogramm ausgeschaltet (PH03 ausschalten)"
+      },
+      "issue_unit_off_by_clock": {
+        "name": "Zu beheben: Gerät durch die interne Uhr ausgeschaltet (PH03 ausschalten)"
+      },
+      "issue_unit_off_by_display": {
+        "name": "Zu beheben: Gerät am Display ausgeschaltet"
+      },
+      "issue_room_temperature_probe_missing": {
+        "name": "Zu beheben: Raumtemperaturfühler erwartet, aber nicht angeschlossen (HA02 auf Nicht verwendet)"
+      },
+      "issue_room_humidity_probe_missing": {
+        "name": "Zu beheben: Raumfeuchtefühler erwartet, aber nicht angeschlossen (HA03 auf Nicht verwendet)"
+      },
+      "issue_probe_input_unrecognised": {
+        "name": "Zu beheben: Fühlereingang (HA02/HA03) hat einen unbekannten Code"
+      },
+      "issue_time_programs_enabled": {
+        "name": "Zu beheben: Zeitprogramme können das Gerät ausschalten (PH03 ausschalten)"
+      },
+      "issue_free_cooling_without_outdoor_probe": {
+        "name": "Zu beheben: Free-Cooling ist an, aber kein Außenfühler (PG03 ausschalten)"
+      },
+      "issue_temperature_unit_fahrenheit": {
+        "name": "Zu beheben: Gerät steht auf Fahrenheit (PH05 muss °C sein)"
+      },
+      "issue_water_pump_output_not_configured": {
+        "name": "Zu beheben: Wasserventil-/Pumpenrelais K5 nicht konfiguriert (HD05)"
+      },
+      "issue_winter_dehumidify_on_brine": {
+        "name": "Zu beheben: Winter-Entfeuchtung bei Sole ohne Temperaturwächter (PU02)"
+      },
       "brine_temperature_guard": {
         "name": "Sole-Temperaturwächter"
       }

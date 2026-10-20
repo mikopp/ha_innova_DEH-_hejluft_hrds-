@@ -367,6 +367,12 @@ Entity ids follow the device name, so setup entities are prefixed with the setup
 device name (for example `sensor.hrds_setup_setup_check`); the tables below omit
 the prefix.
 
+**What is left to fix** is listed on the setup device itself: one *To fix: ...*
+problem sensor per issue (for example *To fix: free cooling is on but no outdoor
+probe (turn off PG03)*). A row reads *Problem* while the issue is open and *OK*
+otherwise; the name says what to do. *Setup check* is `attention` while any of
+them is on, and still lists the slugs in its `issues` attribute.
+
 **What to check, in this order:**
 
 1. **Setup check** (on the setup device) reads `ok` or `attention`. If it reads
@@ -379,7 +385,7 @@ the prefix.
 
    | Switch | Leave | Why |
    |--------|-------|-----|
-   | Enable free cooling/heating (PG03) | **Off** unless an outdoor probe is wired | It acts on the outdoor temperature (bypass relay). With no probe there is no valid reading and the unit may raise AL29. Also off when a central ventilation system handles free cooling. |
+   | Enable free cooling/heating (PG03) | **Off** unless an outdoor probe is wired | It acts on the outdoor temperature (bypass relay). With no probe there is no valid reading, so the unit may behave unpredictably. Also off when a central ventilation system handles free cooling. |
    | Enable on/off via display (PH01) | **Off** without a CNU2 display | Otherwise the unit stays off waiting for the display. |
    | Enable on/off, dehumidify (DEU), integration (INT) via Modbus (PH02, PH28, PH27) | **On** | The unit ignores the matching requests without them. The integration sets them again on every poll, so switching one off by hand is undone. |
 2. **Probe settings** match what is wired. Without a display and without
