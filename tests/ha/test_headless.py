@@ -282,7 +282,8 @@ async def test_brine_guard_gates_starts_only(hass, setup, clock):
         await s.service("climate", "set_hvac_mode", CLIMATE, hvac_mode="dry")
     assert s.device.holding[R.DEU_REQUEST] == 0
 
-    hass.states.async_set(BRINE, "14.0", {"unit_of_measurement": "°C"})
+    # 9 °C passes the default 8 °C minimum (below PU08: the passive path).
+    hass.states.async_set(BRINE, "9.0", {"unit_of_measurement": "°C"})
     await hass.async_block_till_done()
     assert s.state("binary_sensor", "brine_temperature_guard").state == "off"
     await set_hvac_mode(s, clock, "dry")
