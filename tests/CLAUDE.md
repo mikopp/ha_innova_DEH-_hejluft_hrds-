@@ -60,7 +60,8 @@ comes back from disk after a real boot is the e2e column.
 The Home Assistant frontend (names, categories, device pages as a user sees
 them), interplay with other integrations (recorder, automations), RTU/serial
 gateways, and real hardware. The device model's rules come from
-`references/MODBUS_REGISTERS.md` and one real dump, not from hardware: run
+`doc/references/UNIT_BEHAVIOUR.md`, `doc/references/MODBUS_REGISTERS.md` and one real
+dump, not from hardware: run
 `tests/diagnose_hrds.py` (read-only) against a unit to check the model.
 
 ## Running
@@ -81,10 +82,11 @@ from the image's modbus manifest and installs that. A bare `pytest` skips
 (`.github/ha-versions/Dockerfile`).
 
 ## The simulator (`sim/`)
-* It does **not** import `const.py`: addresses and behaviour come from
-  `references/MODBUS_REGISTERS.md` (`sim/registers.py`, `sim/device.py`). A
-  wrong address in the integration then fails a test instead of being copied.
-  When the device docs change, change the model.
+* It does **not** import `const.py`: addresses come from
+  `doc/references/MODBUS_REGISTERS.md` (`sim/registers.py`) and behaviour from
+  `doc/references/UNIT_BEHAVIOUR.md` (`sim/device.py`). A wrong address in the
+  integration then fails a test instead of being copied. When the device docs
+  change, change the model.
 * **Seeds** are real-device dumps in `devices/<model>_<display|headless>_<state>.json`
   (`diagnose_hrds.py --json` output). Every file there is smoke-tested
   automatically (`ha/test_seeds.py`). **Overlays** (`sim/overlays/`) patch a seed
@@ -93,9 +95,9 @@ from the image's modbus manifest and installs that. A bare `pytest` skips
   best-effort into a CNU2 unit with built-in room sensors. `ha/test_display.py`
   and the climate *Auto* tests run on it; nothing about a real display unit is
   verified.
-* The unit keeps every register across `power_cycle()` (manual: data kept on
-  a power failure; a real unit kept PH01/HA00/PH02). Modbus requests count
-  only with their PH02/PH28/PH27 enable (handbook 6.1).
+* The unit keeps every register across `power_cycle()` (a real unit kept
+  PH01/HA00/PH02, `doc/references/UNIT_BEHAVIOUR.md` §3.6). Modbus requests
+  count only with their PH02/PH28/PH27 enable (§3.3).
 * The model ORs the unit's automatic requests with the Modbus ones: DEU from
   the room humidity (PU01/PU07, a display with H or an AI3 probe) and INT from
   the room temperature (summer above SEtC + PF12, winter below SEtH − PF12 with

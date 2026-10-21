@@ -2,7 +2,8 @@
 
 The register image starts from a real-device dump (:mod:`tests.sim.seeds`).
 On top of it the model implements the behaviour documented in
-``references/MODBUS_REGISTERS.md`` that the integration depends on:
+``doc/references/UNIT_BEHAVIOUR.md`` (registers:
+``doc/references/MODBUS_REGISTERS.md``) that the integration depends on:
 
 * writes to on/off, dehumidify and integration are acknowledged but ignored
   unless their "by BMS" enable (PH02/PH28/PH27) is set;
@@ -301,7 +302,7 @@ class HrdsDevice:
     def _probe_alarms(self, status: int) -> set[str]:
         """AL28/AL34: a probe is allocated but reads the unwired sentinel.
 
-        Not raised while the unit is off_by_display (section 14.6).
+        Not raised while the unit is off_by_display (UNIT_BEHAVIOUR.md 8, T4).
         """
         if status == 0:
             return set()

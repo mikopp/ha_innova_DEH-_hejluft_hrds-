@@ -21,7 +21,8 @@ PH02 used to hand on/off to a Modbus register that read off). The
 `modbus_enables_pending` setup issue is gone.
 
 **Fixed (tests):** the simulator no longer resets PH01/PH02/PH27/PH28/HA00 on a
-power cycle. The unit keeps its settings (the manual and a real unit agree), so
+power cycle. The unit keeps its settings (a real unit kept PH01 and PH02, and
+the Innova display-panel manual says its memory survives a power failure), so
 nothing has to be re-asserted after one.
 
 **Changed:** the unit's settings live in EEPROM, which wears with every write,
@@ -185,6 +186,22 @@ setting that says whether the unit has the integration function, already shown
 read-only as `binary_sensor.active_cooling_available` (now "Unit has
 integration function (PG02)"). The switch is removed from the entity registry
 on the next start.
+
+**Docs:** the `references/` folder moved to `doc/references/`. New [`doc/references/UNIT_BEHAVIOUR.md`](doc/references/UNIT_BEHAVIOUR.md),
+the single description of how the unit itself behaves: variants, a state
+diagram with start and stop sequences, the decision procedure as pseudo-code,
+summer and winter operation, display and probe configurations, fan,
+compressor, water circuit, alarm effects, and how each action is done at the
+display, the terminals and over Modbus. Every statement names its source
+(handbook section, Modbus manual page, forum post) or is marked as tested on
+the real unit or as inferred. An evidence log lists what has been seen on real
+hardware, and a table compares the reference unit's as-delivered settings with
+the handbook defaults (they differ, e.g. PC08 10 °C instead of 20 °C, PU13
+10 °C instead of 22 °C, PS01 90 s instead of 20 s). `MODBUS_REGISTERS.md` now
+only defines registers; `doc/references/README.md` is an index plus the technical
+data. Corrected: PC08's factory value is 20 °C (handbook), not 10 °C; the
+factory PH10 cap does not stop the unit's own winter heating, it only caps the
+winter setpoint.
 
 ---
 
@@ -477,7 +494,7 @@ with no register.
 **New `number.fan_min_speed_vmc`** — PF07 (reg 1644), the third per-mode
 minimum, completing the set.
 
-**Documented in `references/MODBUS_REGISTERS.md` §6.1:** the technical handbook
+**Documented in `doc/references/MODBUS_REGISTERS.md` §6.1:** the technical handbook
 states the manual fan request is *scaled linearly between the active mode's min
 and max*, so it is a position within the band rather than an absolute
 percentage. If that applies to PM20, a request of 30 at the factory 50–85 %
@@ -577,7 +594,7 @@ correctly.
 - `binary_sensor.alarm_dirty_filter` — AL22, reg 769 bit 5; filter service
   required. Display-only; manual reset (write 0 to reg 1604).
 
-**Documentation corrections** (`references/README.md`):
+**Documentation corrections** (`doc/references/README.md`):
 - The 130 m³/h (30) / 190 m³/h (50) figures are the **tested spec range**, not
   a firmware-enforced floor. Removed incorrect "fan never runs below 130 m³/h"
   claim.
@@ -594,8 +611,8 @@ correctly.
 (including alarm bit-position table), computed-sensor pattern, and device
 variant / fan-minimum notes for future sessions.
 
-**New reference files:** `references/HRDS+_Technisches_Handbuch_DE.txt` and
-`references/Innova_DEH+_H_Installation_Manual_EN.txt` (searchable text
+**New reference files:** `doc/references/HRDS+_Technisches_Handbuch_DE.txt` and
+`doc/references/Innova_DEH+_H_Installation_Manual_EN.txt` (searchable text
 extracted from the manufacturer PDFs).
 
 ---
@@ -630,7 +647,7 @@ for the supply-fan airflow range. Calibration is refinable via the options flow.
 
 **Documentation:** passive-airflow proof added (non-`R` variant confirms the
 compressor works on MVHR flow alone by design); damper physical role documented
-in `references/README.md` and `MODBUS_REGISTERS.md`; `plans/todo.md` updated to
+in `doc/references/README.md` and `MODBUS_REGISTERS.md`; `plans/todo.md` updated to
 reflect resolved items and narrow the open firmware-clamping question to the
 `R` variant only.
 
@@ -649,7 +666,7 @@ reflect resolved items and narrow the open firmware-clamping question to the
   `None`) when the respective probe-fault alarm is active.
 - `BITMASK` / `BITMASK_INVERT` fields added to `ENTITIES_DICT` for single-bit
   extraction from packed alarm registers.
-- `references/MODBUS_REGISTERS.md` §14: probe types, specs, alarm bits, and a
+- `doc/references/MODBUS_REGISTERS.md` §14: probe types, specs, alarm bits, and a
   step-by-step headless (no display, no probes) setup guide.
 
 ### feat: climate fan mode (off / low / medium / high)
@@ -698,7 +715,7 @@ passive inflow — verified as architecturally correct (see 2026-06-28 entry).
 - `HrdsModbusHub`: chunked block reads for the wide/sparse address space;
   automatic enabling of the mandatory "by BMS" control registers on connect.
 - EN/DE translations; config and options flow.
-- Manufacturer PDFs and distilled register reference under `references/`.
+- Manufacturer PDFs and distilled register reference under `doc/references/`.
 - CI: Ruff lint/format, hassfest, HACS validation.
 
 > Register addresses and scaling come from the manufacturer documentation

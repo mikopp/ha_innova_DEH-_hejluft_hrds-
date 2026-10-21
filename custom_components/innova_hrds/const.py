@@ -2,7 +2,7 @@
 
 All Modbus registers are declared once in ``ENTITIES_DICT``. ``init()`` (called
 at import time) classifies every entry into the typed dicts consumed by the
-platform files. See ``references/MODBUS_REGISTERS.md`` for the source data.
+platform files. See ``doc/references/MODBUS_REGISTERS.md`` for the source data.
 """
 
 from __future__ import annotations

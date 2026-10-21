@@ -55,8 +55,8 @@ documented device, used by two layers:
 Plus the existing `lint.yaml` (now also `wiring_check.py`), `hassfest.yaml`,
 `hacs.yaml`; `release.yaml` runs both test workflows.
 
-Scenarios: headless setup (setup writes, setup check, self-heal after power
-cycle, hidden setpoints), operation gate, dehumidify, active cooling, winter
+Scenarios: headless setup (setup writes, setup check, a power cycle that
+loses nothing, hidden setpoints), operation gate, dehumidify, active cooling, winter
 heating / refusals, brine guard, fan speeds under three firmware hypotheses,
 failures (offline, slow link, bad address, rejected write, AL11/AL12/AL22/AL25,
 probe faults, water circuit), and a unit with display and room probes.

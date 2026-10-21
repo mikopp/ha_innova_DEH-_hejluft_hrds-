@@ -2,7 +2,7 @@
 
 The simulator is deliberately independent of ``custom_components/innova_hrds``:
 its register addresses and behaviour come from
-``references/MODBUS_REGISTERS.md`` and the real-device dumps in
+``doc/references/MODBUS_REGISTERS.md`` and the real-device dumps in
 ``tests/devices/``. Sharing ``const.py`` would make a wrong address in the
 integration invisible to the tests, because the fake device would be wrong in
 exactly the same way.

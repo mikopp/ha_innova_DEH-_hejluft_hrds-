@@ -1,6 +1,6 @@
 """Register addresses the simulator models (direct PDU addresses).
 
-Taken from ``references/MODBUS_REGISTERS.md``, not from the integration's
+Taken from ``doc/references/MODBUS_REGISTERS.md``, not from the integration's
 ``const.py`` (see the package docstring for why).
 """
 

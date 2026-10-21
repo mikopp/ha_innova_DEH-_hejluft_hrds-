@@ -9,7 +9,7 @@ things that have actually broken before:
 * every ``Platform`` in ``PLATFORMS`` has a matching module - ``select`` was
   declared for a while with no ``select.py``, so that entity was never created
 * every entity key has an ``en`` and ``de`` translation
-* every ``REG`` appears in ``references/MODBUS_REGISTERS.md`` with a
+* every ``REG`` appears in ``doc/references/MODBUS_REGISTERS.md`` with a
   self-consistent hex/decimal pair
 * no input-register block spans a holding-register address, because reading a
   holding register with FC 04 can fail the entire block
@@ -441,7 +441,7 @@ def main() -> int:
         check(not missing, f"{lang}.json covers all entities (missing: {missing})")
 
     print("== register addresses match the reference doc ==")
-    doc = (ROOT / "references/MODBUS_REGISTERS.md").read_text()
+    doc = (ROOT / "doc/references/MODBUS_REGISTERS.md").read_text()
     documented: dict[int, str] = {}
     for hex_addr, dec_addr, name in re.findall(
         r"`0x([0-9A-Fa-f]{4})`\s*\|\s*(\d+)\s*\|([^|]+)\|", doc
