@@ -1010,10 +1010,10 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
 INSTALLER_KEYS: frozenset[str] = frozenset(
     installer_key(row[0]) for row in INSTALLER_PARAMS
 )
-# Installer values the hub's own checks use (water check); read once at setup
-# even without the installer device.
+# Installer values the hub's own checks use (water check, heating evidence);
+# read once at setup even without the installer device.
 INSTALLER_LOGIC_KEYS: frozenset[str] = frozenset(
-    {installer_key("PC07"), installer_key("PU08")}
+    {installer_key("PC07"), installer_key("PC08"), installer_key("PU08")}
 )
 # Button on the installer device: the only regular way its registers are read.
 C_INSTALLER_REFRESH = "refresh_installer"

@@ -376,6 +376,9 @@ class HrdsDevice:
         # Request sources are ORed: Modbus and the unit's own room-probe logic.
         deu = h.get(R.DEU_REQUEST) == 1 or self._auto_dehumidify(on, summer, alarms)
         integ = h.get(R.INT_REQUEST) == 1 and h.get(R.PG02_INTEGRATION) == 1
+        # AL03 disables summer integration, AL04 winter integration (heating).
+        if ("AL03" if summer else "AL04") in alarms:
+            integ = False
         # PU13: no dehumidifying while the room is colder than this.
         room = i.get(R.ROOM_TEMP, R.PROBE_SENTINEL)
         too_cold = not _sentinel(room) and _int16(room) < h.get(R.PU13_MIN_ROOM_TEMP, 0)

@@ -59,6 +59,7 @@ from .const import (
     C_MAX_BLOCK,
     C_MAX_GAP,
     C_MAX_TOTAL_AIRFLOW,
+    C_MODE_STATUS,
     C_OPERATING_MODE,
     C_OUTDOOR_TEMPERATURE,
     C_REG_TYPE_HOLDING_REGISTERS,
@@ -491,6 +492,81 @@ class HrdsModbusHub:
         """The season the unit reports (1583): summer, winter, auto or None."""
         return self.data.get(C_OPERATING_MODE)
 
+    @property
+    def active_season(self) -> Optional[str]:
+        """The season the unit runs in now: summer, winter or None.
+
+        1583 reads ``auto`` while the unit switches season itself (PC05); the
+        mode status (1110: summer_manual, winter_auto, ...) says which one is
+        in force.
+        """
+        mode = self.data.get(C_MODE_STATUS)
+        if isinstance(mode, str):
+            for season in ("summer", "winter"):
+                if mode.startswith(season):
+                    return season
+        season = self.season
+        return season if season in ("summer", "winter") else None
+
+    @property
+    def int_effect(self) -> Optional[str]:
+        """What the integration (INT) request can do now: cool, heat or None.
+
+        INT cools in summer and heats in winter, but only on a unit with the
+        integration function (PG02), and heating only with warm water from a
+        heating circuit: never on brine (handbook 3.8.7), and only with the
+        user's permission (``allow_winter_heating``, forced off on brine).
+        None while INT is off or cannot act; the unit then at most dehumidifies.
+        """
+        d = self.data
+        if (
+            d.get(C_ACTIVE_COOLING) != "on"
+            or d.get(C_ACTIVE_COOLING_AVAILABLE) == "off"
+        ):
+            return None
+        season = self.active_season
+        if season == "summer":
+            return "cool"
+        if season == "winter" and self.allow_winter_heating:
+            return "heat"
+        return None
+
+    @property
+    def is_heating(self) -> bool:
+        """Whether the unit heats now, judged from what it does.
+
+        The unit has no heat source of its own: winter INT opens the water
+        valve, runs the pump and fan, and keeps the compressor off (handbook
+        2.6.2, 6.4). Only warm water warms the air, so this needs the valve /
+        pump output on, no AL04, and water at or above PC08 (the unit's own
+        minimum for winter integration; only judged while water circulates).
+        """
+        d = self.data
+        if self.int_effect != "heat":
+            return False
+        if d.get(C_WATER_VALVE_PUMP) != "on" or d.get(C_COMPRESSOR_STATUS) == "on":
+            return False
+        if d.get(C_ALARM_LOW_WATER_TEMP) == "on":
+            return False
+        water = d.get(C_WATER_TEMPERATURE)
+        min_water = d.get(installer_key("PC08"))
+        return water is None or min_water is None or water >= min_water
+
+    @property
+    def is_cooling(self) -> bool:
+        """Whether the unit cools now: a summer INT it acts on, compressor on.
+
+        AL03 (water above PC07) disables active cooling. The condenser valve
+        (K4, 1124) is not used: a real unit reads it ON in standby, against the
+        handbook, so its meaning is unverified.
+        """
+        d = self.data
+        return (
+            self.int_effect == "cool"
+            and d.get(C_COMPRESSOR_STATUS) == "on"
+            and d.get(C_ALARM_HIGH_WATER_TEMP) != "on"
+        )
+
     def _auto_sources(self) -> Tuple[bool, bool]:
         """(humidity, temperature): what the unit can request on its own.
 
@@ -501,7 +577,7 @@ class HrdsModbusHub:
         nothing.
         """
         d = self.data
-        summer = self.season == "summer"
+        summer = self.active_season == "summer"
         humidity = (
             self.show_humidity_target
             and d.get(C_ROOM_HUMIDITY) is not None
@@ -624,7 +700,7 @@ class HrdsModbusHub:
         dehumidifying in winter on a brine circuit risks freezing the coil.
         Raises ServiceValidationError; switching things off always passes.
         """
-        winter = self.season != "summer"
+        winter = self.active_season != "summer"
         d = self.data
         requests_on = d.get(C_DEHUMIDIFY) == "on" or d.get(C_ACTIVE_COOLING) == "on"
         # Switching the unit on starts it when a request is latched or when its
@@ -642,6 +718,15 @@ class HrdsModbusHub:
         # On brine, winter dehumidifying needs a passing guard: the unit only
         # dehumidifies with brine flowing, and cold brine freezes the register.
         brine_winter_ok = self.brine_guard_ok is True
+        if (
+            entity_key == C_ACTIVE_COOLING
+            and raw
+            and d.get(C_ACTIVE_COOLING_AVAILABLE) == "off"
+        ):
+            raise ServiceValidationError(
+                "The unit has no integration function (PG02 = 0); it ignores an "
+                "integration request."
+            )
         if entity_key == C_ACTIVE_COOLING and raw and winter:
             if self.is_brine:
                 raise ServiceValidationError(
@@ -1212,7 +1297,11 @@ class HrdsModbusHub:
             issues.append("low_water_temperature_alarm")
         if d.get(C_ALARM_ANTIFREEZE) == "on":
             issues.append("antifreeze_alarm")
-        if self.is_brine and self.season == "winter" and d.get(C_UNIT_STATUS) == "on":
+        if (
+            self.is_brine
+            and self.active_season == "winter"
+            and d.get(C_UNIT_STATUS) == "on"
+        ):
             # Anti-stagnation pulses run the pump and send cold air puffs.
             issues.append("brine_unit_on_in_winter")
         if self.brine_guard_ok is False:

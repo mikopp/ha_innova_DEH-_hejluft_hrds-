@@ -302,6 +302,76 @@ async def test_winter_heating_when_allowed(setup, clock):
     assert s.state("sensor", "water_valve_pump").state == "on"
 
 
+@pytest.mark.parametrize("entry_options", [{"allow_winter_heating": True}])
+async def test_heating_needs_warm_water(setup, clock):
+    """Winter INT only opens valve and pump; cold water heats nothing."""
+    s = setup
+    await allow_operation(s)
+    await s.service("select", "select_option", "season", option="winter")
+    await clock.settle()
+    await set_hvac_mode(s, clock, "heat")
+    assert s.state("climate", CLIMATE).attributes["hvac_action"] == "heating"
+    # Below PC08 (factory 10 degC): the request stands, but nothing heats.
+    s.device.set_water_temperature(8.0)
+    await clock.poll()
+    climate = s.state("climate", CLIMATE)
+    assert climate.state == "heat"
+    assert climate.attributes["hvac_action"] == "idle"
+    # AL04 is the unit's own verdict: it drops the request (valve closes).
+    s.device.set_water_temperature(18.0)
+    s.device.raise_alarm("AL04")
+    await clock.poll()
+    assert s.state("sensor", "water_valve_pump").state == "off"
+    assert s.state("climate", CLIMATE).attributes["hvac_action"] == "idle"
+
+
+async def test_winter_int_from_elsewhere_is_not_heating(setup, clock):
+    """INT set at the unit in winter, heating not allowed: no Heat anywhere."""
+    s = setup
+    await allow_operation(s)
+    await s.service("select", "select_option", "season", option="winter")
+    await clock.settle()
+    await s.service("switch", "turn_on", "unit_on_off")
+    await clock.settle()
+    s.device.set_holding(R.INT_REQUEST, 1)  # e.g. from a display
+    await clock.poll()
+    assert s.state("switch", "active_cooling").state == "on"
+    climate = s.state("climate", CLIMATE)
+    assert "heat" not in climate.attributes["hvac_modes"]
+    assert climate.state == "off"
+    assert climate.attributes["hvac_action"] == "idle"
+
+
+async def test_summer_int_blocked_by_al03_is_drying(setup, clock):
+    s = setup
+    await allow_operation(s)
+    await set_hvac_mode(s, clock, "cool")
+    assert s.state("climate", CLIMATE).attributes["hvac_action"] == "cooling"
+    # AL03 (water above PC07) disables active cooling; the DEU request that
+    # Cool also sets keeps the compressor dehumidifying.
+    s.device.raise_alarm("AL03")
+    await clock.poll()
+    assert s.state("sensor", "compressor_status").state == "on"
+    assert s.state("climate", CLIMATE).attributes["hvac_action"] == "drying"
+
+
+@pytest.mark.parametrize("entry_options", [{"allow_winter_heating": True}])
+async def test_auto_season_follows_mode_status(setup, clock):
+    """1583 reads auto while the unit switches season; 1110 says which."""
+    s = setup
+    s.device.force_input(R.SEASON_READBACK, 2)
+    s.device.force_input(R.MODE_STATUS, 3)  # winter_auto
+    await clock.poll()
+    modes = s.state("climate", CLIMATE).attributes["hvac_modes"]
+    assert "heat" in modes
+    assert "cool" not in modes
+    s.device.force_input(R.MODE_STATUS, 2)  # summer_auto
+    await clock.poll()
+    modes = s.state("climate", CLIMATE).attributes["hvac_modes"]
+    assert "cool" in modes
+    assert "heat" not in modes
+
+
 async def test_season_change_refused_while_integration_runs(setup, clock):
     s = setup
     await allow_operation(s)
@@ -399,5 +469,13 @@ async def test_brine_never_heats(setup, clock):
     await s.service("select", "select_option", "season", option="winter")
     await clock.settle()
     assert "heat" not in s.state("climate", CLIMATE).attributes["hvac_modes"]
+    # INT set at the unit: on brine it never heats, and the card never says so.
+    await s.service("switch", "turn_on", "unit_on_off")
+    await clock.settle()
+    s.device.set_holding(R.INT_REQUEST, 1)
+    await clock.poll()
+    climate = s.state("climate", CLIMATE)
+    assert climate.state == "off"
+    assert climate.attributes["hvac_action"] == "idle"
     with pytest.raises(ServiceValidationError):
         await s.service("climate", "set_hvac_mode", CLIMATE, hvac_mode="dry")

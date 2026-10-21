@@ -405,6 +405,19 @@ with a probe). That is a way to cool passively with water above PU08 as well.
 | Request | What the unit does |
 |---------|--------------------|
 | INT (climate **Heat**) | **Heating support**: compressor off, warm water from the heating circuit through the water register. Only with the option *Allow winter heating*; never on brine |
+
+The unit has **no heat source of its own** and no heating register. A winter
+INT request only opens the external valve, runs the pump and the fan, and keeps
+the compressor off (handbook §2.6.2, §6.4). The air gets warmer only if the
+building's heating circuit delivers warm water (boiler, or a heat pump in
+heating mode). So the climate action shows **Heating** only when the unit can
+be doing it: the INT request may heat (winter, *Allow winter heating* on, unit
+has the integration function PG02), the valve/pump output is on, AL04 is not
+active, the compressor is off, and the water temperature is at least **PC08**
+(the unit's own minimum for winter integration, factory 10 °C). Otherwise it
+shows *Idle*, or *Drying* while the unit dehumidifies. An INT request that
+cannot heat (brine, option off, set at a display) does not make the mode
+*Heat* either. Not tested on a real unit.
 | DEU (climate **Dry**) | Only if PU02 (`select.winter_dehumidify`) allows it; factory: disabled. On brine only with a passing [brine temperature guard](#brine-temperature-guard) |
 
 On a brine circuit the handbook forbids heating and active winter
@@ -444,7 +457,8 @@ heating, the integration guards it:
 
 * An integration request (switch or climate Cool/Heat) is **refused unless the
   unit reports summer**, unless you enabled **Allow winter heating** in the
-  options. Season *auto* counts as not summer.
+  options. With the season on *auto* (1583), the mode status (1110) decides
+  which season is in force; an unknown season counts as not summer.
 * Switching the season to winter is refused while an integration request is on.
 * Automatic heating needs a room probe and a winter setpoint above SEtH - PF12,
   and the factory PH10 cap (14 °C) prevents it; headless it cannot trigger.
@@ -668,7 +682,7 @@ for full detail.
 
 | Entity | What it shows / does |
 |--------|---------------------|
-| `climate.hrds_climate` | HVAC mode (Off, Auto⁴, Dry, Cool in summer, Heat in winter if enabled), action, fan mode. The mode says what can make the unit act: **Off** also covers a unit that is on with nothing requested and no room sensor (action *Idle*), because such a unit never starts by itself. **Off** clears the dehumidify and integration requests, and switches the unit off only if its own logic could still start it. **Auto** turns the unit on with no request, so it regulates on its own setpoints. Target T¹ / RH² only when a display or room probe is configured. `current_temperature`¹ and `current_humidity`² are suppressed when the corresponding probe is absent. Target-humidity bounds follow the unit's own PH29/PH30 clamps; the target temperature is SEtC in summer and SEtH in winter. |
+| `climate.hrds_climate` | HVAC mode (Off, Auto⁴, Dry, Cool in summer, Heat in winter if enabled), action, fan mode. The mode says what can make the unit act: **Off** also covers a unit that is on with nothing requested and no room sensor (action *Idle*), because such a unit never starts by itself. **Off** clears the dehumidify and integration requests, and switches the unit off only if its own logic could still start it. **Auto** turns the unit on with no request, so it regulates on its own setpoints. **Cool**/**Heat** are offered only on a unit with the integration function (PG02), and an INT request that cannot act (winter without *Allow winter heating*, brine) does not show as Cool/Heat. The action reports what the unit does: *Cooling* needs a summer INT the unit acts on with the compressor running and no AL03; *Heating* needs the evidence described in [Operating modes in winter](#operating-modes-in-winter). Target T¹ / RH² only when a display or room probe is configured. `current_temperature`¹ and `current_humidity`² are suppressed when the corresponding probe is absent. Target-humidity bounds follow the unit's own PH29/PH30 clamps; the target temperature is SEtC in summer and SEtH in winter. |
 
 ⁴ Only offered when a display or a room probe lets the unit raise requests by
 itself (handbook §6.1), and while that reading is healthy. Not tested on a real
@@ -700,7 +714,7 @@ device (see the banner at the top).
 | `sensor.recirculation_damper` | enum | ³ Built-in | Reg 1134; Off/On/Disabled — state of the motorised recirculation damper (R-variant only) |
 | `sensor.supply_fan_airflow` | m³/h | ³ Built-in | Computed from live fan output %; see [Airflow sensors](#airflow-sensors) |
 | `sensor.water_valve_pump` | enum | ³ Built-in | Diagnostic. Reg 1126; relay K5 — external water valve (V3V) and the pump output (PM) switched with it: Off / On / Not configured |
-| `sensor.water_condenser_valve` | enum | ³ Built-in | Diagnostic. Reg 1124; relay K4 — On while all compressor heat goes to the water (summer integration) |
+| `sensor.water_condenser_valve` | enum | ³ Built-in | Diagnostic. Reg 1124; relay K4, the internal valve. The Modbus manual says On = all compressor heat to the water (summer integration), but a real unit reads On in standby, so its meaning is unverified; the climate action does not use it |
 | `sensor.water_check` | enum | — | Diagnostic. `ok` / `attention`; attribute `issues`, see [Water circuit](#water-circuit-and-brine) |
 | `sensor.supply_fan_max_airflow` | m³/h | — | Computed constant; maximum fan airflow (from config) |
 | `sensor.max_total_airflow` | m³/h | — | Computed constant; same as supply_fan_max_airflow (from config) |

@@ -6,6 +6,21 @@ All notable changes to this project are documented here, newest first.
 
 ## Unreleased
 
+**Changed:** the climate action now says what the unit does, not what was
+requested. The unit has no heat source of its own: a winter integration
+request only opens the water valve and runs the pump, so it warms the air only
+with warm water from a heating circuit. *Heating* is shown only when the
+request may heat (winter, *Allow winter heating*, never on brine), the
+valve/pump output is on, AL04 is not active, the compressor is off and the
+water is at least PC08 (now read once at setup). *Cooling* needs a summer
+integration request the unit acts on, the compressor running and no AL03;
+otherwise the action is *Drying* or *Idle*. An integration request that cannot
+act (winter without the option, brine, no integration function) no longer
+shows the mode as *Heat*/*Cool*. *Cool*/*Heat* are not offered, and an
+integration request is refused, on a unit without the integration function
+(PG02 = 0). With the season on *auto*, the mode status decides which season is
+in force.
+
 **Changed:** the climate entity no longer shows *Dry* for a unit that is just
 switched on. The unit acts only on a request (its own room-probe logic, a
 digital input or Modbus), so a unit that is on with nothing requested and no

@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import pytest
 from homeassistant.config_entries import ConfigEntryState
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 
 from custom_components.innova_hrds.const import DOMAIN
 from tests.sim import HrdsDevice, HrdsSimServer, list_seeds
+from tests.sim import registers as R
 
 from .conftest import CLIMATE, add_entry, allow_operation, set_hvac_mode
 
@@ -47,23 +49,24 @@ async def test_seed_sets_up_and_dehumidifies(hass, clock, seed, variant):
         await server.stop()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="climate offers COOL on units without active cooling (PG02 = 0); "
-    "the unit then ignores the integration request",
-)
 async def test_cool_not_offered_without_active_cooling(hass, clock):
+    """PG02 = 0: the unit has no integration function and ignores INT."""
     server = HrdsSimServer(HrdsDevice(overlays=("no_dc",)))
     await server.start()
     try:
         s = await add_entry(hass, server)
         assert s.state("binary_sensor", "active_cooling_available").state == "off"
         modes = s.state("climate", CLIMATE).attributes["hvac_modes"]
+        await allow_operation(s)
+        with pytest.raises(ServiceValidationError, match="PG02"):
+            await s.service("switch", "turn_on", "active_cooling")
+        refused_write = server.device.holding[R.INT_REQUEST]
         await hass.config_entries.async_unload(s.entry.entry_id)
         await hass.async_block_till_done()
     finally:
         await server.stop()
     assert "cool" not in modes
+    assert refused_write == 0
 
 
 @pytest.mark.parametrize(

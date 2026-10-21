@@ -100,10 +100,21 @@ verified on hardware.
 ## Climate entity behaviour
 
 - [ ] **Mode writes**: DRY = on + dehumidify + active_cooling **off**;
-      COOL = on + dehumidify + active_cooling **on**; OFF = unit off. Confirm the
+      COOL = on + dehumidify + active_cooling **on**; OFF = both requests off
+      (unit off only if it could still act on its own). Confirm the
       combinations produce the expected unit behaviour and feedback.
 - [ ] **`hvac_action` derivation** from `unit_status` / `compressor_status` /
       `dehumidify_request` reflects reality (DRYING vs COOLING vs IDLE vs OFF).
+- [ ] **What does the condenser valve (1124, K4) read while cooling?** The
+      Modbus manual says ON = all compressor heat to the water (summer
+      integration), but the real HRDS+ 30 read `1` in standby, where the
+      handbook (§6.4) says the valve stays deactivated. Note its value in
+      standby, while dehumidifying and while cooling (COOL). If it reliably
+      tells cooling from dehumidifying, `hub.is_cooling` can use it.
+- [ ] **Winter heating evidence.** `hub.is_heating` needs the valve/pump output
+      on, no AL04, compressor off and water at or above PC08. Confirm on a unit
+      on a heating circuit that this is when the supply air actually warms, and
+      that AL04 raises below PC08.
 - [ ] **Target humidity** only acts while on + dehumidifying; **target
       temperature** (summer setpoint) only acts in COOL/summer. Confirm, and
       confirm the PH29/PH30 humidity clamps.
