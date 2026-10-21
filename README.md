@@ -20,10 +20,10 @@ module (sold in Austria by https://www.hejluft.at/ as the **HRDS+**) over **Modb
 > * **Developed against:** one **HRDS+ 30 with recirculation (`R` variant)**, run
 >   **headless**: no CNU2 display, no external room/outdoor probes, behind a
 >   Modbus RTU→TCP gateway.
-> * **Not yet tested outside CI / on real hardware:** the HRDS+ 50, units
+> * **Smoke test on real hardware:** only tested on the HRDS+30 with Cooling and Recirculation. The unit is without display and no external sensors. Other versions like the HRDS+ 50, units
 >   without recirculation (non-`R`), units with a display or external probes
->   (automatic setpoint control), brine circuits, winter heating, free cooling,
->   and how the manual fan speed maps to the actual fan output. The open items
+>   (automatic setpoint control), brine circuits, winter heating, free cooling are untested.
+>   How the manual fan speed maps to the actual fan output is also not tested yet. The open items
 >   are listed in [`plans/todo.md`](plans/todo.md).
 > * **Climate *Auto* mode is not tested on a real device.** It only appears
 >   with a display or room probe. CI tests it against a simulated display unit
