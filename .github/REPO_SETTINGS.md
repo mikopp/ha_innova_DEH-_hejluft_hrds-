@@ -4,6 +4,17 @@ GitHub settings that are not files. Check the live state with
 `gh api repos/mikopp/ha_innova_DEH-_hejluft_hrds-/rulesets` before relying on
 this page; it can go stale.
 
+## About panel (discoverability)
+
+* Description: `Home Assistant custom integration (HACS) for Innova DEH+ /
+  hej.luft HRDS+ ducted dehumidifiers, also sold via Messana, over Modbus TCP`
+* Topics (20 is the GitHub maximum): `dehumidifier`, `dehumidifiers`,
+  `hacs-integration`, `hacs`, `hejluft`, `home-assistant`, `homeassistant`,
+  `homeassistant-custom-component`, `custom-component`, `hrds`, `hvac`, `innova`,
+  `innova-deh`, `modbus`, `modbus-tcp`, `taupunktentfeuchtung`, `entfeuchter`,
+  `radiant-cooling`, `messana`, `vmc`.
+* Optional: a social preview image (Settings -> General).
+
 ## Ruleset on the default branch (Settings -> Rules -> Rulesets)
 
 * Enforcement active; target the default branch.
