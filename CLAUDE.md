@@ -181,8 +181,11 @@ Classification rules (`_classify` in `const.py`):
 
 * Two requests only: **DEU** (`dehumidify`, 1140) and **INT** (`active_cooling`,
   1139). INT is dehumidify + cool in summer and **heating** in winter (compressor
-  off, warm water through the register). There is no cooling without
-  dehumidifying.
+  off, warm water through the register). INT starts the compressor only
+  because PU05 (1692, factory on) couples a dehumidify request to it. With
+  water below PU08 (factory 10 °C) the unit runs any summer request on cold
+  water alone, compressor off (handbook §6.3, the passive path; PU09/PU10 add
+  the compressor later). README "How the unit works" documents the modes.
 * `_check_request_allowed` runs on every `write_entity_value`: INT is refused
   unless the read-back season (`operating_mode`, 1583) is summer, unless the
   `allow_winter_heating` option is on; with `water_circuit = brine` winter INT
@@ -191,7 +194,9 @@ Classification rules (`_classify` in `const.py`):
   is refused while a request it would turn unsafe is active. Keep request
   writes going through `write_entity_value`.
 * **Brine temperature guard** (options `brine_temperature_entity`,
-  `brine_min_temperature`, default 10 °C): an HA sensor, judged by
+  `brine_min_temperature`, default 8 °C: above the unit's AL16 frost alarm,
+  PA43 = 3 °C, and below PU08 so the passive cold-water path can run): an HA
+  sensor, judged by
   `update_brine_guard()` on the event loop (before each poll, on its state
   events, and inside `_check_request_allowed`). When configured, any start
   (DEU/INT on, or unit on with one latched) needs value ≥ minimum and

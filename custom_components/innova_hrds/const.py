@@ -68,7 +68,7 @@ DEFAULT_WATER_CIRCUIT = WATER_CIRCUIT_HEATING_COOLING
 # dehumidifying on brine is always refused.
 CONF_BRINE_TEMPERATURE_ENTITY = "brine_temperature_entity"
 CONF_BRINE_MIN_TEMPERATURE = "brine_min_temperature"
-DEFAULT_BRINE_MIN_TEMPERATURE = 10.0
+DEFAULT_BRINE_MIN_TEMPERATURE = 8.0
 BRINE_GUARD_MAX_AGE_HOURS = 24
 # The unit is driven over Modbus; a wired CNU2 display is the exception.
 DEFAULT_HAS_DISPLAY = False

@@ -6,6 +6,19 @@ All notable changes to this project are documented here, newest first.
 
 ## Unreleased
 
+**Changed:** the *Brine guard minimum temperature* now defaults to 8 °C
+(was 10 °C). That is still well above the unit's own frost alarm (AL16, PA43
+factory 3 °C) and lets early-summer brine below PU08 (10 °C) run the passive
+cold-water path. An install that already saved 10 °C keeps it; change it in the
+options if you want the new value.
+
+**Docs:** the README has a new section, *How the unit works*, right after the
+setup steps: what is inside the unit, the two requests (DEU, INT), the summer
+and winter operating modes, including the passive cold-water path (compressor
+off while the water is below PU08, handbook §6.3), what PU05 *Force dehumidify
+when cooling* does, and how to drive the modes from Home Assistant. The entity
+reference moved below the usage sections.
+
 **Changed:** the *AI2 allocation (HA02)* and *AI3 allocation (HA03)* numbers on
 the setup device are now dropdowns named *T/H probe temperature input* and
 *T/H probe humidity input*, with the options *Unused*, *Room temperature probe
