@@ -689,8 +689,8 @@ def step_settings(
             INFO,
             f"recirculation damper output present (state '{damper}'): R unit. "
             "Every dehumidify/integration request opens the damper and runs "
-            "the fan; writing fan 0 does not prevent that (MODBUS_REGISTERS.md "
-            "13.5).",
+            "the fan; writing fan 0 does not prevent that (UNIT_BEHAVIOUR.md "
+            "9.3).",
         )
     if pg02 == 0:
         say(

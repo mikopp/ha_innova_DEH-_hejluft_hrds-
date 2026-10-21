@@ -89,9 +89,10 @@ The integration talks to the unit's control board via Modbus TCP and exposes:
   (about 240 parameters), kept off the main device page. Off by default; turn
   it on in the integration options.
 
-See [`references/README.md`](references/README.md) for the full capability list
-and [`references/MODBUS_REGISTERS.md`](references/MODBUS_REGISTERS.md) for the
-register-level detail.
+How the unit itself behaves (all variants, seasons, display/probe setups, with
+sources and what has been tested on hardware) is in
+[`references/UNIT_BEHAVIOUR.md`](references/UNIT_BEHAVIOUR.md); the registers
+are in [`references/MODBUS_REGISTERS.md`](references/MODBUS_REGISTERS.md).
 
 ## Install and set up
 
@@ -327,37 +328,23 @@ These values feed the live `sensor.supply_fan_airflow` calculation (proportional
 
 ## How the unit works
 
-This section explains what the HRDS+ does with air and water, which operating
-modes follow from that, and how to drive them from Home Assistant. The
-reference for all of it is the technical handbook (§2.6, §2.7, §3.8, §6.1,
-§6.3); the parts not yet seen on a real unit are marked.
+A short summary for using the integration. The complete description of the
+unit, with handbook references and what has been seen on real hardware, is
+[`references/UNIT_BEHAVIOUR.md`](references/UNIT_BEHAVIOUR.md).
 
 ### What is inside
 
-The unit sits in the supply duct of the central ventilation (MVHR). Air passes,
-in this order:
-
-1. the **evaporator** of a small refrigeration circuit (compressor), held at
-   about 6 °C (PU11): it cools the air below its dew point, so moisture
-   condenses;
-2. the **water register**, a water coil right behind it in the airflow.
-
-The compressor's heat goes into a **plate condenser** (refrigerant to water,
-outside the airflow). An **internal 3-way valve** (`sensor.water_condenser_valve`)
-decides where that warmed water goes: through the water register as well, which
-reheats the dried air to about room temperature, or only out to the building's
-water circuit, so the air stays cold. The building circuit is opened by the
-**external valve V3V and pump PM**, both on relay K5 (`sensor.water_valve_pump`).
-With a request the unit also closes its **VMC** contact, which can put a heat
-pump into cooling mode.
-
-`R` units add a **recirculation fan and damper**: with every request the damper
-opens and the fan blends room air into the supply air across the coils (see
-[Fan mode and recirculation](#fan-mode-and-recirculation)).
-
-The water comes from your installation (handbook §3.8): the surface
-heating/cooling circuit of a heat pump in cooling mode, the brine of a
-ground-source heat pump, or a separate ground loop.
+The unit sits in the supply duct of the central ventilation (MVHR). The air
+passes the **evaporator** of a small compressor circuit (held at about 6 °C, so
+moisture condenses) and then a **water register**. The compressor's heat goes
+into the building's water circuit; an internal valve
+(`sensor.water_condenser_valve`) decides whether that warm water also reheats
+the dried air. The external valve and pump (`sensor.water_valve_pump`) connect
+the unit to your water circuit: a heat pump's surface heating/cooling circuit,
+the brine of a ground-source heat pump, or a separate ground loop. `R` units
+add a recirculation fan and damper, which run with **every** request (see
+[Fan mode and recirculation](#fan-mode-and-recirculation)). Details:
+[UNIT_BEHAVIOUR §2](references/UNIT_BEHAVIOUR.md#2-hardware-air-path-water-path-terminals).
 
 ### Two requests
 
@@ -373,32 +360,22 @@ What they do depends on the season and on how cold the water is.
 
 | Mode | Requested by | What the unit does | Air leaves |
 |------|--------------|--------------------|-----------|
-| **Dehumidify** | DEU (climate **Dry**) | Compressor runs; its heat goes through the water register | Dried, at about room temperature |
-| **Cool and dehumidify** | INT (climate **Cool**) with PU05 on (factory) | Compressor runs; internal valve closed, all heat goes into the water circuit | Dried and cold |
-| **Passive (cold water)** | Any request while the water is below **PU08** (factory 10 °C) | **Compressor stays off.** The cold water in the water register cools the air and condenses moisture | Dried and cooled, without compressor |
+| **Dehumidify** | DEU (climate **Dry**) | Compressor runs; its heat reheats the air | Dried, at about room temperature |
+| **Cool and dehumidify** | INT (climate **Cool**), with PU05 on (factory) | Compressor runs; all heat goes into the water | Dried and cold |
+| **Passive (cold water)** | Any request while the water is below **PU08** (factory 10 °C) | **Compressor stays off**; the cold water cools and dries the air. With PU09 on, the compressor joins after PU10 (120 min) if the request is still open | Dried and cooled, without compressor |
 
-**The passive path is automatic.** The handbook (§6.3, *Entfeuchtung mit kaltem
-Wasser*) says: in summer, with a dehumidify or cooling request, the compressor
-is not started while the water is below PU08, because the cold water is enough
-to dehumidify. Nothing has to be set for it. If the request is still open after
-**PU10** (factory 120 min), **PU09** (factory on) adds the compressor as a
-second step. PU08, PU09 and PU10 are on the installer device.
-
-So the water source decides which mode you get:
-
-| Water from | Typical temperature in summer | What runs |
-|------------|-------------------------------|-----------|
-| Brine of a ground-source heat pump, or a separate ground loop | Cold early in summer, warming through the season | Passive while below PU08, compressor later |
-| Heat pump in cooling mode (surface cooling circuit) | About 16–20 °C | Compressor |
-| Heating-only circuit | Warm | Nothing useful: the unit needs the water as a heat sink, and above PC07 (30 °C) it raises AL03 and blocks |
+The passive path is automatic; nothing has to be set for it. Cold brine early
+in summer runs it, a heat pump in cooling mode (about 16–20 °C) runs the
+compressor, and water above PC07 (30 °C) blocks with AL03. PU08, PU09 and PU10
+are on the installer device.
 
 **PU05, *Force dehumidify when cooling*** (`switch.force_dehumidify_in_cooling`,
-factory on) is what makes an INT request start the compressor (§6.3,
-*Kompressor-Aktivierung*). With PU05 off, INT no longer starts the compressor by
-itself: the unit then cools only with the water it gets, and the compressor runs
-only for a dehumidify demand (a DEU request, or a room humidity above PU01 + PU07
-with a probe). That is a way to cool passively with water above PU08 as well.
-**Not yet tested on a real unit**; leave PU05 on unless you want to try this.
+factory on) is what makes an INT request start the compressor. With PU05 off,
+INT presumably cools with the water only; **not tested on a real unit**, leave
+PU05 on unless you want to try this.
+
+Sources and the remaining combinations:
+[UNIT_BEHAVIOUR §6](references/UNIT_BEHAVIOUR.md#6-summer-operation).
 
 ### Operating modes in winter
 
@@ -414,7 +391,8 @@ heating mode). So the climate action shows **Heating** only when the unit can
 be doing it: the INT request may heat (winter, *Allow winter heating* on, unit
 has the integration function PG02), the valve/pump output is on, AL04 is not
 active, the compressor is off, and the water temperature is at least **PC08**
-(the unit's own minimum for winter integration, factory 10 °C). Otherwise it
+(the unit's own minimum for winter integration; handbook 20 °C, the reference
+unit shipped with 10 °C). Otherwise it
 shows *Idle*, or *Drying* while the unit dehumidifies. An INT request that
 cannot heat (brine, option off, set at a display) does not make the mode
 *Heat* either. Not tested on a real unit.
@@ -462,8 +440,10 @@ heating, the integration guards it:
 * Switching the season to winter is refused while an integration request is on,
   and on brine without a passing brine guard while the unit is on and its room
   probe could make it dehumidify in winter by itself (PU02 enabled).
-* Automatic heating needs a room probe and a winter setpoint above SEtH - PF12,
-  and the factory PH10 cap (14 °C) prevents it; headless it cannot trigger.
+* With a display or room probe the unit heats by itself below SEtH − PF12. The
+  factory PH10 cap (14 °C) only limits SEtH, so it still heats below about
+  13.5 °C ([UNIT_BEHAVIOUR §3.3](references/UNIT_BEHAVIOUR.md#33-requests-deu-and-int)).
+  Headless without a probe it cannot trigger.
 * Not something software controls: in OFF/standby the internal water valve is
   open. If warm water circulates through the unit, it warms the ventilation air
   passing through - unless an external valve on V3V closes the circuit.
@@ -567,53 +547,31 @@ external probes to be present, otherwise the unit ignores them.
 
 ### Fan mode and recirculation
 
-The HRDS+ sits on the supply branch of your central MVHR ("inflow pipe"). The
-word *integration* is used by the manufacturer for two different things, so it's
-worth being precise:
+* **Passive airflow**: the unit's own fan is off and only the MVHR pushes air
+  through. On an `R` unit this only happens while the unit is idle (Off or on
+  with no request): watch **Supply fan status = Off**.
+* **Every Dry or Cool request on an `R` unit opens the recirculation damper
+  and runs the fan** (damper first, fan after the pre-start time, then the
+  compressor). **Recirculation active**, **Supply fan output %** and **Supply
+  fan speed (RPM)** show it.
+* Fan mode "off" (a write of 0 to PM20) therefore does **not** give
+  dehumidifying on passive airflow on an `R` unit; the unit may floor the fan
+  at its band minimum. Only a non-`R` unit (no fan, no damper) dehumidifies on
+  MVHR flow alone. An unofficial I/O reassignment exists for `R` units; it is
+  untested here and has a short-circuit risk if the recirculation inlet is
+  teed into the extract duct.
 
-* **Passive airflow** — the unit's own fan is off, but your central MVHR still
-  pushes air through the duct. On an **`R` unit this only happens while the
-  unit is idle** (Off / On-standby, no dehumidify or cooling request). There is
-  no dedicated sensor: watch **Supply fan status = Off** while **Unit status =
-  On**. The unit cannot measure the upstream MVHR's flow.
-* **Fan integration** — the unit runs **its own fan** to blend central inflow
-  air with room air across its coil. **On an `R` unit every Dry or Cool request
-  does this:** the controller opens the recirculation damper, starts the fan
-  after the damper is open, then starts the compressor. **Recirculation active**
-  tells you the fan is running; **Supply fan output %** and **Supply fan speed
-  (RPM)** show the actual speed.
-
-**Dehumidifying on passive airflow alone is not possible on an `R` unit with
-stock settings.** Fan mode "off" (a write of 0 to `PM20`) neither stops the fan
-during Dry/Cool nor keeps the damper closed, and the unit may floor the fan at
-its dehumidify minimum. Only a **non-`R`** unit (no damper, no fan) dehumidifies
-on passive flow. For an `R` unit, an unofficial I/O reassignment exists; it is
-untested here and carries a short-circuit risk if the recirculation inlet is
-teed into the extract duct. See
-[`references/MODBUS_REGISTERS.md` §13.5](references/MODBUS_REGISTERS.md).
-Use the per-mode fan minimum/maximum `number` entities to choose how hard the fan
-runs while it does.
+Use the per-mode fan minimum/maximum `number` entities to choose how hard the
+fan runs. Sources, vendor statements and the workaround:
+[UNIT_BEHAVIOUR §9](references/UNIT_BEHAVIOUR.md#9-fan).
 
 ### Drying with the fan on, but active cooling off
 
-A common state is **drying + fan running + active cooling off**: the unit
-removes moisture and its fan blends/moves air, but it is *not* actively cooling.
-
-This is exactly the climate entity's **Dry** mode:
-
-1. Set the climate entity to **Dry** (this turns the unit on, requests
-   dehumidify, and leaves active cooling off).
-2. The compressor runs to condense moisture, so the **fan runs** — you'll see
-   **Supply fan status = On**, **Recirculation active = on**, and **Compressor
-   status = On**.
-3. **Integration request** stays **off** — the compressor is working for
-   dehumidification, not cooling.
-
-If you prefer the individual switches over the climate entity, the same state is
-**Unit on/off = On**, **Dehumidify = On**, **Integration request = Off**. Going
-to **Cool** mode instead adds the integration request on top (summer only).
-Technical details and register addresses are in
-[`references/MODBUS_REGISTERS.md` §13](references/MODBUS_REGISTERS.md#13-airflow-passive-flow-fan-integration-and-active-cooling).
+That is the climate entity's **Dry** mode: **Unit on/off = On**, **Dehumidify
+= On**, **Integration request = Off**. The compressor runs for
+dehumidification, the fan runs (**Supply fan status = On**, **Recirculation
+active = on**, **Compressor status = On**), and the air leaves at about room
+temperature. **Cool** adds the integration request on top (summer only).
 
 ### Airflow sensors
 
@@ -645,7 +603,7 @@ performance table are the tested operating range, not a firmware floor.
 This is an open-loop estimate — it assumes constant duct resistance, so loaded
 filters or restrictive ducts will make the real flow lower than estimated. If
 you can measure actual flow, adjust `airflow_max_m3h` in Options to calibrate.
-The full derivation and a two-point calibration recipe are in
+The derivation and a two-point calibration recipe are in
 [`references/README.md` — Translating fan speed to airflow](references/README.md#translating-fan-speed--rpm-to-airflow-mh),
 with the underlying spec data in
 [Technical data](references/README.md#technical-data-airflow-capacity-power).
@@ -669,7 +627,8 @@ The integration therefore keeps the two apart:
 If you want a commanded percentage to mean an absolute percentage, set the
 active mode's minimum to `0` and its maximum to `100` — both are writable
 numbers. Whether PM20 really follows the band is **not yet confirmed on
-hardware**; see [`plans/todo.md`](plans/todo.md).
+hardware**; see [UNIT_BEHAVIOUR §9.1](references/UNIT_BEHAVIOUR.md#91-bands-and-sources)
+and [`plans/todo.md`](plans/todo.md).
 
 ## Entity reference
 
@@ -677,7 +636,7 @@ Entities marked **¹** are only meaningful when a room temperature probe is
 present (CNU2 display or external NTC). Entities marked **²** require a room
 humidity probe. Entities marked **³** are built into the unit's control board
 and are always available. See [probe requirements](#probe-requirements) below
-and [`references/README.md` — Probes](references/README.md#probes-built-in-display-and-external-sensors)
+and [UNIT_BEHAVIOUR §8](references/UNIT_BEHAVIOUR.md#8-display-and-probe-configurations)
 for full detail.
 
 ### Climate
@@ -716,7 +675,7 @@ device (see the banner at the top).
 | `sensor.recirculation_damper` | enum | ³ Built-in | Reg 1134; Off/On/Disabled — state of the motorised recirculation damper (R-variant only) |
 | `sensor.supply_fan_airflow` | m³/h | ³ Built-in | Computed from live fan output %; see [Airflow sensors](#airflow-sensors) |
 | `sensor.water_valve_pump` | enum | ³ Built-in | Diagnostic. Reg 1126; relay K5 — external water valve (V3V) and the pump output (PM) switched with it: Off / On / Not configured |
-| `sensor.water_condenser_valve` | enum | ³ Built-in | Diagnostic. Reg 1124; relay K4, the internal valve. The Modbus manual says On = all compressor heat to the water (summer integration), but a real unit reads On in standby, so its meaning is unverified; the climate action does not use it |
+| `sensor.water_condenser_valve` | enum | ³ Built-in | Diagnostic. Reg 1124; relay K4, the internal valve. A real unit reads On in standby, against the handbook's description, so its meaning is unverified ([UNIT_BEHAVIOUR §11.1](references/UNIT_BEHAVIOUR.md#111-internal-valve-relay-k4)); the climate action does not use it |
 | `sensor.water_check` | enum | — | Diagnostic. `ok` / `attention`; attribute `issues`, see [Water circuit](#water-circuit-and-brine) |
 | `sensor.supply_fan_max_airflow` | m³/h | — | Computed constant; maximum fan airflow (from config) |
 | `sensor.max_total_airflow` | m³/h | — | Computed constant; same as supply_fan_max_airflow (from config) |
@@ -890,9 +849,10 @@ temperatures keep working. (The `temp_probe_ok` / `humidity_probe_ok` sensors
 follow alarms AL28/AL34, which a headless unit did not necessarily raise, so
 judge by the sensors above rather than by those two.)
 
-See [`references/README.md` — Probes](references/README.md#probes-built-in-display-and-external-sensors)
-and [`references/MODBUS_REGISTERS.md` §14](references/MODBUS_REGISTERS.md#14-probes-built-in-display-and-external-sensors)
-for full probe specifications, wiring, and the HA00/PH01 configuration detail.
+See [UNIT_BEHAVIOUR §8](references/UNIT_BEHAVIOUR.md#8-display-and-probe-configurations)
+for what each display/probe configuration does, and
+[`references/MODBUS_REGISTERS.md` §14](references/MODBUS_REGISTERS.md#14-probes-inputs-and-probe-source)
+for the inputs, probe types and HA00 values.
 
 ## Requirements
 

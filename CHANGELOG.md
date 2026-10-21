@@ -101,6 +101,22 @@ read-only as `binary_sensor.active_cooling_available` (now "Unit has
 integration function (PG02)"). The switch is removed from the entity registry
 on the next start.
 
+**Docs:** new [`references/UNIT_BEHAVIOUR.md`](references/UNIT_BEHAVIOUR.md),
+the single description of how the unit itself behaves: variants, a state
+diagram with start and stop sequences, the decision procedure as pseudo-code,
+summer and winter operation, display and probe configurations, fan,
+compressor, water circuit, alarm effects, and how each action is done at the
+display, the terminals and over Modbus. Every statement names its source
+(handbook section, Modbus manual page, forum post) or is marked as tested on
+the real unit or as inferred. An evidence log lists what has been seen on real
+hardware, and a table compares the reference unit's as-delivered settings with
+the handbook defaults (they differ, e.g. PC08 10 °C instead of 20 °C, PU13
+10 °C instead of 22 °C, PS01 90 s instead of 20 s). `MODBUS_REGISTERS.md` now
+only defines registers; `references/README.md` is an index plus the technical
+data. Corrected: PC08's factory value is 20 °C (handbook), not 10 °C; the
+factory PH10 cap does not stop the unit's own winter heating, it only caps the
+winter setpoint.
+
 ---
 
 ## 0.9.1 (2026-10-20): fix setup on real hardware, installer device opt-in

@@ -4,10 +4,16 @@ Machine-readable extraction of the Modbus register map for the **hej.luft HRDS+*
 air-dehumidification module (OEM: **Innova DEH+**), taken from
 `references/HRDS+_Modbus_RTU_RS485_DE.pdf` (Stand: Mai 2026).
 
-This file is the authoritative register reference for the Home Assistant
-integration in this repository. It is written to be read by both humans and
-agents. If a value here disagrees with the PDF, the PDF wins — please fix this
-file.
+This file is the **single source of truth for the registers**: which exist,
+their addresses, names, encodings, ranges and value meanings. It is written to
+be read by both humans and agents. If a value here disagrees with the PDF, the
+PDF wins — please fix this file.
+
+What the unit *does* with these registers (states, sequences, seasons,
+variants, what was tested on hardware) is in
+[`UNIT_BEHAVIOUR.md`](UNIT_BEHAVIOUR.md). How the Home Assistant integration
+uses them is in [`../CLAUDE.md`](../CLAUDE.md) and [`../README.md`](../README.md),
+not here.
 
 ---
 
@@ -63,10 +69,10 @@ source (contact, display, Modbus).
 | Addr HEX | Addr DEC | Name                    | R/W | Description |
 |----------|----------|-------------------------|-----|-------------|
 | `0x06F2` | 1778 | `Enable_OnOffByBMS`       | R/W | **PH02** — set `1` to allow On/Off over Modbus (`0=Disabled,1=Enabled`). |
-| `0x074D` | 1869 | `Enable_IntegByBMS`       | R/W | **PH27** — set `1` to allow the integration / active-cooling request over Modbus. |
+| `0x074D` | 1869 | `Enable_IntegByBMS`       | R/W | **PH27** — set `1` to allow the integration (INT) request over Modbus. |
 | `0x074E` | 1870 | `Enable_DehumByBMS`       | R/W | **PH28** — set `1` to allow the dehumidify request over Modbus. |
-| `0x06F1` | 1777 | `Enable_OnOffByDisplay`   | R/W | **PH01** — set `0` if no wired display is present. While `1` with no display the unit stays `sm_UnitStatus` = `0` (OFF by display) permanently, and an OFF from any source beats a Modbus ON. Factory value is `1`. The integration sets it to `0` in headless mode (the default). |
-| `0x070B` | 1803 | `T/H Probe Source` (HA00) | R/W | Source for temp/humidity probes: `0=None`, `6=CNU2 display` (factory default; a unit seen in the field read `2`). Set `0` if no display. The integration sets it to `0` in headless mode. |
+| `0x06F1` | 1777 | `Enable_OnOffByDisplay`   | R/W | **PH01** — set `0` if no wired display is present. While `1` with no display the unit stays `sm_UnitStatus` = `0` (OFF by display) permanently, and an OFF from any source beats a Modbus ON. Factory value is `1`. See [UNIT_BEHAVIOUR §3.1](UNIT_BEHAVIOUR.md#31-on--off). |
+| `0x070B` | 1803 | `T/H Probe Source` (HA00) | R/W | Source for temp/humidity probes: `0=None`, `6=CNU2 display` (factory default; a unit seen in the field read `2`). Set `0` if no display. All values: §14.3. |
 
 ## 4. Operating commands (control)
 
@@ -80,10 +86,9 @@ source (contact, display, Modbus).
 | `0x0766` | 1894 | `PC12_Enable_OnOFF_by_INT_DEU` | R/W | `1` = a DEU/INT request on the **digital inputs** starts the unit even with the OFF/OFF contact open. (Earlier docs guessed 1879; that is PE24.) |
 | `0x0756` | 1878 | `PriorityChangeMode_Display` (PC11) | R/W | Who owns season change: `0=Display`, `1=DI/Digital-IN`. |
 
-> **Active cooling** in this product = the *integration* function (`0x0473`),
-> which engages the compressor/chilled-water circuit to actively cool supply
-> air in summer mode. Plain dehumidification (`0x0474`) removes moisture without
-> the active-cooling integration.
+> **Integration (INT)** (`0x0473`) cools in summer and supports heating in
+> winter; **DEU** (`0x0474`) dehumidifies. What each request does in which
+> season: [UNIT_BEHAVIOUR §6–§7](UNIT_BEHAVIOUR.md#6-summer-operation).
 
 ## 5. Setpoints
 
@@ -97,7 +102,8 @@ source (contact, display, Modbus).
 | `0x06C7` | 1735 | `Setpoint_HighHumWarning` (PA19) | R/W | 70 | 0 | 100 | %RH — triggers high-humidity warning AL02 |
 
 > Setpoints only take effect when a display is present **or** external probes
-> are connected.
+> are connected [Modbus manual p.6]. Clamps and automatic thresholds:
+> [UNIT_BEHAVIOUR §3.3–§3.4](UNIT_BEHAVIOUR.md#33-requests-deu-and-int).
 
 ## 6. Fan speed
 
@@ -117,37 +123,12 @@ for 40 %). Min/Max apply to the modulation band used in each mode.
 | `0x027F` | 639  | `outAO_SupplyFan`          | R/O | — | 0–100 | Actual supply-fan analog output % |
 | `0x045D` | 1117 | `actRPMsupplyFan`          | R/O | — | 0–65535 | Supply-fan actual RPM |
 
-### 6.1 The min/max band is a scaling range, not just a clamp
+### 6.1 How the bands apply
 
-`HRDS+_Technisches_Handbuch_DE.txt` § Lüfter-Regelung, on manual fan control:
-
-> „Die Drehzahl wird **linear zwischen den jeweiligen Minimal- und
-> Maximalwerten** (PF28/PF10 bzw. PF27/PF09) **skaliert**."
-
-So the manual request is a **position within the active mode's band**, not an
-absolute percentage. At the factory band (50–85 %) a request of 30 would produce
-roughly `50 + 0.30 × (85 − 50) ≈ 60.5 %` actual output, and a request of 0 would
-produce 50 %, **not** a stopped fan.
-
-That passage describes manual control *at the display*. `PM20_SupplyFan_Manual`
-(1614) is the Modbus manual setpoint and `SupplyFan_ManualRequest` (1114) is
-documented as the "manual display request", which strongly suggests they feed the
-same logic — but **this has not been confirmed on hardware**. See `plans/todo.md`.
-
-Consequences if it holds:
-
-* To command an absolute percentage, first open the band: set the mode's minimum
-  (`PF28` 1853 dehumidify, `PF27` 1852 integration, `PF07` 1644 VMC) to `0` and
-  the maximum (`PF10` 1647 / `PF09` 1646) to `100`. Then request == output.
-* To actually stop the fan, the minimum must be `0`; otherwise the floor applies.
-* `outAO_SupplyFan` (639) is the only trustworthy reading of what the fan is
-  doing. The integration's `fan` and `climate` entities both report it for that
-  reason, and expose the commanded value separately.
-
-**The per-mode minimum is device state, not integration state.** All three minima
-are writable holding registers and are exposed as `number` entities; the
-integration deliberately does not carry its own "fan is off below X %" setting,
-which would shadow them.
+The min/max pairs are per-mode bands; display and 0–10 V requests are scaled
+linearly into the active band (handbook §6.2). Whether `PM20_SupplyFan_Manual`
+(1614) is scaled the same way is not confirmed on hardware. Details:
+[UNIT_BEHAVIOUR §9](UNIT_BEHAVIOUR.md#9-fan).
 
 ## 7. Sensors (read-only, FC 04)
 
@@ -169,13 +150,13 @@ which would shadow them.
 |----------|----------|-------------------|--------|
 | `0x0450` | 1104 | `sm_UnitStatus`      | `0=OFF by display`, `1=OFF by DI`, `2=OFF by BMS`, `3=OFF by scheduler`, `4=OFF by RTC`, `5=ON` |
 | `0x0456` | 1110 | `ModeStatus`         | `0=Summer manual`, `1=Winter manual`, `2=Summer auto`, `3=Winter auto`, `4=Summer DI`, `5=Winter DI` |
-| `0x0458` | 1112 | `FanIntegration_Request` | `0=No`, `1=Yes` — the **fan-integration** function is currently active, i.e. the supply fan is running to integrate (mix) the central-MVHR inflow air with room air. Set whenever the fan runs for ventilation/integration, independent of whether active cooling (`Status_Integ_byBMS`, 1139) is requested. |
+| `0x0458` | 1112 | `FanIntegration_Request` | `0=No`, `1=Yes` — "Fans integration request". Not the INT request (1139), see §13. Our reading: `1` while the fan runs to blend MVHR air with room air (unverified). |
 | `0x045F` | 1119 | `SupplyFan_Status`   | `0=Disable`, `1=OFF`, `2=Wait ON`, `3=ON`, `4=Wait OFF`, `5=Alarm` |
 | `0x0461` | 1121 | `DehumRequest`       | `0=No`, `1=Yes` — dehumidification currently requested |
 | `0x0462` | 1122 | `CmpStatus`          | `0=Disable`, `1=Alarm`, `2=Manual`, `3=Wait ON`, `4=ON`, `5=Wait OFF`, `6=OFF` — compressor (active cooling/dehum) |
-| `0x0464` | 1124 | `outDO_WaterCond` | Internal water condenser valve (relay K4): `0=OFF`, `1=ON`, `2=Disable`. The manual: ON = closed, all compressor heat to the water (summer integration). **But** a real HRDS+ 30 read `1` in standby (`tests/devices/hrds_30+_headless_factory_state.json`), where the handbook (§6.4) says the valve stays deactivated with the compressor off, so the mapping is unverified. The integration does not use it to decide anything. |
-| `0x0466` | 1126 | `outDO_WaterFlow` | External water valve V3V (relay K5) — the PM pump output is switched together with it: `0=OFF`, `1=ON`, `2=Disable` (not configured: the unit cannot start the pump). |
-| `0x046E` | 1134 | `outDO_RecircDamper` | `0=OFF` (damper closed — room-air duct sealed, MVHR passive flow only), `1=ON` (damper open — room air blended with MVHR inflow), `2=Disable` (no damper wired, non-`R` variant) |
+| `0x0464` | 1124 | `outDO_WaterCond` | Internal water condenser valve (relay K4): `0=OFF`, `1=ON`, `2=Disable`. A real unit reads `1` in standby, against the handbook's description; see [UNIT_BEHAVIOUR §11.1](UNIT_BEHAVIOUR.md#111-internal-valve-relay-k4). |
+| `0x0466` | 1126 | `outDO_WaterFlow` | External water valve V3V (relay K5) — the PM pump output is switched together with it: `0=OFF`, `1=ON`, `2=Disable` (output not configured). |
+| `0x046E` | 1134 | `outDO_RecircDamper` | `0=OFF` (damper closed), `1=ON` (damper open), `2=Disable` (no damper output allocated; expected on a non-`R` unit) |
 | `0x027F` | 639  | `outAO_SupplyFan`    | Supply-fan output % (×0.01) |
 | `0x0281` | 641  | `outAO_Cmp`          | Compressor output % (×0.01) |
 | `0x044F` | 1103 | `OR_Alarms`          | `0/1` cumulative "any alarm active" flag |
@@ -187,7 +168,7 @@ per signal** (`bitN..bitN+1`); a non-zero pair means active.
 
 | Addr HEX | Addr DEC | Name | Notable bits |
 |----------|----------|------|--------------|
-| `0x0180` | 384 | `Packed_DO1` | bit4-5=Compressor, bit8-9=Recirculation damper, bit12-13=Water condensation valve (`0=Integration,1=Dehumidify`) |
+| `0x0180` | 384 | `Packed_DO1` | bit4-5=Compressor (K6), bit8-9=Recirculation damper (K1), bit10-11=External water valve or pump (K5), bit12-13=Water condensation valve (K4) (`0=Integration,1=Dehumidify`) |
 | `0x0181` | 385 | `Packed_DO2` | bit4-5=On/Off, bit6-7=Summer/Winter, bit8-9=Serious alarm, bit10-11=Light alarm, bit12-13=High humidity |
 | `0x0101` | 257 | `Packed_logicDI1` | bit0-1=Remote on/off, bit2-3=Summer/Winter, bit4-5=Dehum request, bit6-7=Integration/thermo request |
 
@@ -205,25 +186,28 @@ Each bit = one alarm code. Bit set ⇒ alarm active.
 
 ### 9.2 Alarm code reference
 
-| Code | Description | Reset | Effect |
-|------|-------------|-------|--------|
-| AL02 | High humidity | Auto | Shuts everything off if PA57=1, else display-only |
-| AL03 | High summer water temperature | Auto | Disables active cooling (integration); disables dehum if PU03=0 |
-| AL04 | Low winter water temperature | Auto | Disables winter heating (integration) |
-| AL11 | Compressor low-pressure / frost-thermostat | Auto (manual if >5×/h) | Stops compressor |
-| AL12 | Compressor high-pressure switch | Auto (manual if >5×/h) | Stops compressor |
-| AL16 | Water-circuit antifreeze | Auto | Stops fan |
-| AL18 | Generic alarm | Manual | Shuts everything off |
-| AL19 | Generic warning | Auto | Display only |
-| AL22 | Dirty filters | Manual | Display only |
-| AL25 | I/O configuration error | Auto | Shuts everything off |
-| AL26 | RTC clock failed/disconnected | Auto | Disables scheduler |
-| AL28 | Room/return temperature probe fault | Auto | Disables dependent control |
-| AL29 | External temperature probe fault | Auto | Disables dependent control |
-| AL30 | Water temperature probe fault | Auto | Disables dependent control |
-| AL34 | Room/return humidity probe fault | Auto | Disables dependent control |
-| AL36 | Fan potentiometer fault | Auto | Disables dependent control |
-| AL39 | Evaporator temperature probe fault | Auto | Disables dependent control |
+What triggers each alarm, what it stops and how it resets:
+[UNIT_BEHAVIOUR §12](UNIT_BEHAVIOUR.md#12-alarms-and-what-they-do-to-the-flow).
+
+| Code | Description |
+|------|-------------|
+| AL02 | High humidity |
+| AL03 | High summer water temperature |
+| AL04 | Low winter water temperature |
+| AL11 | Compressor low-pressure / frost-thermostat |
+| AL12 | Compressor high-pressure switch |
+| AL16 | Water-circuit antifreeze |
+| AL18 | Generic alarm |
+| AL19 | Generic warning |
+| AL22 | Dirty filters |
+| AL25 | I/O configuration error |
+| AL26 | RTC clock failed/disconnected |
+| AL28 | Room/return temperature probe fault |
+| AL29 | External temperature probe fault |
+| AL30 | Water temperature probe fault |
+| AL34 | Room/return humidity probe fault |
+| AL36 | Fan potentiometer fault |
+| AL39 | Evaporator temperature probe fault |
 
 ### 9.3 Alarm reset registers (R/W)
 
@@ -241,13 +225,13 @@ Write `1` to reset the corresponding alarm: `0x030B`=AL01, `0x030C`=AL02,
 | `0x0699` | 1689 | `PU02_EnableWinterDehum` | `0=No`, `1=With water`, `2=Without water` |
 | `0x069C` | 1692 | `PU05_ForceDehumInCooling` | Force dehumidify when cooling requested |
 | `0x06F5` | 1781 | `PH05_TemperatureUM` | `0=°C`, `1=°F` |
-| `0x06F3` | 1779 | `PH03_EnableTimePrograms` | `0=No`, `1=Yes`. Time programs can switch the unit OFF (status `off_by_scheduler`). Exposed as a switch; the integration flags it in the setup check. |
-| `0x070D` | 1805 | `HA02_AI2_Allocation` | Analog input 2 allocation. `0`=unused, `45`=room temperature probe. A probe code with nothing wired raises AL28. Exposed as the select *T/H probe temperature input*. |
-| `0x070E` | 1806 | `HA03_AI3_Allocation` | Analog input 3 allocation. `0`=unused, `53`/`54`=room humidity probe. A probe code with nothing wired raises AL34. Exposed as the select *T/H probe humidity input*. |
-| `0x0720` | 1824 | `DI3_Configuration` (HB03) | Remote ON/OFF contact (OFF/OFF terminals): `0=unused`, `1=normally closed`, `2=normally open`. With the contact open the unit is forced OFF (`off_by_di`). Shown read-only. |
-| `0x0728` | 1832 | `HC04` | Analog output allocation of the supply fan (raw code; `1` = 0-10 V supply fan). Shown read-only. |
-| `0x072E` | 1838 | `HD01` | Relay DO1 allocation (raw code; `10` = recirculation damper NO, `9` = NC). Shown read-only. |
-| `0x06A2` | 1698 | `PS01_PreStartTime_RecircDamper` | Damper pre-start time before the fan starts, in seconds (default 20). Shown read-only. |
+| `0x06F3` | 1779 | `PH03_EnableTimePrograms` | `0=No`, `1=Yes`. Time programs can switch the unit OFF (status `off_by_scheduler`). |
+| `0x070D` | 1805 | `HA02_AI2_Allocation` | Analog input 2 allocation. `0`=unused, `45`=room temperature probe. A probe code with nothing wired raises AL28. |
+| `0x070E` | 1806 | `HA03_AI3_Allocation` | Analog input 3 allocation. `0`=unused, `53`/`54`=room humidity probe. A probe code with nothing wired raises AL34. |
+| `0x0720` | 1824 | `DI3_Configuration` (HB03) | Remote ON/OFF contact (OFF/OFF terminals): `0=unused`, `1=normally closed`, `2=normally open`. With the contact open the unit is forced OFF (`off_by_di`). |
+| `0x0728` | 1832 | `HC04` | Analog output allocation of the supply fan (raw code; `1` = 0-10 V supply fan). |
+| `0x072E` | 1838 | `HD01` | Relay DO1 allocation (raw code; `10` = recirculation damper NO, `9` = NC). |
+| `0x06A2` | 1698 | `PS01_PreStartTime_RecircDamper` | Damper pre-start time before the fan starts, in seconds (handbook default 20; a real unit read 90). |
 | `0x0642` | 1602 | `PM00_Limit_FansHours` | Fan running-hours alarm limit (h ×10) |
 | `0x0644` | 1604 | `PM01_SupplyFan_Hours` | Fan running-hours counter (write 0 to reset filter alarm AL22) |
 
@@ -270,7 +254,8 @@ Write `1` to reset the corresponding alarm: `0x030B`=AL01, `0x030C`=AL02,
 
 **Turn active cooling (integration) on / off**
 1. One-time: write `1` to `1869` (PH27 Enable_IntegByBMS) and ensure
-   `PG02_EnableIntegration` (1798) = 1 (installer setting, read-only in the integration), season = Summer.
+   `PG02_EnableIntegration` (1798) = 1 (installer setting). In summer INT cools,
+   in winter it supports heating.
 2. On: write `1` to `1139`; Off: write `0`.
 3. Compressor feedback via `1122` (`CmpStatus`, `4`=ON).
 
@@ -287,332 +272,103 @@ Write `1` to reset the corresponding alarm: `0x030B`=AL01, `0x030C`=AL02,
 outdoor temp `500`, water temp `501`, supply/discharge temp `503`.
 
 **Is the unit on?** — read `1104`; `5` = ON, anything `0–4` = a specific OFF cause.
+A written request reads back late (several polls on a real unit), see
+[UNIT_BEHAVIOUR §3.3](UNIT_BEHAVIOUR.md#33-requests-deu-and-int).
 
 **Check errors / status** — read `1103` (any-alarm flag) then `768/769/770`
 (per-bit alarm codes); decode with §9.2.
 
 ---
 
-## 12. Notes for the HA integration
+## 12. Transport notes
 
-* **No coils / discrete inputs.** Model read-only entities as input registers
-  (FC 04) and read-write entities as holding registers (FC 03). 0/1 flags are
-  analog registers, not bits.
+* **No coils / discrete inputs.** Read-only values are input registers (FC 04),
+  read-write values holding registers (FC 03/06/16). 0/1 flags are analog
+  registers, not bits [Modbus manual p.5].
 * **Wide, sparse address space (≈0x0100–0x077A).** A single block read of the
-  whole range exceeds Modbus' 125-register-per-request limit. The hub must read
-  in **contiguous chunks** per function code, not one big block. Keep the
-  chunks small: a real unit behind an RS-485 gateway did not answer a
-  120-register read at all, while 10-register reads covered the whole map.
-  The integration reads at most 10 per request and halves that if a block
-  goes unanswered while a single register answers promptly.
-* **Enables are mandatory.** The integration should set PH02/PH27/PH28 on setup
-  (or expose them), or writes will silently no-op.
-* **Fan/percent registers use ×0.01 scaling**; temps/setpoints ×0.1; humidity ×1.
-* See `references/HRDS+_Modbus_RTU_RS485_DE.pdf` §6 "FULL MODBUS REGISTER LIST"
-  for the complete ~250-register table (schedulers, probe calibration, alarm
-  tuning, hardware I/O mapping) not reproduced in full here.
+  whole range exceeds Modbus' 125-register-per-request limit, so read in
+  contiguous chunks per function code.
+* **Keep the chunks small.** On a real unit behind an RS-485→TCP gateway a
+  120-register read got no reply at all, while 10-register reads covered the
+  whole map ([UNIT_BEHAVIOUR evidence T9](UNIT_BEHAVIOUR.md#13-evidence-log-what-was-seen-on-real-hardware)).
+  Whether the limit is the gateway's or the controller's is open.
+* **Enables are mandatory**: §3.
+* See `HRDS+_Modbus_RTU_RS485_DE.pdf` §6 "FULL MODBUS REGISTER LIST" for the
+  complete table (schedulers, probe calibration, alarm tuning, hardware I/O
+  mapping); the installer parameters from it are in §16.
 
 ---
 
-## 13. Airflow: passive flow, fan integration, and active cooling
+## 13. Two registers called "integration"
 
-The HRDS+ sits on the supply branch of a central MVHR/VMC system (the "inflow
-pipe"). The word *integration* is overloaded in the manufacturer documentation,
-so this section pins down the three distinct concepts and the registers that
-expose each. Sources: `HRDS+_Technisches_Handbuch_DE.pdf` (§ Funktionsweise /
-Integration, Lüfterregelung) and `HRDS+_Benutzerhandbuch_DE.pdf` (operation
-modes); register numbers from the Modbus PDF and §§6–8 above.
+`Status_Integ_byBMS` (1139) and `FanIntegration_Request` (1112) both contain
+the word *integration* but are unrelated: 1139 is the **INT request**
+(cooling in summer, heating support in winter, written by the BMS); 1112 is a
+read-only status that the **supply fan** is running.
 
-> **Read §13.5 first.** The three-way split below is this repository's own
-> reading, not manufacturer terminology. On the `R` variant the controller does
-> **not** treat recirculation as a separate mode: every dehumidification or
-> integration request opens the recirculation damper and starts the fan. There
-> is no documented way to dehumidify on passive MVHR flow with the damper closed.
-
-### 13.1 Three concepts, three meanings
-
-| Concept | What physically happens | How it is exposed |
-|---------|-------------------------|-------------------|
-| **Passive airflow** | The unit's own supply fan is **off**, but the central MVHR upstream still pushes air through the unit's duct, so air keeps flowing through the inflow pipe. On the `R` variant this is the **OFF / ON-Standby** state („ohne Luftaufbereitung“, no air treatment, §2.7); on the non-`R` variant it is the only state. | **No dedicated register.** Infer it: `SupplyFan_Status` (1119) = `1` (OFF) while `sm_UnitStatus` (1104) = `5` (ON). The unit cannot measure the upstream MVHR's flow, so there is no "passive flow rate". |
-| **Fan integration** (the *fan's* job) | The unit's **own supply fan runs** to "integrate" — i.e. blend the central-MVHR inflow air with recirculated room air and drive it across the coil. On the `R` variant this happens on **every** dehumidification and integration request (§13.5). | `FanIntegration_Request` (1112) = `1` when the fan-integration function is active; `SupplyFan_Status` (1119) = `3` (ON); modulation at `outAO_SupplyFan` (639, ×0.01 %) and `actRPMsupplyFan` (1117). The Modbus PDF labels 1112 only "Fans integration request" (R/O); the blending interpretation is ours. |
-| **Active cooling** (the manufacturer's *"integration" register*) | The compressor / chilled-water circuit engages to **actively cool** the supply air in summer (the "Integration" function PG02). | `Status_Integ_byBMS` (1139, R/W request, requires PH27=1), feedback via `CmpStatus` (1122). **This is a different meaning of "integration" than the fan blending in row 2.** |
-
-> **Trap.** `Status_Integ_byBMS` (1139) and `FanIntegration_Request` (1112) both
-> contain the word *integration* but are unrelated: 1139 is the *active-cooling*
-> command (compressor), 1112 is a read-only status that the *supply fan* is
-> running its integration/blending function. The HA integration maps 1139 to the
-> `active_cooling` switch and 1112 to the `fan_integration_active` binary sensor.
-
-### 13.2 HA fan mode → register mapping
-
-The climate entity writes `PM20_SupplyFan_Manual` (1614, holding, ×0.01) to
-control the supply fan independently of the HVAC mode:
-
-| Fan mode | Value written to 1614 | Percentage |
-|----------|-----------------------|------------|
-| off      | 0                     | 0 %        |
-| low      | 3000                  | 30 %       |
-| medium   | 5500                  | 55 %       |
-| high     | 8500                  | 85 %       |
-
-Read-back uses `outAO_SupplyFan` (639, ×0.01 %) with nearest-neighbour
-thresholds at 42.5 % (low/medium) and 70.0 % (medium/high). Fan mode "off"
-is also forced when `SupplyFan_Status` (1119) = `1` or `0`.
-
-**Fan mode "off" does not give passive-only dehumidification.** Even if
-`1614 = 0` stopped the fan, the recirculation damper still opens on every
-dehumidification/integration request (§13.5). A user report also says the fan
-could not be commanded below 30 %. Whether the remaining floor is a clamp to
-`MinSpeedFan_Dehum` (1853) / `MinSpeedFan_Integ` (1852) or a band rescale is
-still unverified on hardware — see `plans/todo.md`.
-
-### 13.3 Detecting passive airflow
-
-There is no Modbus point that reports "air is passively flowing through the
-duct". Derive it from the fan being commanded off while the unit is otherwise
-running:
-
-```
-passive_airflow = (sm_UnitStatus[1104] == 5)        # unit is ON
-                  and (SupplyFan_Status[1119] == 1)  # but supply fan is OFF
-                  and (FanIntegration_Request[1112] == 0)
-```
-
-The unit only knows the state of *its own* fan (1119) and its integration
-request (1112). Whether the central MVHR is actually moving air is upstream of
-the HRDS+ and not visible on this bus — treat passive airflow as "fan off, unit
-on" and rely on the central system's own controls/sensors for the real rate.
-On a stock `R` unit this condition only holds while no dehumidification or
-integration request is active, i.e. while the air passes untreated.
-
-### 13.4 Dehumidify with the fan running but active cooling off
-
-This is a normal, common state: the unit is **drying** and the **fan is on**,
-but **active cooling is off**.
-
-* `Status_Dehum_byBMS` (1140) = 1 → the compressor condenses moisture out of the
-  air. Dehumidification inherently needs airflow over the coil, so the **supply
-  fan runs** (`SupplyFan_Status` 1119 = ON, `FanIntegration_Request` 1112 = 1)
-  using the **dehumidify fan band** `MinSpeedFan_Dehum` (1853) /
-  `MaxSpeedFan_Dehum` (1647).
-* `Status_Integ_byBMS` (1139) = 0 → the **active-cooling** integration is *not*
-  requested, so the chilled-water/active-cooling band
-  `MinSpeedFan_Integ` (1852) / `MaxSpeedFan_Integ` (1646) is not in play.
-* Feedback: `CmpStatus` (1122) = `4` (ON) because the compressor is running for
-  dehumidification — **not** because active cooling is on. `DehumRequest`
-  (1121) = 1, `outAO_SupplyFan` (639) shows the actual fan %.
-
-In other words, the compressor here serves dehumidification, and the fan runs to
-move/blend air across the coil; active cooling (1139) is an *additional,
-separate* request layered on top in summer. See `PU05_ForceDehumInCooling`
-(1692) for the inverse coupling (force dehum whenever cooling is requested) and
-`PU02_EnableWinterDehum` (1689) for dehumidification in the winter season.
-
-To reproduce over Modbus (assuming PH02/PH28 already = 1):
-1. `1105` ← 1 (unit on), `1140` ← 1 (dehumidify), `1139` ← 0 (active cooling off).
-2. Optionally shape the airflow with the dehumidify band `1853`/`1647`
-   (×100 encoding: 50 % → `5000`).
-3. Read back `1121`=1, `1119`=3 (fan ON), `1112`=1 (integration/blend active),
-   `1139`-derived `CmpStatus` `1122`=4, while there is no active-cooling request.
-
-### 13.5 Dehumidifying without recirculation (`R` variant)
-
-**The manufacturer documentation has no such mode.** Dehumidification and
-recirculation are coupled in the controller:
-
-* **Handbuch §2.7 Betriebsarten.** The dehumidify mode (DEU) and both
-  integration modes (INT summer, INT winter) all list „die Umluftklappe ist
-  geöffnet“ and „der Lüfter ist aktiv“. DEU says explicitly: „In diesem
-  Betriebsmodus ist die Umluftumwälzung aktiviert“. Only OFF / ON-Standby
-  („ohne Luftaufbereitung“) has the damper closed and the fan off. The mode
-  pictures match: the closed-damper picture is the untreated standby state.
-* **§6.5 Umluftklappe.** The damper opens whenever there is an integration or
-  dehumidification request. It closes only once the request has ended, the
-  compressor's safety times have elapsed and the external water valve has
-  closed after its run-on. A blocking alarm closes it immediately.
-* **§6.2 Lüfter-Regelung.** The fan starts only after the damper is fully open
-  (`PS01_PreStartTime_RecircDamper`, reg 1698, default 20 s). It then runs in
-  the PF28–PF10 band (dehumidify) or PF27–PF09 (integration).
-* **"ohne Umluft" is a hardware variant**, not an operating mode: §2.1
-  „Variante ohne Umluft“, §3.7.2 „Anschluss-Schema, Version ohne
-  Umluftumwälzung“ and the separate „ohne Umluft“ product codes. Those units
-  have no recirculation fan or damper.
-* **Modbus.** No register selects "dehumidify without recirculation".
-  `FanIntegration_Request` (1112) and `outDO_RecircDamper` (1134) are
-  read-only status.
-
-**Vendor statements** (energiesparhaus.at HRDS+ thread, user Murphy08, who
-writes for the vendor side):
-
-* #44 (4.12.2025): „Immer wenn der Kompressor läuft, ist auch der Umluftbetrieb
-  aktiv.“
-* #76 (8.5.2026): „Die Entfeuchtung ist regelungsseitig streng mit dem
-  Umluftbetrieb gekoppelt.“ Start order: water valve, recirculation damper and
-  VMC output first, then the fan after a delay, then the compressor.
-* #78 (8.5.2026): setting the fan to 0 „bringt ja nichts, weil die Klappe dann
-  trotzdem aufgeht“.
-
-**Unofficial workaround** (user manuon, #77–#79 and #93, May 2026; untested by
-this repository, at your own risk):
-
-* The fan could not be commanded below 30 %.
-* Deactivating the fan output (AO4) or the damper output (DO1) stops the
-  compressor from starting.
-* Fan: deactivate AO4 and assign the spare AO3 as "Supply Fan 0-10V", so the
-  real fan stays off while the compressor runs.
-* Damper: set `HD01` (DO1 allocation, default `10` = "Recirculation damper
-  NO") to `9` = "Recirculation damper NC". This inverts the relay: the damper
-  stays closed during operation but is open whenever it would normally be
-  closed, which presumably includes standby.
-* Reported result: an HRDS+ 50 running on KWL supply air alone at 368 m³/h,
-  about 1.7 l/h of condensate.
-
-**Consequences**
-
-* Writing `PM20_SupplyFan_Manual` (1614) = 0 does not produce passive-only
-  dehumidification. The damper opens regardless, and the fan is probably
-  floored.
-* If the recirculation inlet is not open to a room at about room pressure —
-  for example, teed into the MVHR extract duct — an open damper with a stopped
-  or slow fan short-circuits supply air into the extract. A backdraft valve in
-  the recirculation branch, opening towards the unit, prevents that without
-  parameter changes. The NC inversion is unsuitable there, because the damper
-  would then be open in standby.
-* In any fan-off configuration, the compressor's own protection (AL11
-  low-pressure / frost thermostat) remains the guard against too little
-  airflow.
+Airflow behaviour (passive MVHR flow, recirculation coupled to every request,
+the unofficial I/O workaround) used to be described here and is now in
+[UNIT_BEHAVIOUR §9](UNIT_BEHAVIOUR.md#9-fan), in particular
+[§9.3 Recirculation is coupled to every request](UNIT_BEHAVIOUR.md#93-recirculation-is-coupled-to-every-request-r-variant).
 
 ---
 
-## 14. Probes: built-in, display, and external sensors
+## 14. Probes: inputs and probe source
 
-### 14.1 Which probes are always present (factory-wired)
+### 14.1 Analog inputs
 
-These sensors are hard-wired to fixed analog inputs on the control board and
-are always available regardless of display or external probe configuration:
+| Register | Addr DEC | Input | Probe | Notes |
+|----------|----------|-------|-------|-------|
+| `AI_TreturnRoom` | 499 | AI2 (M2) when `HA02 = 45`, or the display | NTC 10 kΩ @ 25 °C, B 3435 | Probe fault: AL28 |
+| `AI_Toutdoor` | 500 | configurable input | NTC 10 kΩ B 3435, outdoor rated | Probe fault: AL29 |
+| `AI_Twater` | 501 | AI5 (M5), factory wired | — | Probe fault: AL30 |
+| `AI_Texhaust` | 502 | configurable input | NTC 10 kΩ B 3435 | — |
+| `AI_Tdischarge` | 503 | configurable input | NTC 10 kΩ B 3435 | — |
+| `AI_HretRoom` | 505 | AI3 (M3) when `HA03 = 53/54`, or the display | 4–20 mA (`53`) or 0–10 V (`54`), 0–100 %RH | Probe fault: AL34 |
+| `AI_AirQuality` | 506 | configurable input | 0–10 V / 4–20 mA | — |
+| `AI_Tevaporation` | 511 | AI4 (M4), factory wired | — | Inverter version only; probe fault: AL39 |
 
-| Register | Addr DEC | Name | Input | Notes |
-|----------|----------|------|-------|-------|
-| `AI_Twater` | 501 | Water circuit temperature | M5 (AI5) fixed | Used for AL03 / AL04 protection |
-| `AI_Tevaporation` | 511 | Evaporator temperature | M4 (AI4) fixed | Compressor modulation control |
+The high- and low-pressure switches (DI1/DI2, the frost thermostat on DI2's
+input) are digital inputs with no analog register; they raise AL12 / AL11.
+Sources: handbook §6.3, §6.7, §7.3; Modbus manual p.7.
 
-The **high-pressure** and **low-pressure** switches (DI1/DI2) are also
-factory-wired but are digital inputs that do not appear as Modbus analog
-registers; they generate alarms AL11 / AL12 directly.
+What each probe drives, and how the unit behaves with and without a display
+or probes: [UNIT_BEHAVIOUR §8](UNIT_BEHAVIOUR.md#8-display-and-probe-configurations).
 
-### 14.2 Which probes are external (must be wired by installer)
-
-All other temperature and humidity measurements come from **configurable analog
-inputs** on the control board. The installer assigns a function code to each
-analog input (via parameters HA02, HA03 …) and wires the appropriate sensor to
-the corresponding terminal. If no sensor is wired to a configured input, the
-unit raises a probe-fault alarm.
-
-| Register | Addr DEC | Name | Probe type | What it drives |
-|----------|----------|------|-----------|---------------|
-| `AI_TreturnRoom` | 499 | Room/return temperature | NTC 10 kΩ B3435 | Automatic dehumidify/cooling requests; alarm gating (PU13). **Raises AL28 if missing.** |
-| `AI_HretRoom` | 505 | Room/return humidity | 0–10 V (0=0 %RH, 10 V=100 %RH) or 4–20 mA | Automatic dehumidify request. **Raises AL34 if missing.** |
-| `AI_Toutdoor` | 500 | Outdoor temperature | NTC 10 kΩ B3435, outdoor-rated IP65+ | Only used by Free-Cooling/Free-Heating (PG03). Display-only if PG03 = 0. |
-| `AI_Texhaust` | 502 | Exhaust air temperature | NTC 10 kΩ B3435 | Display/monitoring only — no control logic. |
-| `AI_Tdischarge` | 503 | Discharge (supply) air temperature | NTC 10 kΩ B3435 | Display/monitoring only — no control logic. |
-| `AI_AirQuality` | 506 | Air quality | 0–10 V or 4–20 mA IAQ sensor | Display/monitoring; can trigger ventilation boost if wired. |
-
-The room temperature and humidity probes can alternatively be provided by the
-**CNU2 wired display unit**, which has built-in T and H sensors. See §14.3.
+### 14.2 (merged into 14.1)
 
 ### 14.3 Probe source — HA00 parameter (register 1803)
 
-Parameter **HA00** (holding register 1803, R/W) tells the controller which
-source to use for room temperature and humidity. The unit ignores readings from
-unconfigured inputs; it raises AL28/AL34 when the configured source is absent.
+Parameter **HA00** tells the controller which source to use for room
+temperature and humidity (handbook §5.3, §6.7).
 
 | HA00 value | Meaning | Room T source | Room H source |
 |-----------|---------|---------------|---------------|
-| `0` | None / external probes | AI2 (M2) if wired with code 45 | AI3 (M3) if wired with code 53/54 |
-| `1` | CNU display, T only | CNU built-in NTC | — |
-| `2` | CNU display, T + H | CNU built-in NTC | CNU built-in humidity |
+| `0` | None / external probes | AI2 (M2) if allocated with code 45 | AI3 (M3) if allocated with code 53/54 |
+| `1` | CNU display (Evj), T only | CNU built-in NTC | — |
+| `2` | CNU display (Evj), T + H | CNU built-in NTC | CNU built-in humidity |
 | `3` | EPJ display, T only | EPJ built-in NTC | — |
 | `4` | EPJ display, T + H | EPJ built-in NTC | EPJ built-in humidity |
-| `5` | CNU2 display, T only | CNU2 built-in NTC | — |
-| `6` | CNU2 display, T + H **(factory default)** | CNU2 built-in NTC | CNU2 built-in humidity |
+| `5` | CNU2 display (Epj Graph), T only | CNU2 built-in NTC | — (AI3 probe possible) |
+| `6` | CNU2 display (Epj Graph), T + H **(factory default)** | CNU2 built-in NTC | CNU2 built-in humidity |
 
-> **Headless setup (no display, no external probes):** set HA00 = 0 **and**
-> PH01 (1777) = 0 ("display not present"). Without this the unit stays OFF by
-> display and waits for room T/H from a display that is not there (AL28/AL34
-> may follow). The handbook (§5.1 and the commissioning checklist) gives the
-> same pair: with CNU2 `PH01 = 1, HA00 = 6`; without CNU2 `PH01 = 0, HA00 = 0`.
-> The HA integration does this itself unless the `has_display` option is set:
-> it re-asserts PH01 = 0 and HA00 = 0 on every poll, like the BMS enables.
-> Both are also exposed (`switch.enable_onoff_display`, `select.probe_source`),
-> but in headless mode a manual change is undone on the next poll.
+Required pairs (handbook §5.1, §8.1): with CNU2 `PH01 = 1, HA00 = 6`; without
+CNU2 `PH01 = 0, HA00 = 0`. A real unit without a display shipped with
+`HA00 = 2`.
 
-### 14.4 Probe fault detection — packed alarm registers
+### 14.4 Probe fault bits
 
-Probe faults are reported in the packed alarm bitmap registers. Bits are
-**set** when the alarm is active (probe absent or faulty):
+| Alarm | Register | Addr DEC | Bit |
+|-------|----------|----------|-----|
+| AL28 — room temperature probe fault | `PackedAlarm_2` | 769 | 11 |
+| AL34 — room humidity probe fault | `PackedAlarm_3` | 770 | 1 |
 
-| Alarm | Register | Addr DEC | Bit | What it blocks |
-|-------|----------|----------|-----|----------------|
-| AL28 — room temp probe fault | `PackedAlarm_2` | 769 | 11 | Automatic integration (cooling/heating) request; PU13 minimum-temp interlock |
-| AL34 — room humidity probe fault | `PackedAlarm_3` | 770 | 1 | Automatic dehumidify request |
+### 14.5 / 14.6 (moved)
 
-The HA integration decodes these bits into two binary sensors:
-
-* `temp_probe_ok` — **ON** = room temperature probe is healthy (AL28 not active)
-* `humidity_probe_ok` — **ON** = room humidity probe is healthy (AL34 not active)
-
-When either sensor reads OFF, the climate entity suppresses the corresponding
-`current_temperature` / `current_humidity` attribute (reports `None`) so the
-HA UI does not show a stale or garbage value.
-
-### 14.5 What each probe controls (summary)
-
-| Probe | Control purpose | Display only if… |
-|-------|----------------|-----------------|
-| Room temperature (499) | Triggers auto cooling (SEtC/SEtH) and auto dehumidify (PU13 guard) | HA00 = 0 with no probe wired |
-| Room humidity (505) | Triggers auto dehumidify (PU01 setpoint) | HA00 = 0 with no probe wired |
-| Evaporator temp (511) | Compressor modulation (PU11 target 6 °C) | Never — always controls |
-| Water temp (501) | AL03 / AL04 protection; gates cooling/heating | Never — always controls |
-| Outdoor temp (500) | Free-Cooling / Free-Heating damper control | PG03 = 0 (default) |
-| Exhaust temp (502) | — | Always display only |
-| Discharge temp (503) | — | Always display only |
-
-### 14.6 Running without any display or external probes
-
-The unit can be driven **entirely via Modbus** (from Home Assistant) without a
-display or any room sensors. In this mode:
-
-1. Set **HA00 = 0** (`probe_source` select → "None / external probes") and
-   **PH01 = 0** (disable display). The HA integration writes both itself when
-   `has_display` is off (the default).
-2. The HA integration auto-sets **PH02/PH27/PH28** = 1 on every connection,
-   so on/off, dehumidify and cooling are controllable immediately.
-3. Automatic setpoint-based control (trigger dehumidify when room humidity >
-   PU01) does **not** function — there is no room sensor to compare against.
-   Issue dehumidify / cooling requests **explicitly via Modbus** (the climate
-   entity or individual switches). A unit that is merely switched on does
-   nothing: the climate entity shows it as *Off* with action *Idle*, and offers
-   no *Auto*.
-4. `current_temperature` and `current_humidity` on the climate entity read
-   `None`. An unwired input does not read 0: it reads a sentinel word
-   (§14.7), which the integration decodes to "no value" (entity state
-   `unknown`). The `temp_probe_ok` / `humidity_probe_ok` binary sensors depend
-   on AL28/AL34, which were **not** raised on a real headless unit while it was
-   OFF by display, so do not rely on them alone. This is expected, not an error.
-5. The evaporator and water-circuit probes remain active (factory-wired) and
-   continue to protect the unit against AL03/AL04/AL11/AL12.
-
-**Request sources (handbook §6.1, §6.3).** The unit ORs them; any one starts
-the request:
-
-| Request | Automatic (room probe or display) | Digital input | Modbus |
-|---|---|---|---|
-| DEU | room humidity > PU01 + PU07, off below PU01; held off below PU13 (re-enabled above PU13 + PU14); in winter only if PU02 allows it | DEU input | 1140 with PH28 = 1 |
-| INT | summer: room temp > SEtC + PF12, off below SEtC − PF12; winter: room temp < SEtH − PF12 (SEtH capped by PH10, factory 14 °C) | INT input | 1139 with PH27 = 1 |
-
-An INT request in summer also requests DEU when PU05 is on. The effective DEU
-request is readable (`DehumRequest`, 1121); the INT one is not. Over Modbus the
-automatic requests can only be stopped by switching the unit off.
+What each probe controls and how a unit without display or probes behaves:
+[UNIT_BEHAVIOUR §8](UNIT_BEHAVIOUR.md#8-display-and-probe-configurations).
+Request sources (automatic, digital input, Modbus):
+[UNIT_BEHAVIOUR §3.3](UNIT_BEHAVIOUR.md#33-requests-deu-and-int).
 
 ### 14.7 Unwired analog inputs read a sentinel, not a temperature
 
@@ -623,61 +379,53 @@ PH01 = 1): `AI_TreturnRoom` (499), `AI_Toutdoor` (500), `AI_Texhaust` (502),
 that is **-3276.4 °C** (and -32764 %RH), which is never a real reading. The
 factory-wired `AI_Twater` (501) and `AI_Tevaporation` (511) read normally.
 
-This sentinel is empirical, not in the manufacturer tables. The integration
-treats any INT16 word in `0x7FF0..0x800F` (`PROBE_SENTINEL_LOW/HIGH` in
-`const.py`) as "no value". Real readings cannot collide: that window is
-±3276 °C. Negative temperatures are fine (-1.0 °C = `0xFFF6`).
+This sentinel is empirical, not in the manufacturer tables. A window of
+`0x7FF0..0x800F` covers both observed words and cannot collide with a real
+reading (±3276 °C). Negative temperatures are fine (-1.0 °C = `0xFFF6`). What a
+wired but broken probe reads is not known yet.
 
 ---
 
-## 15. Control parameters used by the HA integration
+## 15. Control parameters worth reading
 
 Extracted from `HRDS+_Modbus_RTU_RS485_DE.pdf` §6 (FULL MODBUS REGISTER LIST).
-These are the parameters an external controller needs in order to reason about
-what the unit will do on its own, rather than fighting it.
+What the unit does with them: [UNIT_BEHAVIOUR §5](UNIT_BEHAVIOUR.md#5-decision-procedure-agent-readable).
 
-| Addr HEX | Addr DEC | Name | R/W | Range | Why it matters |
-|----------|----------|------|-----|-------|----------------|
-| `0x069E` | 1694 | `PU07_Dehumidity_Diff` | R/W | 0-100 %RH | The unit's **own** dehumidify hysteresis: the auto request turns on at `PU01 + PU07` and off at `PU01`. An external controller's hysteresis should not be narrower than this. |
-| `0x0761` | 1889 | `PU13_MinTRoom_disableDEU` | R/W | 0-30.0 °C (×0.1) | **Minimum room temperature below which dehumidification is disabled.** This interlock applies to Modbus requests too, so on a unit with no room probe it can silently block a dehumidify command. |
+| Addr HEX | Addr DEC | Name | R/W | Range | Meaning |
+|----------|----------|------|-----|-------|---------|
+| `0x069E` | 1694 | `PU07_Dehumidity_Diff` | R/W | 0-100 %RH | Automatic DEU request on above `PU01 + PU07`, off below `PU01`. |
+| `0x0761` | 1889 | `PU13_MinTRoom_disableDEU` | R/W | 0-30.0 °C (×0.1) | Room temperature below which dehumidification (and the compressor) is disabled. |
 | `0x0762` | 1890 | `PU14_TRoomDIFF_enableDEU` | R/W | 0.1-20.0 °C (×0.1) | Differential above `PU13` at which dehumidification is re-enabled. |
-| `0x0666` | 1638 | `PF01_MinTimeOnFan` | R/W | 0-999 s | **Device-side minimum fan runtime.** The fan stays on for this long even if the request clears, so the unit already provides anti-short-cycling. |
-| `0x0668` | 1640 | `PF03_MinTimePostFan` | R/W | 0-999 s | Post-ventilation run-on after the compressor stops (`0` disables it). |
-| `0x0707` | 1799 | `PG03_EnableFreeCoolingHeating` | R/W | `0=No`, `1=Yes` | Enables the Free-Cooling/Free-Heating function. **While this is `0` (the factory default), `AI_Toutdoor` (500) drives nothing** - it is display-only. |
+| `0x0666` | 1638 | `PF01_MinTimeOnFan` | R/W | 0-999 s | Minimum fan run time. |
+| `0x0668` | 1640 | `PF03_MinTimePostFan` | R/W | 0-999 s | Fan run-on after the compressor stops (`0` disables it). |
+| `0x0707` | 1799 | `PG03_EnableFreeCoolingHeating` | R/W | `0=No`, `1=Yes` | Enables free cooling/heating; only then does `AI_Toutdoor` (500) drive anything. |
 
 > The `PF01`/`PF03` unit is inferred from the parameter's 0-999 range and the
 > technical manual's description ("Mindestlaufzeit" / "Nachlauf"); it is not
 > stated explicitly in the Modbus table. Confirm against the wired display
 > before relying on the absolute value.
 
-### 15.1 What this means for an external controller
+### 15.1 (moved)
 
-* **Minimum runtime is already enforced by the unit** (`PF01`). A controller
-  does not need its own compressor-protection timer, only hysteresis on its
-  *decision* input.
-* **`PU13` can veto a Modbus dehumidify request.** If a request appears to be
-  accepted but the compressor never starts, read `PU13` and the room
-  temperature before looking anywhere else.
-* **`PU07` interacts with an external hysteresis band.** If the controller's
-  band is narrower than `PU07`, the unit's own auto logic decides the edges.
-* **`PG03` decides whether outdoor temperature is a control input.** Leave it
-  at `0` if the central MVHR owns free cooling, as is the case when the HRDS+
-  sits on that system's supply branch.
+The consequences for an external controller (the unit already enforces minimum
+run times, `PU13` can veto a dehumidify request, `PU07` sets the unit's own
+hysteresis) are in [UNIT_BEHAVIOUR §3.3, §9, §10](UNIT_BEHAVIOUR.md#33-requests-deu-and-int).
 
 ---
 
 ## 16. Installer-menu parameters (installer device)
 
 Every handbook parameter (§5.3) that has a Modbus address in the RTU
-manual's parameter table and is not already listed above. The integration
-exposes them on the **installer** child device (`installer_params.py`).
-Scaling was checked against a real unit's raw read-back. "shown R/O"
-means the integration deliberately does not write it (link settings,
-manufacturer I/O allocation, refrigerant, safety bypass, test mode).
-Passwords (`PSd*`), `PH15` (restore defaults) and `PH18` (clear alarm
-history) are not exposed. Addresses above 1900 are not read. The installer
-device is opt-in, and its registers are never part of the regular poll: they
-are read at setup and on the device's refresh button.
+manual's parameter table and is not already listed above. Scaling was checked
+against a real unit's raw read-back. Not listed: passwords (`PSd*`), `PH15`
+(restore defaults), `PH18` (clear alarm history) and addresses above 1900
+(not verified).
+
+The *Access* column mixes two things: `R/W` / `R/O` is the register as the
+Modbus manual defines it; "shown R/O" and "disabled by default" record how the
+Home Assistant integration exposes it (it deliberately never writes link
+settings, I/O allocation, refrigerant, safety bypass and test mode; source of
+truth for that: `custom_components/innova_hrds/installer_params.py`).
 
 | Addr HEX | Addr DEC | Code | Meaning | Scale | Range | Access |
 |----------|----------|------|---------|-------|-------|--------|
@@ -704,7 +452,7 @@ are read at setup and on the device's refresh button.
 | `0x065F` | 1631 | PC05 | Season change (0 manual, 1 manual+auto, 2 auto) | x1 | 0…2  | R/W |
 | `0x0660` | 1632 | PC06 | Auto season probe (0 water, 1 room) | x1 | 0…1  | R/W |
 | `0x0661` | 1633 | PC07 | Max water temperature for dehumidify / summer integration | x0.1 | 0…70 °C | R/W |
-| `0x0662` | 1634 | PC08 | Min water temperature for winter integration (below it AL04 blocks heating; the climate action needs water ≥ PC08 to show Heating; read once at setup) | x0.1 | 0…70 °C | R/W |
+| `0x0662` | 1634 | PC08 | Min water temperature for winter integration (below it AL04 blocks heating) | x0.1 | 0…70 °C | R/W |
 | `0x0663` | 1635 | PC09 | Auto summer above room temperature | x0.1 | 0…70 °C | R/W |
 | `0x0664` | 1636 | PC10 | Auto winter below room temperature | x0.1 | 0…70 °C | R/W |
 | `0x0665` | 1637 | PF26 | Supply fan post-run speed | x0.01 | 0…100 % | R/W |
@@ -834,7 +582,7 @@ are read at setup and on the device's refresh button.
 | `0x06F7` | 1783 | PH07 | Summer setpoint min | x0.1 | -15…70 °C | R/W |
 | `0x06F8` | 1784 | PH08 | Summer setpoint max | x0.1 | -15…70 °C | R/W |
 | `0x06F9` | 1785 | PH09 | Winter setpoint min | x0.1 | -15…70 °C | R/W |
-| `0x06FA` | 1786 | PH10 | Winter setpoint max (factory 14 °C blocks auto heating) | x0.1 | -15…70 °C | R/W |
+| `0x06FA` | 1786 | PH10 | Winter setpoint max (caps SEtH; factory 14 °C, so the unit still heats by itself below 14 °C − PF12) | x0.1 | -15…70 °C | R/W |
 | `0x06FC` | 1788 | PH16 | CAN baud rate code | x1 | 1…4  | shown R/O, disabled by default |
 | `0x06FD` | 1789 | PH17 | CAN node | x1 | 1…127  | shown R/O, disabled by default |
 | `0x06FF` | 1791 | PH19 | Air quality probe min | x1 | 0…9999  | shown R/O, disabled by default |

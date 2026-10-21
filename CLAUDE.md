@@ -70,21 +70,45 @@ not backed by a single register, and are declared directly in `init()`
 * **Scaling:** temperatures/setpoints ×0.1 (`FAKTOR`), fan/percent registers
   ×0.01, humidity ×1.
 
-The full register documentation is in
-[`references/MODBUS_REGISTERS.md`](references/MODBUS_REGISTERS.md), distilled
-from the manufacturer PDFs in `references/`.
+## Where to find what
 
-## Reference material
+Each topic has one home; other files link to it instead of repeating it. Put
+new knowledge in the right file, and do not restate it elsewhere.
+
+| Topic | Home |
+|-------|------|
+| **How the unit behaves** (variants, states and start/stop sequences, summer/winter, display/probe setups, fan, compressor, water circuit, alarm effects, display and Modbus actions, as-delivered vs handbook defaults) and **what was tested on real hardware** (evidence log `T1…`) | [`references/UNIT_BEHAVIOUR.md`](references/UNIT_BEHAVIOUR.md) |
+| **Which registers exist**: addresses, names, encodings, ranges, value meanings, write recipes, installer parameter table (§16) | [`references/MODBUS_REGISTERS.md`](references/MODBUS_REGISTERS.md) |
+| Technical data, fan-speed → airflow estimate, index of the source PDFs | [`references/README.md`](references/README.md) |
+| What the integration does on top of the unit (architecture, guards, entity mapping) | this file |
+| User-facing description of the integration | [`README.md`](README.md) |
+| Open hardware questions and test plans | [`plans/todo.md`](plans/todo.md) |
+| Tests | [`tests/CLAUDE.md`](tests/CLAUDE.md) |
+
+Rules for the references:
+
+* `UNIT_BEHAVIOUR.md` is only about the unit, never the integration, and tags
+  every statement with its evidence: a handbook section `[HB 6.3]`, a Modbus
+  manual page `[MB p.7]`, a forum post `[V#76]` / `[F#79]`, a hardware test
+  `[T7]`, or `[INFERRED]`.
+* When something is checked on real hardware, add a `T` row to its evidence
+  log (date, what was seen, source), replace the `[INFERRED]` tags it settles,
+  and tick the item in `plans/todo.md`.
+* `MODBUS_REGISTERS.md` defines registers and does not describe behaviour.
+  `tests/wiring_check.py` reads its table rows of the form
+  ``| `0xHHHH` | dec | name |``; every `REG` in `const.py` must have one.
+* Factory defaults: the handbook's and the reference unit's differ (PC08, PU13,
+  PS01, PG03, PH07, …); `UNIT_BEHAVIOUR.md` §15 lists both. Say which one you
+  mean.
+
+Source documents (search the `.txt`, check tables in the PDF):
 
 | File | Use for |
 |------|---------|
-| `references/MODBUS_REGISTERS.md` | **Start here.** Register addresses, alarm bit map, alarm code table, cookbook for common operations. |
-| `references/README.md` | Implementation notes: airflow / passive flow / fan-integration / active-cooling distinction; variant detection (30/50, R/non-R, DC); fan-speed-to-airflow formula; probe wiring; alarm interpretation. |
-| `references/HRDS+_Technisches_Handbuch_DE.txt` | Full text of the 87-page German technical handbook (searchable). Firmware parameters (PF27/PF28 fan min %, PG01 fan arrangement, BMS enable, etc.), performance tables, wiring diagrams. |
-| `references/Innova_DEH+_H_Installation_Manual_EN.txt` | Innova DEH+ H installation manual EN — the Italian OEM original of the HRDS+. Alarm table (with effect descriptions), microswitch DIP settings, VMC wiring. |
-| `references/HRDS+_Modbus_RTU_RS485_DE.pdf` | Modbus RTU/RS-485 connection manual — original source of the register table in MODBUS_REGISTERS.md. |
-| `references/HRDS+_Technisches_Handbuch_DE.pdf` | Original German technical handbook PDF (87 pp). |
-| `references/HRDS+_Benutzerhandbuch_DE.pdf` | End-user handbook DE (12 pp). |
+| `references/HRDS+_Technisches_Handbuch_DE.txt` / `.pdf` | Technical handbook (87 pp): operating modes (§2.7), terminals (§4.4–4.5), parameter list with defaults (§5.3), control logic (§6), alarms (§7), technical data (§10). |
+| `references/HRDS+_Modbus_RTU_RS485_DE.pdf` | Modbus manual: source of every register address; enables, season change via HB04, setpoint validity. |
+| `references/HRDS+_Benutzerhandbuch_DE.pdf` | End-user handbook (12 pp); a subset of the technical handbook. |
+| `references/Innova_DEH+_H_Installation_Manual_EN.txt` | OEM original; describes an **older controller** (microswitches, fixed speeds), so only the product line and hardware apply. |
 
 ## Adding or modifying an entity
 
@@ -185,7 +209,8 @@ Classification rules (`_classify` in `const.py`):
   because PU05 (1692, factory on) couples a dehumidify request to it. With
   water below PU08 (factory 10 °C) the unit runs any summer request on cold
   water alone, compressor off (handbook §6.3, the passive path; PU09/PU10 add
-  the compressor later). README "How the unit works" documents the modes.
+  the compressor later). `references/UNIT_BEHAVIOUR.md` §6–7 documents the
+  modes; README "How the unit works" summarises them for users.
 * `_check_request_allowed` runs on every `write_entity_value`: INT is refused
   unless the read-back season (`operating_mode`, 1583) is summer, unless the
   `allow_winter_heating` option is on; with `water_circuit = brine` winter INT
@@ -227,18 +252,13 @@ The product code on the type plate encodes the variant: `HRDS+ 30 H R K DC`.
 | `R` | optional | Has recirculation fan + motorised damper + air filter. **No dedicated register**: detect it from the damper output `outDO_RecircDamper` (1134): `disabled` = no damper (non-R), `off`/`on` = R. `PG01_MachineType` (1797) is **not** this flag — it is the fan arrangement (0 = supply fan only, 1 = supply + exhaust) and reads `0` on an R unit (verified on an HRDS+ 30 R). |
 | `DC` | optional | Has active cooling. `PG02_EnableIntegration` (1798) = `1`. |
 
-**Non-R variant always runs on passive MVHR airflow** — no recirculation fan at all.
-This proves the compressor can operate without the unit's own fan running.
-**The R variant cannot do this with stock settings:** every dehumidification or
-integration request opens the recirculation damper and starts the fan, and writing
-0 to `PM20_SupplyFan_Manual` (1614) does not keep the damper closed. Dehumidifying
-without recirculation needs an unofficial I/O reassignment — see
-`references/MODBUS_REGISTERS.md` §13.5. Compressor self-protects via **AL11**
-(low-pressure / frost-thermostat, reg 768 bit 10) if airflow is insufficient.
-
-Fan minimum speed during DEU/INT is configurable: **PF28** (dehumidify) and **PF27**
-(integration) default 50 % but can be set 0–PF10. The 130 m³/h (30) / 190 m³/h (50)
-figures in the technical data are the tested spec range, **not** a firmware floor.
+How the variants behave (non-R runs on MVHR flow alone; on an R unit every
+request opens the damper and runs the fan, and PM20 = 0 does not prevent it;
+the unofficial I/O workaround; AL11 as the airflow guard) is in
+[`references/UNIT_BEHAVIOUR.md`](references/UNIT_BEHAVIOUR.md) §1 and §9.3.
+The fan minimum during DEU/INT is the device's own PF28/PF27 (factory 50 %,
+settable to 0); the 130 / 190 m³/h in the technical data are the tested spec
+range, **not** a firmware floor.
 
 ## Hub (`HrdsModbusHub` in `__init__.py`)
 
@@ -343,7 +363,7 @@ the divergence between the two is the diagnostic.
 across the active mode's min/max band* (PF28/PF10 dehumidify, PF27/PF09
 integration, PF07 VMC), so a request of 30 at the factory 50–85 % band could
 produce ≈60 % output, and 0 would not stop the fan. Unconfirmed on hardware —
-see `references/MODBUS_REGISTERS.md` §6.1 and `plans/todo.md`.
+see `references/UNIT_BEHAVIOUR.md` §9.1 and `plans/todo.md`.
 
 **The per-mode minimum is device state.** All three minima are writable
 registers exposed as `number` entities. The integration must not carry its own

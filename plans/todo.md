@@ -1,11 +1,12 @@
 # TODO — verify against real hardware
 
-The register map, scaling and behaviour in this integration were distilled from
-the manufacturer PDFs in [`references/`](../references/), **not** validated on a
-physical unit. This file collects every assumption, caveat and open question
-that needs to be confirmed against a real HRDS+ / DEH+ before the integration
-can be considered "tested". Tick items off (and fix the code/docs) as they are
-verified on hardware.
+Most of the register map, scaling and unit behaviour was distilled from the
+manufacturer PDFs in [`references/`](../references/). What has been seen on the
+real unit so far is recorded in the evidence log of
+[`references/UNIT_BEHAVIOUR.md` §13](../references/UNIT_BEHAVIOUR.md#13-evidence-log-what-was-seen-on-real-hardware).
+This file collects the assumptions and open questions that still need a real
+HRDS+ / DEH+. When an item is verified: tick it here, add a `T` row to that
+evidence log, replace the `[INFERRED]` tags it settles, and fix the code/docs.
 
 ## Scaling & data types
 
@@ -154,7 +155,7 @@ opened to 0/100.
       compressor dehumidifies and cools with MVHR passive flow only, by design.
       **On the `R` variant the stock controller does not allow it:** the damper
       opens and the fan starts on every dehumidification/integration request,
-      regardless of PM20 (`references/MODBUS_REGISTERS.md` §13.5). A user
+      regardless of PM20 (`references/UNIT_BEHAVIOUR.md` §9.3). A user
       reports the fan would not go below 30 %, and an unofficial I/O
       reassignment as the only way around it.
 - [ ] **Rescale or clamp? (R variant only) — the key fan question.** The technical
@@ -190,7 +191,7 @@ opened to 0/100.
 
 ## Fan = 0 during dehumidification, and keeping the damper closed (Modbus only)
 
-Background: `references/MODBUS_REGISTERS.md` §13.5. On the `R` variant the
+Background: `references/UNIT_BEHAVIOUR.md` §9.3. On the `R` variant the
 handbook couples dehumidification to recirculation (§2.7, §6.2, §6.5), and the
 vendor confirms it in the energiesparhaus.at HRDS+ thread. Everything below is
 **untested on hardware** and **expected not to work**, unless noted otherwise.
@@ -279,13 +280,15 @@ option is recommended.
 
 - [x] **Exhaust air temp (502)** and **evaporator temp (511)** — now exposed as
       sensors.
-- [ ] **Alarm detail**: only the cumulative `alarm_active` (1103) is exposed.
-      The per-bit alarm bitmaps `PackedAlarm_1/2/3` (768/769/770) and the
-      `BMS_ALxx` reset registers are not decoded into entities yet.
-- [ ] **Season / operating-mode change**: only the R/O feedback (1583) is
-      exposed. Writing the season via `DI4_Configuration` (1825, only 3/4 valid)
-      and the `PriorityChangeMode` (1878) ownership flag are not implemented.
-- [ ] **Manual fan request / remote request** (1114 / 1116, R/O) are not exposed.
+- [ ] **Alarm detail**: AL03, AL04, AL11, AL12, AL16, AL22 and the probe
+      alarms AL28/AL34 are exposed as binary sensors. Other alarm bits and the
+      `BMS_ALxx` reset registers (785/786/791) are not.
+- [x] **Season change**: `select.season` writes `DI4_Configuration` (1825,
+      3/4 only); `PriorityChangeMode` (1878) is shown read-only. (Whether the
+      write switches the season on hardware is under *Installer device /
+      season / water circuit* below.)
+- [ ] **Remote fan request** (1116, R/O) is not exposed; the display's manual
+      request (1114) is (`sensor.fan_manual_request`).
 - [x] Recirculation damper status (1134) — now exposed as `sensor.recirculation_damper`.
 
 ## Setup check / operation gate (added 2026-10-19)
@@ -351,3 +354,32 @@ none of them has been seen on the real unit yet.
       of the newest release tag for `categories`). Alternative if it should not
       wait: add it now and strip the key from the CI checkout in `hassfest.yaml`
       and the `hassfest` job of `release.yaml` until then.
+
+## Unit behaviour marked `[INFERRED]` in UNIT_BEHAVIOUR.md (added 2026-10-21)
+
+Open points found while writing
+[`references/UNIT_BEHAVIOUR.md`](../references/UNIT_BEHAVIOUR.md). The
+handbook is silent or contradicts itself on these.
+
+- [ ] **K4 / 1124 meaning.** The reference unit reads 1124 = 1 and
+      `Packed_DO1` bits 12–13 = 1 in standby; the Modbus manual labels those
+      bits `0 = Integration, 1 = Dehumidify`. Hypothesis: 1 = open (reheat)
+      position. Read both while cooling (INT, compressor on): expect 0.
+      (Same test as the condenser valve item under *Climate entity behaviour*.)
+- [ ] **Anti-stagnation while OFF.** Do V3V + PM still pulse every Pb08 hours
+      with the unit OFF (handbook §4.5 "independent of operation") or only
+      while ON (§2.7, and §3.8.7 recommends OFF on brine)? Watch 1126 over a
+      Pb08 interval (reference unit: 60 h) with the unit OFF.
+- [ ] **PU02 "with water" / "without water".** What changes between 1 and 2
+      (does V3V/PM open)? And does PU02 = 0 also block a Modbus or DI
+      dehumidify request in winter, or only the automatic one?
+- [ ] **Automatic season with the water probe** (PC05 = 2, PC06 = 0): which
+      thresholds decide? Not described in the handbook.
+- [ ] **Non-`R` unit read-back.** Does `outDO_RecircDamper` (1134) read
+      `2 = Disable` on a unit without recirculation, and what do the fan
+      registers read?
+- [ ] **Other units' product code** (FC 43): does an HRDS+ 50 or a non-`R`
+      unit also report `EPB9…`? (Also listed under *Headless operation*.)
+- [ ] **As-delivered settings.** The reference unit shipped with values that
+      differ from the handbook defaults (`UNIT_BEHAVIOUR.md` §15). A second
+      unit's dump would show whether these are the distributor's presets.
