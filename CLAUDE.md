@@ -77,9 +77,9 @@ new knowledge in the right file, and do not restate it elsewhere.
 
 | Topic | Home |
 |-------|------|
-| **How the unit behaves** (variants, states and start/stop sequences, summer/winter, display/probe setups, fan, compressor, water circuit, alarm effects, display and Modbus actions, as-delivered vs handbook defaults) and **what was tested on real hardware** (evidence log `T1…`) | [`references/UNIT_BEHAVIOUR.md`](references/UNIT_BEHAVIOUR.md) |
-| **Which registers exist**: addresses, names, encodings, ranges, value meanings, write recipes, installer parameter table (§16) | [`references/MODBUS_REGISTERS.md`](references/MODBUS_REGISTERS.md) |
-| Technical data, fan-speed → airflow estimate, index of the source PDFs | [`references/README.md`](references/README.md) |
+| **How the unit behaves** (variants, states and start/stop sequences, summer/winter, display/probe setups, fan, compressor, water circuit, alarm effects, display and Modbus actions, as-delivered vs handbook defaults) and **what was tested on real hardware** (evidence log `T1…`) | [`doc/references/UNIT_BEHAVIOUR.md`](doc/references/UNIT_BEHAVIOUR.md) |
+| **Which registers exist**: addresses, names, encodings, ranges, value meanings, write recipes, installer parameter table (§16) | [`doc/references/MODBUS_REGISTERS.md`](doc/references/MODBUS_REGISTERS.md) |
+| Technical data, fan-speed → airflow estimate, index of the source PDFs | [`doc/references/README.md`](doc/references/README.md) |
 | What the integration does on top of the unit (architecture, guards, entity mapping) | this file |
 | User-facing description of the integration | [`README.md`](README.md) |
 | Open hardware questions and test plans | [`plans/todo.md`](plans/todo.md) |
@@ -105,10 +105,10 @@ Source documents (search the `.txt`, check tables in the PDF):
 
 | File | Use for |
 |------|---------|
-| `references/HRDS+_Technisches_Handbuch_DE.txt` / `.pdf` | Technical handbook (87 pp): operating modes (§2.7), terminals (§4.4–4.5), parameter list with defaults (§5.3), control logic (§6), alarms (§7), technical data (§10). |
-| `references/HRDS+_Modbus_RTU_RS485_DE.pdf` | Modbus manual: source of every register address; enables, season change via HB04, setpoint validity. |
-| `references/HRDS+_Benutzerhandbuch_DE.pdf` | End-user handbook (12 pp); a subset of the technical handbook. |
-| `references/Innova_DEH+_H_Installation_Manual_EN.txt` | OEM original; describes an **older controller** (microswitches, fixed speeds), so only the product line and hardware apply. |
+| `doc/references/HRDS+_Technisches_Handbuch_DE.txt` / `.pdf` | Technical handbook (87 pp): operating modes (§2.7), terminals (§4.4–4.5), parameter list with defaults (§5.3), control logic (§6), alarms (§7), technical data (§10). |
+| `doc/references/HRDS+_Modbus_RTU_RS485_DE.pdf` | Modbus manual: source of every register address; enables, season change via HB04, setpoint validity. |
+| `doc/references/HRDS+_Benutzerhandbuch_DE.pdf` | End-user handbook (12 pp); a subset of the technical handbook. |
+| `doc/references/Innova_DEH+_H_Installation_Manual_EN.txt` | OEM original; describes an **older controller** (microswitches, fixed speeds), so only the product line and hardware apply. |
 
 ## Adding or modifying an entity
 
@@ -214,7 +214,7 @@ Classification rules (`_classify` in `const.py`):
   because PU05 (1692, factory on) couples a dehumidify request to it. With
   water below PU08 (factory 10 °C) the unit runs any summer request on cold
   water alone, compressor off (handbook §6.3, the passive path; PU09/PU10 add
-  the compressor later). `references/UNIT_BEHAVIOUR.md` §6–7 documents the
+  the compressor later). `doc/references/UNIT_BEHAVIOUR.md` §6–7 documents the
   modes; README "How the unit works" summarises them for users.
 * `_check_request_allowed` runs on every `write_entity_value`: INT is refused
   unless the read-back season (`operating_mode`, 1583) is summer, unless the
@@ -274,7 +274,7 @@ The product code on the type plate encodes the variant: `HRDS+ 30 H R K DC`.
 How the variants behave (non-R runs on MVHR flow alone; on an R unit every
 request opens the damper and runs the fan, and PM20 = 0 does not prevent it;
 the unofficial I/O workaround; AL11 as the airflow guard) is in
-[`references/UNIT_BEHAVIOUR.md`](references/UNIT_BEHAVIOUR.md) §1 and §9.3.
+[`doc/references/UNIT_BEHAVIOUR.md`](doc/references/UNIT_BEHAVIOUR.md) §1 and §9.3.
 The fan minimum during DEU/INT is the device's own PF28/PF27 (factory 50 %,
 settable to 0); the 130 / 190 m³/h in the technical data are the tested spec
 range, **not** a firmware floor.
@@ -397,7 +397,7 @@ the divergence between the two is the diagnostic.
 across the active mode's min/max band* (PF28/PF10 dehumidify, PF27/PF09
 integration, PF07 VMC), so a request of 30 at the factory 50–85 % band could
 produce ≈60 % output, and 0 would not stop the fan. Unconfirmed on hardware —
-see `references/UNIT_BEHAVIOUR.md` §9.1 and `plans/todo.md`.
+see `doc/references/UNIT_BEHAVIOUR.md` §9.1 and `plans/todo.md`.
 
 **The per-mode minimum is device state.** All three minima are writable
 registers exposed as `number` entities. The integration must not carry its own
@@ -492,6 +492,6 @@ sizes.
 `tests/wiring_check.py` runs without Home Assistant installed: it stubs the HA
 API, imports `const.py`, and asserts that every entity is classified, every
 declared platform has a module, every entity has `en`/`de` translations, every
-register is documented in `references/MODBUS_REGISTERS.md`, and no input block
+register is documented in `doc/references/MODBUS_REGISTERS.md`, and no input block
 spans a holding address. It is not a substitute for real tests, but it catches
 the failures this integration has actually had.

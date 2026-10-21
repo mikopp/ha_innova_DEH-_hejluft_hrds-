@@ -2,7 +2,7 @@
 
 The register image starts from a real-device dump (:mod:`tests.sim.seeds`).
 On top of it the model implements the behaviour documented in
-``references/UNIT_BEHAVIOUR.md`` (registers: ``references/MODBUS_REGISTERS.md``)
+``doc/references/UNIT_BEHAVIOUR.md`` (registers: ``doc/references/MODBUS_REGISTERS.md``)
 that the integration depends on:
 
 * writes to on/off, dehumidify and integration are acknowledged but ignored

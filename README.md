@@ -99,8 +99,8 @@ The integration talks to the unit's control board via Modbus TCP and exposes:
 
 How the unit itself behaves (all variants, seasons, display/probe setups, with
 sources and what has been tested on hardware) is in
-[`references/UNIT_BEHAVIOUR.md`](references/UNIT_BEHAVIOUR.md); the registers
-are in [`references/MODBUS_REGISTERS.md`](references/MODBUS_REGISTERS.md).
+[`doc/references/UNIT_BEHAVIOUR.md`](doc/references/UNIT_BEHAVIOUR.md); the registers
+are in [`doc/references/MODBUS_REGISTERS.md`](doc/references/MODBUS_REGISTERS.md).
 
 ## Install and set up
 
@@ -338,7 +338,7 @@ These values feed the live `sensor.supply_fan_airflow` calculation (proportional
 
 A short summary for using the integration. The complete description of the
 unit, with handbook references and what has been seen on real hardware, is
-[`references/UNIT_BEHAVIOUR.md`](references/UNIT_BEHAVIOUR.md).
+[`doc/references/UNIT_BEHAVIOUR.md`](doc/references/UNIT_BEHAVIOUR.md).
 
 ### What is inside
 
@@ -352,7 +352,7 @@ the unit to your water circuit: a heat pump's surface heating/cooling circuit,
 the brine of a ground-source heat pump, or a separate ground loop. `R` units
 add a recirculation fan and damper, which run with **every** request (see
 [Fan mode and recirculation](#fan-mode-and-recirculation)). Details:
-[UNIT_BEHAVIOUR §2](references/UNIT_BEHAVIOUR.md#2-hardware-air-path-water-path-terminals).
+[UNIT_BEHAVIOUR §2](doc/references/UNIT_BEHAVIOUR.md#2-hardware-air-path-water-path-terminals).
 
 ### Two requests
 
@@ -383,7 +383,7 @@ INT presumably cools with the water only; **not tested on a real unit**, leave
 PU05 on unless you want to try this.
 
 Sources and the remaining combinations:
-[UNIT_BEHAVIOUR §6](references/UNIT_BEHAVIOUR.md#6-summer-operation).
+[UNIT_BEHAVIOUR §6](doc/references/UNIT_BEHAVIOUR.md#6-summer-operation).
 
 ### Operating modes in winter
 
@@ -456,7 +456,7 @@ heating, the integration guards it:
 * *Allow winter heating* governs only what Home Assistant requests. The unit
   can heat by itself below SEtH − PF12 (about 13.5 °C with the factory PH10 cap and
   PF12), see below and
-  [UNIT_BEHAVIOUR §3.3](references/UNIT_BEHAVIOUR.md#33-requests-deu-and-int).
+  [UNIT_BEHAVIOUR §3.3](doc/references/UNIT_BEHAVIOUR.md#33-requests-deu-and-int).
 * Not something software controls: in OFF/standby the internal water valve is
   open. If warm water circulates through the unit, it warms the ventilation air
   passing through - unless an external valve on V3V closes the circuit.
@@ -610,7 +610,7 @@ external probes to be present, otherwise the unit ignores them.
 
 Use the per-mode fan minimum/maximum `number` entities to choose how hard the
 fan runs. Sources, vendor statements and the workaround:
-[UNIT_BEHAVIOUR §9](references/UNIT_BEHAVIOUR.md#9-fan).
+[UNIT_BEHAVIOUR §9](doc/references/UNIT_BEHAVIOUR.md#9-fan).
 
 ### Drying with the fan on, but active cooling off
 
@@ -651,9 +651,9 @@ This is an open-loop estimate — it assumes constant duct resistance, so loaded
 filters or restrictive ducts will make the real flow lower than estimated. If
 you can measure actual flow, adjust `airflow_max_m3h` in Options to calibrate.
 The derivation and a two-point calibration recipe are in
-[`references/README.md` — Translating fan speed to airflow](references/README.md#translating-fan-speed--rpm-to-airflow-mh),
+[`doc/references/README.md` — Translating fan speed to airflow](doc/references/README.md#translating-fan-speed--rpm-to-airflow-mh),
 with the underlying spec data in
-[Technical data](references/README.md#technical-data-airflow-capacity-power).
+[Technical data](doc/references/README.md#technical-data-airflow-capacity-power).
 
 ### Commanded vs actual fan speed
 
@@ -674,7 +674,7 @@ The integration therefore keeps the two apart:
 If you want a commanded percentage to mean an absolute percentage, set the
 active mode's minimum to `0` and its maximum to `100` — both are writable
 numbers. Whether PM20 really follows the band is **not yet confirmed on
-hardware**; see [UNIT_BEHAVIOUR §9.1](references/UNIT_BEHAVIOUR.md#91-bands-and-sources)
+hardware**; see [UNIT_BEHAVIOUR §9.1](doc/references/UNIT_BEHAVIOUR.md#91-bands-and-sources)
 and [`plans/todo.md`](plans/todo.md).
 
 ## Entity reference
@@ -683,7 +683,7 @@ Entities marked **¹** are only meaningful when a room temperature probe is
 present (CNU2 display or external NTC). Entities marked **²** require a room
 humidity probe. Entities marked **³** are built into the unit's control board
 and are always available. See [probe requirements](#probe-requirements) below
-and [UNIT_BEHAVIOUR §8](references/UNIT_BEHAVIOUR.md#8-display-and-probe-configurations)
+and [UNIT_BEHAVIOUR §8](doc/references/UNIT_BEHAVIOUR.md#8-display-and-probe-configurations)
 for full detail.
 
 ### Climate
@@ -722,7 +722,7 @@ device (see the banner at the top).
 | `sensor.recirculation_damper` | enum | ³ Built-in | Reg 1134; Off/On/Disabled — state of the motorised recirculation damper (R-variant only) |
 | `sensor.supply_fan_airflow` | m³/h | ³ Built-in | Computed from live fan output %; see [Airflow sensors](#airflow-sensors) |
 | `sensor.water_valve_pump` | enum | ³ Built-in | Diagnostic. Reg 1126; relay K5 — external water valve (V3V) and the pump output (PM) switched with it: Off / On / Not configured |
-| `sensor.water_condenser_valve` | enum | ³ Built-in | Diagnostic. Reg 1124; relay K4, the internal valve. A real unit reads On in standby, against the handbook's description, so its meaning is unverified ([UNIT_BEHAVIOUR §11.1](references/UNIT_BEHAVIOUR.md#111-internal-valve-relay-k4)); the climate action does not use it |
+| `sensor.water_condenser_valve` | enum | ³ Built-in | Diagnostic. Reg 1124; relay K4, the internal valve. A real unit reads On in standby, against the handbook's description, so its meaning is unverified ([UNIT_BEHAVIOUR §11.1](doc/references/UNIT_BEHAVIOUR.md#111-internal-valve-relay-k4)); the climate action does not use it |
 | `sensor.water_check` | enum | — | Diagnostic. `ok` / `attention`; attribute `issues`, see [Water circuit](#water-circuit-and-brine) |
 | `sensor.supply_fan_max_airflow` | m³/h | — | Computed constant; maximum fan airflow (from config) |
 | `sensor.max_total_airflow` | m³/h | — | Computed constant; same as supply_fan_max_airflow (from config) |
@@ -871,7 +871,7 @@ without the installer device.)
   **disabled by default**; enable them in the entity settings if needed.
 * Never exposed: passwords, PH15 *restore factory defaults*, PH18 *clear alarm
   history*. The full list with addresses and scaling is in
-  [`references/MODBUS_REGISTERS.md` §16](references/MODBUS_REGISTERS.md).
+  [`doc/references/MODBUS_REGISTERS.md` §16](doc/references/MODBUS_REGISTERS.md).
 
 ## Probe requirements
 
@@ -897,9 +897,9 @@ temperatures keep working. (The `temp_probe_ok` / `humidity_probe_ok` sensors
 follow alarms AL28/AL34, which a headless unit did not necessarily raise, so
 judge by the sensors above rather than by those two.)
 
-See [UNIT_BEHAVIOUR §8](references/UNIT_BEHAVIOUR.md#8-display-and-probe-configurations)
+See [UNIT_BEHAVIOUR §8](doc/references/UNIT_BEHAVIOUR.md#8-display-and-probe-configurations)
 for what each display/probe configuration does, and
-[`references/MODBUS_REGISTERS.md` §14](references/MODBUS_REGISTERS.md#14-probes-inputs-and-probe-source)
+[`doc/references/MODBUS_REGISTERS.md` §14](doc/references/MODBUS_REGISTERS.md#14-probes-inputs-and-probe-source)
 for the inputs, probe types and HA00 values.
 
 ## Requirements
@@ -966,4 +966,4 @@ size/variant). Until then the 0.x releases keep the beta label above.
 
 Architecture closely follows the
 [`ha_comfoconnectpro`](https://github.com/hstrohmaier/ha_comfoconnectpro)
-integration. Documentation © Innova / hej.luft (see `references/`).
+integration. Documentation © Innova / hej.luft (see `doc/references/`).

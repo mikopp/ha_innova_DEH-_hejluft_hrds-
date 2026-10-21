@@ -14,8 +14,8 @@ it.
 | **How the unit behaves**: variants, states, start/stop sequences, summer/winter, display/probe configurations, fan, compressor, water circuit, alarm effects, display and Modbus actions, what was tested on real hardware | [`UNIT_BEHAVIOUR.md`](UNIT_BEHAVIOUR.md) |
 | **Which registers exist**: addresses, names, encodings, ranges, value meanings, write recipes | [`MODBUS_REGISTERS.md`](MODBUS_REGISTERS.md) |
 | Technical data (airflow, capacity, power) and the fan-speed → airflow estimate | this file, below |
-| What the Home Assistant integration does on top of the unit | [`../CLAUDE.md`](../CLAUDE.md) (agents), [`../README.md`](../README.md) (users) |
-| Open hardware questions and test plans | [`../plans/todo.md`](../plans/todo.md) |
+| What the Home Assistant integration does on top of the unit | [`../../CLAUDE.md`](../../CLAUDE.md) (agents), [`../../README.md`](../../README.md) (users) |
+| Open hardware questions and test plans | [`../../plans/todo.md`](../../plans/todo.md) |
 
 ## Source documents
 

@@ -1,9 +1,9 @@
 # TODO — verify against real hardware
 
 Most of the register map, scaling and unit behaviour was distilled from the
-manufacturer PDFs in [`references/`](../references/). What has been seen on the
+manufacturer PDFs in [`doc/references/`](../doc/references/). What has been seen on the
 real unit so far is recorded in the evidence log of
-[`references/UNIT_BEHAVIOUR.md` §13](../references/UNIT_BEHAVIOUR.md#13-evidence-log-what-was-seen-on-real-hardware).
+[`doc/references/UNIT_BEHAVIOUR.md` §13](../doc/references/UNIT_BEHAVIOUR.md#13-evidence-log-what-was-seen-on-real-hardware).
 This file collects the assumptions and open questions that still need a real
 HRDS+ / DEH+. When an item is verified: tick it here, add a `T` row to that
 evidence log, replace the `[INFERRED]` tags it settles, and fix the code/docs.
@@ -155,7 +155,7 @@ opened to 0/100.
       compressor dehumidifies and cools with MVHR passive flow only, by design.
       **On the `R` variant the stock controller does not allow it:** the damper
       opens and the fan starts on every dehumidification/integration request,
-      regardless of PM20 (`references/UNIT_BEHAVIOUR.md` §9.3). A user
+      regardless of PM20 (`doc/references/UNIT_BEHAVIOUR.md` §9.3). A user
       reports the fan would not go below 30 %, and an unofficial I/O
       reassignment as the only way around it.
 - [ ] **Rescale or clamp? (R variant only) — the key fan question.** The technical
@@ -191,7 +191,7 @@ opened to 0/100.
 
 ## Fan = 0 during dehumidification, and keeping the damper closed (Modbus only)
 
-Background: `references/UNIT_BEHAVIOUR.md` §9.3. On the `R` variant the
+Background: `doc/references/UNIT_BEHAVIOUR.md` §9.3. On the `R` variant the
 handbook couples dehumidification to recirculation (§2.7, §6.2, §6.5), and the
 vendor confirms it in the energiesparhaus.at HRDS+ thread. Everything below is
 **untested on hardware** and **expected not to work**, unless noted otherwise.
@@ -358,7 +358,7 @@ none of them has been seen on the real unit yet.
 ## Unit behaviour marked `[INFERRED]` in UNIT_BEHAVIOUR.md (added 2026-10-21)
 
 Open points found while writing
-[`references/UNIT_BEHAVIOUR.md`](../references/UNIT_BEHAVIOUR.md). The
+[`doc/references/UNIT_BEHAVIOUR.md`](../doc/references/UNIT_BEHAVIOUR.md). The
 handbook is silent or contradicts itself on these.
 
 - [ ] **K4 / 1124 meaning.** The reference unit reads 1124 = 1 and

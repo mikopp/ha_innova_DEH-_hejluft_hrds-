@@ -8,7 +8,7 @@ Scope rules:
 
 * **Only the unit.** Nothing here describes what the Home Assistant
   integration does on top (guards, entities, defaults it writes). That is in
-  [`../CLAUDE.md`](../CLAUDE.md) (for agents) and [`../README.md`](../README.md)
+  [`../../CLAUDE.md`](../../CLAUDE.md) (for agents) and [`../../README.md`](../../README.md)
   (for users).
 * **Registers are named, not defined.** Which registers exist, their
   addresses, encodings, ranges and enum values are only in
@@ -28,7 +28,7 @@ Scope rules:
 | `[V#76]` | Statement by the vendor side (user Murphy08) in the energiesparhaus.at HRDS+ forum thread, post number. |
 | `[F#79]` | Field report by another user in the same thread (not verified here). |
 | `[T7]` | **Tested**: seen on the reference unit by the repository owner. Each `T` number is an entry in the [evidence log](#13-evidence-log-what-was-seen-on-real-hardware) with date and source. |
-| `[INFERRED]` | **Not backed by a source or a test.** Our reading or extrapolation. Open checks are in [`../plans/todo.md`](../plans/todo.md). |
+| `[INFERRED]` | **Not backed by a source or a test.** Our reading or extrapolation. Open checks are in [`../../plans/todo.md`](../../plans/todo.md). |
 
 When two sources disagree, both are given and the conflict is marked.
 
@@ -652,7 +652,7 @@ Codes, bit positions and reset registers:
 
 Reference unit: **HRDS+ 30 `R` `DC`**, headless (no display, no external
 probes), RS-485→TCP gateway, behind a Zehnder ComfoAir Q350. "Dump" means
-[`tests/devices/hrds_30+_headless_factory_state.json`](../tests/devices/hrds_30+_headless_factory_state.json)
+[`tests/devices/hrds_30+_headless_factory_state.json`](../../tests/devices/hrds_30+_headless_factory_state.json)
 (read-only diagnostic, taken before the integration wrote anything).
 
 | # | Date | What | Source |
@@ -663,7 +663,7 @@ probes), RS-485→TCP gateway, behind a Zehnder ComfoAir Q350. "Dump" means
 | T4 | 2026-10 | No alarm bits set (768/769/770 = 0, `OR_Alarms` = 0) while OFF by display with no probes | dump |
 | T5 | 2026-10 | `R` unit: `PG01 = 0`; damper output 1134 = 0 (off); fan status OFF; compressor status OFF; 1112 = 0; K5 (1126) = 0; **K4 (1124) = 1** and `Packed_DO1` bits 12–13 = 1 in standby | dump |
 | T6 | 2026-10 | Season: `HB04 = 4`, `ModeStatus` = Summer DI, `Mode_OperatingMode` = summer, `PC05 = 0` | dump |
-| T7 | 2026-10-20 | `PH01 = 0`, `HA00 = 0`, `PH02 = 1` and a power cycle: still `off_by_display`. First Modbus ON → `on` at once | [`plans/todo.md`](../plans/todo.md), PR #31 |
+| T7 | 2026-10-20 | `PH01 = 0`, `HA00 = 0`, `PH02 = 1` and a power cycle: still `off_by_display`. First Modbus ON → `on` at once | [`plans/todo.md`](../../plans/todo.md), PR #31 |
 | T8 | 2026-10-21 | OFF written to `Status_OnOff_byBMS`: register read ON for several polls; register and `sm_UnitStatus` changed together at one later poll | PR #32 |
 | T9 | 2026-10-20 | Through the RS-485→TCP gateway a 120-register read got no reply at all; 10-register reads covered the whole map | PR #28 |
 | T10 | 2026-10 | Installation context: HRDS+ 30 behind a Zehnder ComfoAir Q350 | PR #14 |
@@ -672,7 +672,7 @@ Not yet observed on hardware (everything else in this file): a running DEU or
 INT cycle with recorded fan/damper/compressor/valve read-backs, the passive
 cold-water path, winter operation, `HB04` season writes, `PM20` vs fan output,
 any display or probe configuration, the HRDS+ 50 and non-`R` units. The test
-plans are in [`plans/todo.md`](../plans/todo.md). When a test is done, add a
+plans are in [`plans/todo.md`](../../plans/todo.md). When a test is done, add a
 `T` row here and replace the `[INFERRED]` tag where it applies.
 
 Third-party field reports (energiesparhaus.at HRDS+ thread):
