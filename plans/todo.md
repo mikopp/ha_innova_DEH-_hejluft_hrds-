@@ -49,11 +49,11 @@ verified on hardware.
 ## BMS enables
 
 - [ ] **PH02 (1778) / PH27 (1869) / PH28 (1870) must be set before writes are
-      honoured.** Confirm `_sync_bms_enables_locked()` actually unlocks on/off,
-      dehumidify and cooling. The hub now re-asserts these every poll from the
-      read-back, so a power-cycle that clears them should self-heal within one
-      scan interval — verify that it does, by power-cycling the unit and then
-      issuing a write.
+      honoured.** They are the user's switches now (the integration never
+      writes them). Confirm on hardware that with one off the unit ignores
+      the matching request register, that it keeps a request written while
+      the enable was off, and that a power cycle keeps the enables and the
+      requests (1105/1139/1140).
 - [ ] Confirm an **OFF command always wins** over an ON from any source
       (display/DI/Modbus), per the manual.
 - [ ] **`PU13_MinTRoom_disableDEU` (1889) can veto a Modbus dehumidify request.**

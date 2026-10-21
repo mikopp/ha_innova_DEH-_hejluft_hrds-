@@ -290,6 +290,15 @@ class Entry:
         self.entity_ids.clear()
 
     def allow_operation(self, allowed: bool = True) -> None:
+        """Full control: the Modbus enables (the user's setup step), the gate."""
+        if allowed:
+            for key in (
+                "enable_onoff_bms",
+                "enable_dehumidify_bms",
+                "enable_integration_bms",
+            ):
+                self.service("switch", "turn_on", key)
+                self.assert_state(key, "on", timeout=10)
         self.service(
             "switch", "turn_on" if allowed else "turn_off", "operation_allowed"
         )
@@ -349,9 +358,9 @@ def _reset(entry: Entry) -> None:
     except ServiceError:
         pass
     entry.sim.call("/reset")
-    # Two polls: one reads the factory state, the next re-asserts settings.
+    # The next poll asserts the headless settings (the enables are the user's).
     entry.sim.wait_for(
-        lambda s: s["holding"]["1778"] == 1, what="BMS enable re-asserted"
+        lambda s: s["holding"]["1777"] == 0, what="headless settings asserted"
     )
     entry.assert_state("unit_status", lambda s: s["state"] in ("off_by_bms", "on"))
     entry.sim.call("/clear_writes")

@@ -29,9 +29,6 @@ from tests.sim import registers as R
 from .conftest import CLIMATE, Clock, Setup, add_entry, allow_operation, set_hvac_mode
 
 REQUIRED_SETTINGS = {
-    R.PH02_ONOFF_BMS,
-    R.PH27_INT_BMS,
-    R.PH28_DEU_BMS,
     R.PH01_ONOFF_DISPLAY,
     R.HA00_PROBE_SOURCE,
 }
@@ -112,26 +109,22 @@ async def test_restart_keeps_season_and_fan_setpoint(hass, setup, clock):
     assert s.state("select", "season").state == "winter"
 
 
-# ---- 4. a unit that lost its settings gets them back -------------------------
+# ---- 4. a unit power cycle loses nothing ----------------------------------------
 async def test_restart_together_with_a_unit_power_cycle(hass, setup, clock):
     s = setup
     await allow_operation(s)
     await hass.config_entries.async_unload(s.entry.entry_id)
     await hass.async_block_till_done()
     s.device.power_cycle()
-    assert s.device.input[R.UNIT_STATUS] == 0  # back to off_by_display
     s.device.clear_write_log()
 
     await hass.config_entries.async_setup(s.entry.entry_id)
     await hass.async_block_till_done()
 
-    # Only what the power cycle dropped (PH27/PH28 are 1 from factory).
-    assert {w.address for w in s.device.write_log} == REQUIRED_SETTINGS - {
-        R.PH27_INT_BMS,
-        R.PH28_DEU_BMS,
-    }
+    # The unit kept every setting: nothing to write, control works at once.
+    assert s.device.write_log == []
+    assert s.state("switch", "enable_onoff_bms").state == "on"
     assert s.state("sensor", "unit_status").state == "off_by_bms"
-    await allow_operation(s)
     await set_hvac_mode(s, clock, "dry")
     assert s.state("climate", CLIMATE).attributes["hvac_action"] == "drying"
 
@@ -221,6 +214,7 @@ async def test_gate_stored_before_it_had_an_owner_is_closed(hass, sim):
 
 
 async def test_restored_gate_allows_requests_straight_away(hass, sim, clock):
+    sim.device.holding[R.PH02_ONOFF_BMS] = 1  # set up earlier, kept by the unit
     s = await add_entry(hass, sim)
     entity_id = s.entity_id("switch", "operation_allowed")
     assert await hass.config_entries.async_unload(s.entry.entry_id)

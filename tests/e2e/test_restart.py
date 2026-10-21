@@ -164,18 +164,13 @@ def test_ha_booting_before_the_unit_is_reachable(hl, restart_ha):
 
 @pytest.mark.needs_real_ha("persistence")
 def test_restart_together_with_a_unit_power_cycle(hl, restart_ha):
-    """Contract 4: a unit that lost its settings gets them back."""
+    """Contract 4: a unit power cycle loses nothing, so nothing is rewritten."""
+    hl.allow_operation()
+    hl.sim.call("/clear_writes")
     _booted(hl, restart_ha, while_down=lambda: hl.sim.call("/power_cycle"))
 
-    hl.sim.wait_for(
-        lambda s: (
-            s["holding"]["1778"] == 1
-            and s["holding"]["1777"] == 0
-            and s["holding"]["1803"] == 0
-        ),
-        what="required settings restored",
-    )
     hl.assert_state("unit_status", "off_by_bms")
-    hl.allow_operation()
+    hl.assert_state("enable_onoff_bms", "on")
+    assert hl.sim.writes() == []
     hl.service("climate", "set_hvac_mode", CLIMATE, hvac_mode="dry")
     hl.assert_state(CLIMATE, "dry", {"hvac_action": "drying"})

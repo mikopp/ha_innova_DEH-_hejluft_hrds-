@@ -41,30 +41,41 @@ not backed by a single register, and are declared directly in `init()`
   pymodbus' retry can pick up a late answer and fake a working link), the hub
   halves the cap for its lifetime (`_shrink_blocks`); a dead link fails the
   poll instead.
-* **"by BMS" enables are mandatory.** Writes are ignored unless PH02/PH27/PH28
-  are set: PH02 gates on/off, PH28 gates the DEU request, PH27 gates the INT
-  request (key `enable_integration_bms`; it is not a cooling mode). PG02 (1798) is
-  a different thing, an installer setting saying the unit has INT at all, and is
-  only shown read-only (`integration_available`). `_sync_required_settings_locked` checks them **every poll**, against
-  that same poll's read-back rather than a one-shot flag, so a device
-  power-cycle that clears them self-heals. It writes only a setting that reads
-  back wrong (never one that was not read), then reads the poll again; one the
-  unit does not keep is given up after `REQUIRED_SETTING_MAX_WRITES` (3) polls
-  in a row until it reads back right or the entry reloads. They are also exposed
-  as switches — and because the hub re-asserts them, turning one off by hand is
-  undone by the refresh after the write.
+* **"by BMS" enables are the user's.** The unit acts on a Modbus request only
+  while its enable is on (handbook 6.1): PH02 gates on/off, PH28 the DEU
+  request, PH27 the INT request (key `enable_integration_bms`; it is not a
+  cooling mode). `MODBUS_ENABLE_FOR` maps each request to its enable. The
+  integration **never writes them on its own** (not at setup, not on a poll):
+  they are ordinary switches on the setup device, and with one off the
+  integration only observes that function. `hub.modbus_enabled(key)` /
+  `hub.request_active(key)` (register on *and* its enable on) are what the
+  derived state uses, since the unit ignores a request register whose enable
+  is off; `check_write_allowed` refuses a write to a disabled request
+  (`MODBUS_DISABLED_MESSAGES`), and turning on an enable while its request is
+  latched is checked as a start of that request. The enables are
+  `PENDING_KEYS`, so what may be requested follows them at once. PG02 (1798)
+  is a different thing, an installer setting saying the unit has INT at all,
+  and is only shown read-only (`integration_available`).
+* **The unit keeps its settings across a power cycle** (manual: data kept on a
+  power failure; a real unit kept PH01/HA00/PH02). Nothing needs re-asserting
+  after one; the sim's `power_cycle` keeps every register.
 * **EEPROM: write only what changes.** The unit's parameters are in EEPROM,
   which wears with every write. Nothing in the integration writes periodically:
   `_write_registers` reads the register first and skips a write the unit
   already holds (except for a `PENDING_KEYS` request whose read-back may still
-  lag the last command), and the required-settings sync above is capped. Never
-  add a periodic or unconditional write.
+  lag the last command), and the headless sync below is capped. Never add a
+  periodic or unconditional write.
 * **Headless by default (`has_display` option, default off).** With no CNU2
   display the unit must have **PH01 (1777) = 0** and **HA00 (1803) = 0**, else
   it sits in `off_by_display` forever (an OFF from any source beats a Modbus ON)
   and waits for room T/H from a display that is not there. In headless mode the
-  same `_sync_required_settings_locked` asserts both (`HEADLESS_SETTINGS` in
-  `const.py`). With `has_display` on, they are left alone.
+  `_sync_required_settings_locked` asserts both (`HEADLESS_SETTINGS` in
+  `const.py`), the only settings the integration writes by itself. It checks
+  them every poll against that poll's read-back, writes only one that reads
+  wrong (never one that was not read), then reads the poll again; one the unit
+  does not keep is given up after `REQUIRED_SETTING_MAX_WRITES` (3) polls in a
+  row until it reads back right or the entry reloads. With `has_display` on,
+  they are left alone.
 * **Device identity is verified before anything is written** (`identity.py`,
   called from `async_setup_entry` and from the config/options flow). FC 43/14
   must report vendor `EVCO` and a product code starting `EPB9` (a real unit
@@ -300,9 +311,10 @@ figures in the technical data are the tested spec range, **not** a firmware floo
   the commanded value in `hub.data` after the write (`_pending`), re-reads just
   that register at `PENDING_RECHECK_SECONDS` (`_async_verify_pending`, never a
   full cycle) and drops the entry as soon as the read-back agrees; after the last
-  re-read the unit's value stands and a warning is logged. The BMS enables are
-  deliberately not pending (the hub re-asserts them from the read-back), and
-  neither are fan and climate, which stay actual-only (see below).
+  re-read the unit's value stands and a warning is logged. The Modbus enables
+  are pending too (`BMS_ENABLE_KEYS`): the climate modes and the write checks
+  follow them at once. Fan and climate are not: they stay actual-only (see
+  below).
 * Entity callbacks register via `hub.async_add_my_modbus_sensor(callback)`.
 
 ## Climate entity mapping
@@ -320,8 +332,12 @@ figures in the technical data are the tested spec range, **not** a firmware floo
   `dehumidify_request` (1121) on from another source → DRY; else FAN_ONLY
   ("Standby": on, but nothing can make it act). OFF only ever means the unit
   is off, so it never contradicts `switch.unit_on_off`. An INT request that
-  cannot act never decides the mode. FAN_ONLY is offered only while
-  `auto_capable` is false (otherwise "on, nothing requested" is AUTO).
+  cannot act never decides the mode, nor does a request register whose
+  Modbus enable is off (`hub.request_active`, `hub.unit_running`). FAN_ONLY is
+  offered only while `auto_capable` is false (otherwise "on, nothing
+  requested" is AUTO). The enables trim the offered modes: no DRY without
+  PH28, no COOL/HEAT without PH27, and without PH02 only the modes on the
+  side of on/off the unit is on; the current mode is always listed.
 * Season for the climate logic and the request guards is `hub.active_season`:
   the prefix of `mode_status` (1110), falling back to `operating_mode` (1583,
   which reads `auto` under PC05). Unknown counts as not summer in the guards.
@@ -348,7 +364,9 @@ figures in the technical data are the tested spec range, **not** a firmware floo
   requests and turn the unit on. OFF clears both requests and always turns
   the unit off: that alone stops the unit's own logic, digital-input requests
   and a manual fan. `turn_on` = AUTO if `auto_capable` else FAN_ONLY;
-  `turn_off` = OFF.
+  `turn_off` = OFF. `_usable` drops the writes a disabled enable makes
+  pointless (clearing an ignored request, switching a unit to the side it is
+  on, Cool's extra DEU); what remains for a disabled enable is refused.
 * Auto mode is tested only against the derived `display_cnu2` overlay, never on
   a real display unit; the README banner says so.
 * `target_humidity` ← `humidity_setpoint`; `target_temperature` ←

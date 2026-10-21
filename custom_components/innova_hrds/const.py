@@ -628,7 +628,7 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "REG": 1778,
         "DT": C_DT_UINT16,
         "SWITCH": {"off": 0, "on": 1},
-        "NAME": "Enable on/off via Modbus",
+        "NAME": "Enable on/off via Modbus (PH02)",
     },
     C_ENABLE_DEHUM_BMS: {
         "RT": C_REG_TYPE_HOLDING_REGISTERS,
@@ -1085,32 +1085,35 @@ SWITCH_HINTS: Dict[str, tuple[str, str]] = {
         "aktiv ist.",
     ),
     C_ENABLE_ONOFF_BMS: (
-        "Leave ON. The unit ignores on/off from Home Assistant without it; the "
-        "integration sets it again on every poll.",
-        "AN lassen. Ohne diese Freigabe ignoriert das Gerät Ein/Aus aus Home "
-        "Assistant; die Integration setzt sie bei jeder Abfrage erneut.",
+        "Turn ON to switch the unit on and off from Home Assistant (climate Off, "
+        "turn on/off, 'Unit on/off (Modbus)'). OFF: Home Assistant only shows "
+        "whether the unit runs; its own controls switch it.",
+        "AN, um das Gerät aus Home Assistant ein- und auszuschalten (Klima Aus, "
+        "Ein/Aus, 'Gerät ein/aus (Modbus)'). AUS: Home Assistant zeigt nur an, "
+        "ob das Gerät läuft; es wird über seine eigenen Bedienelemente geschaltet.",
     ),
     C_ENABLE_DEHUM_BMS: (
-        "Leave ON. The unit ignores the dehumidify (DEU) request without it; the "
-        "integration sets it again on every poll.",
-        "AN lassen. Ohne diese Freigabe ignoriert das Gerät die Entfeuchtungs-"
-        "anforderung (DEU); die Integration setzt sie bei jeder Abfrage erneut.",
+        "Turn ON to request dehumidifying from Home Assistant (climate Dry, "
+        "'Dehumidify (Modbus)'). OFF: the unit ignores that request; Home Assistant only "
+        "shows what the unit does.",
+        "AN, um die Entfeuchtung aus Home Assistant anzufordern (Klima Entfeuchten, "
+        "'Entfeuchtung (Modbus)'). AUS: das Gerät ignoriert diese Anforderung; Home "
+        "Assistant zeigt nur an, was das Gerät tut.",
     ),
     C_ENABLE_INT_BMS: (
-        "Leave ON. The unit ignores the integration (INT) request without it; the "
-        "integration sets it again on every poll.",
-        "AN lassen. Ohne diese Freigabe ignoriert das Gerät die Integrations-"
-        "anforderung (INT); die Integration setzt sie bei jeder Abfrage erneut.",
+        "Turn ON to request integration from Home Assistant: cooling in summer, "
+        "heating in winter (climate Cool/Heat, 'Integration request'). OFF: the "
+        "unit ignores that request; Home Assistant only shows what the unit does.",
+        "AN, um die Integration aus Home Assistant anzufordern: Kühlen im Sommer, "
+        "Heizen im Winter (Klima Kühlen/Heizen, 'Integrationsanforderung'). AUS: "
+        "das Gerät ignoriert diese Anforderung; Home Assistant zeigt nur an, was "
+        "das Gerät tut.",
     ),
 }
 
 # What to do about each setup issue slug (Setup check `issues`), shown as the
 # `to_fix` attribute: {slug: (English, German)}.
 SETUP_ISSUE_TEXTS: Dict[str, tuple[str, str]] = {
-    "modbus_enables_pending": (
-        "Modbus enables not set yet (PH02/PH27/PH28): written on the next poll",
-        "Modbus-Freigaben noch nicht gesetzt (PH02/PH27/PH28): werden bei der nächsten Abfrage geschrieben",
-    ),
     "headless_settings_pending": (
         "Settings for running without a display not set yet (PH01, HA00): written on the next poll",
         "Einstellungen für Betrieb ohne Display noch nicht gesetzt (PH01, HA00): werden bei der nächsten Abfrage geschrieben",
@@ -1121,13 +1124,14 @@ SETUP_ISSUE_TEXTS: Dict[str, tuple[str, str]] = {
     ),
     "unit_waiting_for_first_on": (
         "The unit still shows 'off by display' although no display is used: it "
-        "keeps that stored OFF until the first Modbus ON. Turn on 'Allow "
-        "operational requests', then switch on 'Unit on/off (Modbus)' once on the "
-        "main device",
+        "keeps that stored OFF until the first Modbus ON. Turn on 'Enable on/off "
+        "via Modbus (PH02)' and 'Allow operational requests', then switch on "
+        "'Unit on/off (Modbus)' once on the main device",
         "Das Gerät zeigt noch 'Aus durch Display', obwohl kein Display genutzt "
         "wird: es behält dieses gespeicherte AUS bis zum ersten Modbus-EIN. "
-        "'Betriebsanforderungen erlauben' einschalten, dann auf dem Hauptgerät "
-        "einmal 'Gerät ein/aus (Modbus)' einschalten",
+        "'Ein/Aus über Modbus freigeben (PH02)' und 'Betriebsanforderungen "
+        "erlauben' einschalten, dann auf dem Hauptgerät einmal 'Gerät ein/aus "
+        "(Modbus)' einschalten",
     ),
     "unit_off_by_scheduler": (
         "Unit held off by a time program: turn off 'Time programs enabled' (PH03)",
@@ -1187,13 +1191,37 @@ SETUP_ISSUE_TEXTS: Dict[str, tuple[str, str]] = {
     ),
 }
 
-# Registers written (in order) when the integration is set up, to make sure
-# Modbus control is actually permitted by the unit.
-BMS_ENABLE_KEYS = (C_ENABLE_ONOFF_BMS, C_ENABLE_DEHUM_BMS, C_ENABLE_INT_BMS)
+# The unit acts on a Modbus request only while its "by BMS" enable is on
+# (PH02 on/off, PH28 dehumidify, PH27 integration; handbook 6.1). The enables
+# are the user's: the integration never writes them by itself. With one off,
+# Home Assistant refuses that operation and only observes it.
+MODBUS_ENABLE_FOR: Dict[str, str] = {
+    C_UNIT_ON_OFF: C_ENABLE_ONOFF_BMS,
+    C_DEHUMIDIFY: C_ENABLE_DEHUM_BMS,
+    C_INTEGRATION_REQUEST: C_ENABLE_INT_BMS,
+}
+BMS_ENABLE_KEYS = tuple(MODBUS_ENABLE_FOR.values())
+MODBUS_DISABLED_MESSAGES: Dict[str, str] = {
+    C_UNIT_ON_OFF: (
+        "Switching the unit on or off over Modbus is disabled on the unit "
+        "(PH02). Turn on 'Enable on/off via Modbus (PH02)' on the setup device "
+        "to switch it from Home Assistant."
+    ),
+    C_DEHUMIDIFY: (
+        "The dehumidify request over Modbus is disabled on the unit (PH28). "
+        "Turn on 'Enable dehumidify (DEU) via Modbus (PH28)' on the setup "
+        "device to request it from Home Assistant."
+    ),
+    C_INTEGRATION_REQUEST: (
+        "The integration request (cool in summer, heat in winter) over Modbus "
+        "is disabled on the unit (PH27). Turn on 'Enable integration (INT) via "
+        "Modbus (PH27)' on the setup device to request it from Home Assistant."
+    ),
+}
 
 # Settings that must hold when no CNU2 display is fitted: {key: (decoded, raw)}.
 # Without them the unit sits OFF-by-display and expects room T/H from a display
-# that is not there (handbook section 5.1). Asserted like the BMS enables.
+# that is not there (handbook section 5.1). Re-asserted by the hub.
 HEADLESS_SETTINGS: Dict[str, tuple[str, int]] = {
     C_ENABLE_ONOFF_DISPLAY: ("off", 0),
     C_PROBE_SOURCE: ("none_or_external", 0),
@@ -1369,8 +1397,9 @@ OPERATIONAL_KEYS = (C_UNIT_ON_OFF, C_DEHUMIDIFY, C_INTEGRATION_REQUEST, C_FAN_MA
 # so after a write the hub shows the command until the read-back agrees, and
 # re-reads just that register at these offsets (seconds after the write). The
 # last one is the cap: a request still unconfirmed then shows the unit's value.
+# The Modbus enables are here too: what may be requested follows them at once.
 # The fan setpoint is not here: fan and climate report what the unit does.
-PENDING_KEYS = (C_UNIT_ON_OFF, C_DEHUMIDIFY, C_INTEGRATION_REQUEST)
+PENDING_KEYS = (C_UNIT_ON_OFF, C_DEHUMIDIFY, C_INTEGRATION_REQUEST, *BMS_ENABLE_KEYS)
 PENDING_RECHECK_SECONDS = (3, 6, 12, 25)
 # A required setting the unit does not keep is written this many polls in a
 # row, then left alone (the setup check keeps reporting it). The unit's

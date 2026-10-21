@@ -508,7 +508,7 @@
         "name": "Ein/Aus über Display freigeben (PH01)"
       },
       "enable_onoff_bms": {
-        "name": "Ein/Aus über Modbus freigeben"
+        "name": "Ein/Aus über Modbus freigeben (PH02)"
       },
       "enable_dehumidify_bms": {
         "name": "Entfeuchtung (DEU) über Modbus freigeben (PH28)"

@@ -305,8 +305,10 @@ outdoor temp `500`, water temp `501`, supply/discharge temp `503`.
   120-register read at all, while 10-register reads covered the whole map.
   The integration reads at most 10 per request and halves that if a block
   goes unanswered while a single register answers promptly.
-* **Enables are mandatory.** The integration should set PH02/PH27/PH28 on setup
-  (or expose them), or writes will silently no-op.
+* **Enables are mandatory.** Without PH02/PH27/PH28 the matching Modbus
+  writes silently no-op. The integration exposes them as switches and leaves
+  them to the user (it never writes them by itself); with one off it refuses
+  that operation and only observes it.
 * **Fan/percent registers use ×0.01 scaling**; temps/setpoints ×0.1; humidity ×1.
 * See `references/HRDS+_Modbus_RTU_RS485_DE.pdf` §6 "FULL MODBUS REGISTER LIST"
   for the complete ~250-register table (schedulers, probe calibration, alarm
@@ -585,14 +587,15 @@ display or any room sensors. In this mode:
 1. Set **HA00 = 0** (`probe_source` select → "None / external probes") and
    **PH01 = 0** (disable display). The HA integration writes both itself when
    `has_display` is off (the default).
-2. The HA integration auto-sets **PH02/PH27/PH28** = 1 on every connection,
-   so on/off, dehumidify and cooling are controllable immediately.
+2. Turn on **PH02/PH27/PH28** (the *Enable … via Modbus* switches on the setup
+   device) for the functions Home Assistant should control. The integration
+   never sets them by itself.
 3. Automatic setpoint-based control (trigger dehumidify when room humidity >
    PU01) does **not** function — there is no room sensor to compare against.
    Issue dehumidify / cooling requests **explicitly via Modbus** (the climate
    entity or individual switches). A unit that is merely switched on does
-   nothing: the climate entity shows it as *Off* with action *Idle*, and offers
-   no *Auto*.
+   nothing: the climate entity shows it as *Standby* with action *Idle*, and
+   offers no *Auto*.
 4. `current_temperature` and `current_humidity` on the climate entity read
    `None`. An unwired input does not read 0: it reads a sentinel word
    (§14.7), which the integration decodes to "no value" (entity state

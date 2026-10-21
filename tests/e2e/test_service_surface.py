@@ -17,11 +17,15 @@ DEU_REQUEST = 1140
 
 
 def test_gate_refusal_is_a_service_validation_error(hl):
+    # The user's Modbus enable is on (Dry is offered), the gate still closed.
+    hl.service("switch", "turn_on", "enable_onoff_bms")
+    hl.assert_state("enable_onoff_bms", "on", timeout=10)
     with pytest.raises(ServiceError) as err:
         hl.service("climate", "set_hvac_mode", CLIMATE, hvac_mode="dry")
     assert err.value.code == "service_validation_error"
     assert "Operational requests are not allowed" in err.value.message
-    assert all(value == 0 for _address, value in hl.sim.writes())
+    # Nothing was requested or switched (1105 on/off, 1139 INT, 1140 DEU).
+    assert not {address for address, _value in hl.sim.writes()} & {1105, 1139, 1140}
 
 
 def test_dry_cycle_through_the_service_api(hl):

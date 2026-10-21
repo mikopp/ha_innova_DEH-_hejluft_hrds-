@@ -508,7 +508,7 @@
         "name": "Enable on/off via display (PH01)"
       },
       "enable_onoff_bms": {
-        "name": "Enable on/off via Modbus"
+        "name": "Enable on/off via Modbus (PH02)"
       },
       "enable_dehumidify_bms": {
         "name": "Enable dehumidify (DEU) via Modbus (PH28)"

@@ -134,7 +134,7 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
         if not hub.has_fan:
             features &= ~ClimateEntityFeature.FAN_MODE
         self._attr_supported_features = features
-        self._attr_hvac_modes = self._modes_for()
+        self._attr_hvac_modes = self._modes_for(None)
         self._attr_hvac_mode = HVACMode.OFF
         self._attr_hvac_action = HVACAction.OFF
         self._attr_min_temp = _SUMMER_MIN_TEMP
@@ -146,16 +146,19 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
             self._attr_fan_modes = _FAN_MODES
             self._attr_fan_mode = _FAN_OFF
 
-    def _modes_for(self) -> list[HVACMode]:
+    def _modes_for(self, current: HVACMode | None) -> list[HVACMode]:
         hub = self._hub
         season = hub.active_season
         modes = [HVACMode.OFF]
         # On with no request: the unit's own logic can act (Auto), or nothing
         # can and it waits (Standby, shown through HA's fan_only mode).
         modes.append(HVACMode.AUTO if hub.auto_capable else HVACMode.FAN_ONLY)
-        modes.append(HVACMode.DRY)
+        if hub.modbus_enabled(C_DEHUMIDIFY):
+            modes.append(HVACMode.DRY)
         # INT needs the integration function (PG02); unknown counts as present.
-        if hub.data.get(C_INTEGRATION_AVAILABLE) != "off":
+        if hub.data.get(C_INTEGRATION_AVAILABLE) != "off" and hub.modbus_enabled(
+            C_INTEGRATION_REQUEST
+        ):
             if season == "summer":
                 modes.append(HVACMode.COOL)
             # Heat is offered when allowed; a winter INT set elsewhere still
@@ -164,12 +167,18 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
                 hub.allow_winter_heating or hub.int_effect == "heat"
             ):
                 modes.append(HVACMode.HEAT)
+        if not hub.modbus_enabled(C_UNIT_ON_OFF):
+            # Home Assistant cannot switch the unit: only the modes on the
+            # side of on/off the unit is on are reachable.
+            running = hub.unit_running
+            modes = [m for m in modes if (m != HVACMode.OFF) == running]
+        if current is not None and current not in modes:
+            modes.append(current)
         return modes
 
     @callback
     def _on_hub_update(self) -> None:
         data = self._hub.data
-        self._attr_hvac_modes = self._modes_for()
 
         # No reading when the unit reports a probe fault (AL28 / AL34;
         # probe_ok == "off" means the alarm is active) or when the input carries
@@ -222,18 +231,19 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
             self._attr_target_temperature = float(target_temp)
 
         self._attr_hvac_mode = self._derive_mode(data)
+        self._attr_hvac_modes = self._modes_for(self._attr_hvac_mode)
         self._attr_hvac_action = self._derive_action(data)
         if self._hub.has_fan:
             self._attr_fan_mode = self._derive_fan_mode(data)
         self.async_write_ha_state()
 
     def _derive_mode(self, data) -> HVACMode:
-        if data.get(C_UNIT_ON_OFF) != "on" and data.get(C_UNIT_STATUS) != "on":
+        if not self._hub.unit_running:
             return HVACMode.OFF
         effect = self._hub.int_effect
         if effect is not None:
             return HVACMode.HEAT if effect == "heat" else HVACMode.COOL
-        if data.get(C_DEHUMIDIFY) == "on":
+        if self._hub.request_active(C_DEHUMIDIFY):
             return HVACMode.DRY
         if self._hub.auto_capable:
             return HVACMode.AUTO
@@ -286,19 +296,25 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
             # Off is the unit off: that alone stops every request source (its
             # own room logic, digital inputs) and a manually set fan. The
             # requests are cleared too, so switching on starts nothing.
+            requests = self._usable([(C_INTEGRATION_REQUEST, 0), (C_DEHUMIDIFY, 0)])
+            unit_off = self._usable([(C_UNIT_ON_OFF, 0)])
+            for key, raw in requests + unit_off:
+                hub.check_write_allowed(key, raw)
             try:
-                await hub.write_entity_value(C_INTEGRATION_REQUEST, 0)
-                await hub.write_entity_value(C_DEHUMIDIFY, 0)
+                for key, raw in requests:
+                    await hub.write_entity_value(key, raw)
             except HomeAssistantError:
                 # A request may still be latched: switching the unit off is
                 # then the only sure way to stop it. Report the original
                 # failure, not the fallback's (a dead link fails both).
-                try:
-                    await hub.write_entity_value(C_UNIT_ON_OFF, 0)
-                except HomeAssistantError as err:
-                    _LOGGER.warning("Could not switch the unit off either: %s", err)
+                for key, raw in unit_off:
+                    try:
+                        await hub.write_entity_value(key, raw)
+                    except HomeAssistantError as err:
+                        _LOGGER.warning("Could not switch the unit off either: %s", err)
                 raise
-            await hub.write_entity_value(C_UNIT_ON_OFF, 0)
+            for key, raw in unit_off:
+                await hub.write_entity_value(key, raw)
             return
 
         if hvac_mode == HVACMode.AUTO:
@@ -328,11 +344,34 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
         # Requests first, so the unit is never switched on with a refused
         # request. Every write is checked (gate, brine guard, season) before
         # the first one, so a refused mode leaves a running request alone.
-        writes.append((C_UNIT_ON_OFF, 1))
+        writes = self._usable([*writes, (C_UNIT_ON_OFF, 1)])
         for key, raw in writes:
             hub.check_write_allowed(key, raw)
         for key, raw in writes:
             await hub.write_entity_value(key, raw)
+
+    def _usable(self, writes: list[tuple[str, int]]) -> list[tuple[str, int]]:
+        """Drop the writes a disabled Modbus enable makes pointless.
+
+        The unit ignores a request whose enable (PH02/PH27/PH28) is off, so
+        clearing it changes nothing, nor does switching a unit on or off that
+        already is. Cool's dehumidify request only adds to the integration
+        request, which dehumidifies in summer by itself. What remains for a
+        disabled enable is refused by ``check_write_allowed``.
+        """
+        hub = self._hub
+        usable = []
+        for key, raw in writes:
+            if not hub.modbus_enabled(key):
+                if key == C_UNIT_ON_OFF:
+                    if bool(raw) == hub.unit_running:
+                        continue
+                elif not raw or (
+                    key == C_DEHUMIDIFY and (C_INTEGRATION_REQUEST, 1) in writes
+                ):
+                    continue
+            usable.append((key, raw))
+        return usable
 
     async def async_turn_on(self) -> None:
         """Unit on, nothing requested: Standby, or Auto where it regulates."""

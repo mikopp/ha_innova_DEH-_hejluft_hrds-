@@ -10,11 +10,16 @@ from homeassistant.helpers import entity_registry as er
 from custom_components.innova_hrds.const import DOMAIN, PENDING_RECHECK_SECONDS
 from tests.sim import registers as R
 
-from .conftest import CLIMATE, add_entry, allow_operation, set_hvac_mode
+from .conftest import (
+    CLIMATE,
+    add_entry,
+    allow_operation,
+    enable_modbus_control,
+    set_hvac_mode,
+)
 
-# What the factory unit lacks; PH27/PH28 are already 1 and are not written.
+# Only the headless settings: the Modbus enables are the user's.
 SETUP_WRITES = {
-    R.PH02_ONOFF_BMS: 1,
     R.PH01_ONOFF_DISPLAY: 0,
     R.HA00_PROBE_SOURCE: 0,
 }
@@ -30,8 +35,11 @@ async def test_first_connect_writes_required_settings(setup):
     written = {w.address: w.value for w in s.device.write_log}
     assert written == SETUP_WRITES
     assert all(w.accepted for w in s.device.write_log)
-    # The unit left off_by_display and now waits for a Modbus on.
+    # The unit left off_by_display; on/off over Modbus is still the user's to
+    # enable (factory PH02 = 0), so Home Assistant only observes it.
     assert s.state("sensor", "unit_status").state == "off_by_bms"
+    assert s.state("switch", "enable_onoff_bms").state == "off"
+    assert s.state("climate", CLIMATE).attributes["hvac_modes"] == ["off"]
 
 
 async def test_setup_check_lists_real_issues_until_fixed(setup, clock):
@@ -81,51 +89,107 @@ async def test_setpoints_hidden_without_room_probe(setup):
     assert s.state("climate", CLIMATE).attributes["current_temperature"] is None
 
 
-async def test_power_cycle_self_heals(setup, clock):
+async def test_power_cycle_loses_nothing_and_writes_nothing(setup, clock):
     s = setup
+    await allow_operation(s)
+    await clock.settle()
     s.device.clear_write_log()
     s.device.power_cycle()
-    await clock.poll()  # reads the dropped settings, writes them, reads again
-    # Only what the power cycle changed (PH27/PH28 are already 1 from factory).
-    assert {w.address: w.value for w in s.device.write_log} == {
-        R.PH02_ONOFF_BMS: 1,
-        R.PH01_ONOFF_DISPLAY: 0,
-        R.HA00_PROBE_SOURCE: 0,
-    }
-    assert s.device.input[R.UNIT_STATUS] == 2
-    assert "modbus_enables_pending" not in _issues(s)
+    await clock.poll()
+    assert s.device.write_log == []
+    assert s.state("switch", "enable_onoff_bms").state == "on"
+    assert _issues(s) == ["free_cooling_without_outdoor_probe"]
 
 
-async def test_bms_enable_switched_off_by_hand_is_undone(setup, clock):
+async def test_modbus_enable_switched_off_stays_off(setup, clock):
     s = setup
+    await allow_operation(s)
     s.device.clear_write_log()
     await s.service("switch", "turn_off", "enable_onoff_bms")
-    await clock.settle()  # the refresh after the write reads it and undoes it
-    assert [(w.address, w.value) for w in s.device.write_log] == [
-        (R.PH02_ONOFF_BMS, 0),
-        (R.PH02_ONOFF_BMS, 1),
-    ]
-    assert s.device.holding[R.PH02_ONOFF_BMS] == 1
-    assert s.state("switch", "enable_onoff_bms").state == "on"
+    for _ in range(3):
+        await clock.poll()
+    assert [(w.address, w.value) for w in s.device.write_log] == [(R.PH02_ONOFF_BMS, 0)]
+    assert s.state("switch", "enable_onoff_bms").state == "off"
 
 
-async def test_enables_ignored_by_device_are_reported(hass, sim, clock):
-    sim.device.ignore_writes = {R.PH02_ONOFF_BMS}
+async def test_headless_setting_the_unit_does_not_keep(hass, sim, clock):
+    sim.device.ignore_writes = {R.PH01_ONOFF_DISPLAY}
     s = await add_entry(hass, sim)
     for _ in range(6):
         await clock.poll()
-    assert "modbus_enables_pending" in _issues(s)
+    assert "headless_settings_pending" in _issues(s)
     # Its EEPROM is not written every poll: given up after three tries.
-    assert len(s.device.writes_to(R.PH02_ONOFF_BMS)) == 3
+    assert len(s.device.writes_to(R.PH01_ONOFF_DISPLAY)) == 3
     # Once the unit keeps it, a later loss is written again.
     sim.device.ignore_writes = set()
-    s.device.holding[R.PH02_ONOFF_BMS] = 1
+    s.device.holding[R.PH01_ONOFF_DISPLAY] = 0
     await clock.poll()
-    assert "modbus_enables_pending" not in _issues(s)
-    s.device.holding[R.PH02_ONOFF_BMS] = 0
+    assert "headless_settings_pending" not in _issues(s)
+    s.device.holding[R.PH01_ONOFF_DISPLAY] = 1
     await clock.poll()
-    assert len(s.device.writes_to(R.PH02_ONOFF_BMS)) == 4
-    assert s.device.holding[R.PH02_ONOFF_BMS] == 1
+    assert len(s.device.writes_to(R.PH01_ONOFF_DISPLAY)) == 4
+    assert s.device.holding[R.PH01_ONOFF_DISPLAY] == 0
+
+
+# ---- Modbus enables: the user decides what Home Assistant may control ------------
+async def test_dehumidify_enable_off_refuses_dry_and_observes(setup, clock):
+    s = setup
+    await allow_operation(s)
+    await s.service("switch", "turn_off", "enable_dehumidify_bms")
+    await set_hvac_mode(s, clock, "fan_only")
+    assert "dry" not in s.state("climate", CLIMATE).attributes["hvac_modes"]
+    s.device.clear_write_log()
+    with pytest.raises(ServiceValidationError, match="not valid"):
+        await s.service("climate", "set_hvac_mode", CLIMATE, hvac_mode="dry")
+    with pytest.raises(ServiceValidationError, match="PH28"):
+        await s.service("switch", "turn_on", "dehumidify")
+    assert s.device.write_log == []
+    # A dehumidify request from elsewhere (a digital input) is still shown.
+    s.device.force_input(R.DEHUM_REQUEST, 1)
+    await clock.poll()
+    climate = s.state("climate", CLIMATE)
+    assert climate.state == "dry"
+    assert climate.attributes["hvac_action"] == "drying"
+    # Off needs no dehumidify request: it clears the integration request and
+    # switches the unit off.
+    await set_hvac_mode(s, clock, "off")
+    assert s.state("climate", CLIMATE).state == "off"
+
+
+async def test_request_latched_while_disabled_does_not_count(setup, clock):
+    s = setup
+    await allow_operation(s)
+    await s.service("switch", "turn_on", "unit_on_off")
+    await s.service("switch", "turn_off", "enable_dehumidify_bms")
+    await clock.settle()
+    s.device.holding[R.DEU_REQUEST] = 1  # the unit ignores it (PH28 off)
+    await clock.poll()
+    assert s.state("climate", CLIMATE).state == "fan_only"
+    # Enabling it would start that request: it has to pass like a start.
+    await s.service("switch", "turn_off", "operation_allowed")
+    with pytest.raises(ServiceValidationError, match="still on in the unit"):
+        await s.service("switch", "turn_on", "enable_dehumidify_bms")
+    assert s.device.holding[R.PH28_DEU_BMS] == 0
+
+
+async def test_on_off_enable_off_keeps_the_side_the_unit_is_on(setup, clock):
+    s = setup
+    await allow_operation(s)
+    await set_hvac_mode(s, clock, "dry")
+    await s.service("switch", "turn_off", "enable_onoff_bms")
+    # On/off is the unit's own now (display, digital input), and it is on:
+    # Home Assistant can change what it requests, but not switch it off.
+    s.device.force_input(R.UNIT_STATUS, 5)
+    await clock.settle()
+    modes = s.state("climate", CLIMATE).attributes["hvac_modes"]
+    assert "off" not in modes and "dry" in modes and "cool" in modes
+    s.device.clear_write_log()
+    await set_hvac_mode(s, clock, "cool")
+    assert [(w.address, w.value) for w in s.device.write_log] == [(R.INT_REQUEST, 1)]
+    with pytest.raises(ServiceValidationError, match="not valid"):
+        await s.service("climate", "set_hvac_mode", CLIMATE, hvac_mode="off")
+    with pytest.raises(ServiceValidationError, match="PH02"):
+        await s.service("switch", "turn_off", "unit_on_off")
 
 
 async def test_polling_writes_nothing_while_the_unit_keeps_its_settings(setup, clock):
@@ -476,6 +540,7 @@ async def test_summer_int_blocked_by_al03_is_drying(setup, clock):
 async def test_auto_season_follows_mode_status(setup, clock):
     """1583 reads auto while the unit switches season; 1110 says which."""
     s = setup
+    await enable_modbus_control(s)
     s.device.force_input(R.SEASON_READBACK, 2)
     s.device.force_input(R.MODE_STATUS, 3)  # winter_auto
     await clock.poll()

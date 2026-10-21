@@ -110,7 +110,6 @@ class HrdsDevice:
             self._staged: dict[int, list[int]] = {}
             self.forced: dict[int, int] = {}
             self.write_log: list[Write] = []
-            self._factory = {a: self.holding.get(a, 0) for a in R.VOLATILE_SETTINGS}
             self._running_since: Optional[float] = None
             self._auto_dehum = False
             self._auto_int = False
@@ -118,9 +117,15 @@ class HrdsDevice:
             self._recompute()
 
     def power_cycle(self) -> None:
-        """Mains off/on: volatile settings and requests drop to factory values."""
+        """Mains off/on: the unit keeps every setting.
+
+        Its memory keeps data on a power failure (installation manual), and a
+        real unit read PH01 = 0, HA00 = 0, PH02 = 1 unchanged after one. Whether
+        the Modbus requests (1105/1139/1140) survive is unverified; they are
+        kept too.
+        """
         with self._lock:
-            self.holding.update(self._factory)
+            self._staged.clear()
             self._recompute()
 
     # ---- Modbus access -------------------------------------------------------
@@ -412,11 +417,14 @@ class HrdsDevice:
         i[R.UNIT_STATUS] = status
 
         on = status == 5 and not shutdown
-        # Request sources are ORed: Modbus and the unit's own room-probe logic.
-        deu = h.get(R.DEU_REQUEST) == 1 or self._auto_dehumidify(on, summer, alarms)
-        integ = (
-            h.get(R.INT_REQUEST) == 1 or self._auto_integration(on, summer, alarms)
-        ) and h.get(R.PG02_INTEGRATION) == 1
+        # Request sources are ORed: Modbus (only with its PH28/PH27 enable,
+        # handbook 6.1) and the unit's own room-probe logic.
+        modbus_deu = h.get(R.DEU_REQUEST) == 1 and h.get(R.PH28_DEU_BMS) == 1
+        modbus_int = h.get(R.INT_REQUEST) == 1 and h.get(R.PH27_INT_BMS) == 1
+        deu = modbus_deu or self._auto_dehumidify(on, summer, alarms)
+        integ = (modbus_int or self._auto_integration(on, summer, alarms)) and h.get(
+            R.PG02_INTEGRATION
+        ) == 1
         # AL03 disables summer integration, AL04 winter integration (heating).
         if ("AL03" if summer else "AL04") in alarms:
             integ = False

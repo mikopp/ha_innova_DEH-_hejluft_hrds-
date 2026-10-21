@@ -22,11 +22,9 @@ pytestmark = [
 
 async def test_display_settings_left_alone(setup):
     s = setup
-    written = {w.address for w in s.device.write_log}
-    assert R.PH01_ONOFF_DISPLAY not in written
-    assert R.HA00_PROBE_SOURCE not in written
-    # Only the enable the unit lacks: PH27/PH28 are 1 from factory.
-    assert written == {R.PH02_ONOFF_BMS}
+    # With a display nothing is written at all: the Modbus enables are the
+    # user's, and PH01/HA00 belong to the display.
+    assert s.device.write_log == []
     assert s.device.holding[R.PH01_ONOFF_DISPLAY] == 1
     assert s.state("sensor", "setup_check").state == "attention"
     # Free cooling without an outdoor probe, and the display's room

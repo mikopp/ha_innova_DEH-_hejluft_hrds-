@@ -40,10 +40,12 @@ module (sold in Austria by https://www.hejluft.at/ as the **HRDS+**) over **Modb
 >    with the address of your Modbus-TCP gateway.
 > 3. [Check the setup](#3-check-the-setup): open the **HRDS+ setup** device and
 >    make sure **Setup check** reads `ok`.
-> 4. **[Turn on *Allow operational requests*](#4-switch-on-allow-operational-requests).**
->    It is **off after every fresh install**, and until you switch it on the
->    integration refuses to start the unit, dehumidify, cool or run the fan from
->    Home Assistant. Readings and settings work without it.
+> 4. **[Choose what Home Assistant may control](#4-choose-what-home-assistant-may-control).**
+>    Turn on the **Modbus enables** for the functions you want (on/off,
+>    dehumidify, integration), then **Allow operational requests**. Both are
+>    **off after a fresh install** (the unit's on/off enable from factory), and
+>    the integration never turns them on by itself. Without them it monitors:
+>    readings and settings work.
 > 5. Read [How the unit works](#how-the-unit-works) for the operating modes,
 >    including the passive cold-water path, and how to drive them.
 
@@ -164,13 +166,15 @@ and its status registers must make sense. Anything else is refused with
 If the form says *"Cannot reach the unit"*, check the host, the port and the
 Modbus slave ID.
 
-On connection the integration sets the registers the unit needs in order to obey
-Modbus: the "by BMS" enables **PH02/PH27/PH28**, and, unless a display is
-connected, **PH01 = 0** (no on/off from a display; with PH01 = 1 and no display
-the unit stays *Off (display)* and ignores Modbus) and **HA00 = 0** (no display
-sensors). It re-checks them every poll, so a power cycle that resets them heals
-itself, and a manual change to one of them is undone on the next poll. If you
-*do* have a display, tick the option and the integration leaves PH01/HA00 alone.
+Without a display, the integration sets two registers the unit needs in order
+to run at all: **PH01 = 0** (no on/off from a display; with PH01 = 1 and no
+display the unit stays *Off (display)* and ignores Modbus) and **HA00 = 0** (no
+display sensors). It checks them every poll and writes one only when it reads
+wrong (the unit keeps its settings in EEPROM, which wears with every write, and
+across a power cycle); a manual change to one of them is undone. If you *do*
+have a display, tick the option and the integration leaves PH01/HA00 alone.
+Nothing else is written on connection: the Modbus enables **PH02/PH27/PH28**
+are yours (see [step 4](#4-choose-what-home-assistant-may-control)).
 
 ### 3. Check the setup
 
@@ -212,7 +216,7 @@ show attributes, so this sensor is the one place to look.
    |--------|-------|-----|
    | Enable free cooling/heating (PG03) | **Off** unless an outdoor probe is wired | It acts on the outdoor temperature (bypass relay). With no probe there is no valid reading, so the unit may behave unpredictably. Also off when a central ventilation system handles free cooling. |
    | Enable on/off via display (PH01) | **Off** without a CNU2 display | Otherwise the unit stays off waiting for the display. |
-   | Enable on/off, dehumidify (DEU), integration (INT) via Modbus (PH02, PH28, PH27) | **On** | The unit ignores the matching requests without them. The integration checks them on every poll and writes one only when the unit lost it, so switching one off by hand is undone. |
+   | Enable on/off, dehumidify (DEU), integration (INT) via Modbus (PH02, PH28, PH27) | **Your choice** | Each one lets Home Assistant control one function; see [step 4](#4-choose-what-home-assistant-may-control). The integration never changes them. |
 2. **Probe settings** match what is wired. Without a display and without
    probes, *T/H probe source (HA00)* is *None / external probes* and both *T/H
    probe temperature / humidity input* selects are *Unused*; the integration
@@ -234,11 +238,10 @@ show attributes, so this sensor is the one place to look.
 
    | Issue | Meaning and what to do |
    |-------|------------------------|
-   | `modbus_enables_pending` | PH02/PH27/PH28 are not set on the unit yet. The integration writes them on the next poll; if this persists, the unit does not keep the write, and after three tries the integration stops writing it (check the log). |
-   | `headless_settings_pending` | Without a display, PH01 and HA00 must be 0. Same: written on the next poll. |
+   | `headless_settings_pending` | Without a display, PH01 and HA00 must be 0. The integration writes them on the next poll; if this persists, the unit does not keep the write, and after three tries the integration stops writing it (check the log). |
    | `unit_off_by_digital_input` | The remote on/off contact (OFF/OFF terminals, HB03) is open, so the unit is forced off. Close it (the factory bridge) or set HB03 accordingly. |
    | `unit_off_by_scheduler` / `unit_off_by_clock` | A time program or the internal clock holds the unit off. Check PH03 (**Time programs enabled**); switch it off for Modbus-only control. |
-   | `unit_waiting_for_first_on` | Without a display, *Unit status* still reads *off by display* although PH01 is 0: the unit keeps a stored OFF until the first Modbus ON. Turn on *Allow operational requests*, then switch on *Unit on/off (Modbus)* once (main device). |
+   | `unit_waiting_for_first_on` | Without a display, *Unit status* still reads *off by display* although PH01 is 0: the unit keeps a stored OFF until the first Modbus ON. Turn on *Enable on/off via Modbus (PH02)* and *Allow operational requests*, then switch on *Unit on/off (Modbus)* once (main device). |
    | `unit_off_by_display` | Only reported when the display option is ticked: the display has switched the unit off. |
    | `room_temperature_probe_missing` | *T/H probe temperature input* (HA02) says a probe is on AI2, but nothing is wired. The unit will wait for a room temperature. Set `select.ai2_allocation` to *Unused* or wire the probe. |
    | `room_humidity_probe_missing` | Same for *T/H probe humidity input* (`select.ai3_allocation`, HA03) and the humidity probe. |
@@ -265,10 +268,48 @@ show attributes, so this sensor is the one place to look.
    watch `sensor.water_valve_pump` turn *On* with the first request and the
    **Water circuit check** stay `ok` (see [Water circuit](#water-circuit-and-brine)).
 6. When the setup check is `ok`, continue with
-   [step 4](#4-switch-on-allow-operational-requests) and turn on **Allow
-   operational requests**.
+   [step 4](#4-choose-what-home-assistant-may-control) and choose what Home
+   Assistant may control.
 
-### 4. Switch on Allow operational requests
+### 4. Choose what Home Assistant may control
+
+You are in charge of two things, both on the **HRDS+ setup** device. The
+integration never turns either on by itself.
+
+1. **The Modbus enables on the unit**, one per function. Turn on the ones
+   for the functions you want Home Assistant to control. Leave a function's
+   enable off to keep it on the unit's own controls (display, remote contact,
+   digital inputs). Home Assistant then only shows what the unit does, and
+   refuses that operation with a message naming the switch to turn on.
+2. **Allow operational requests**, the integration's own safety gate (below).
+
+With every enable off (or the gate off), the integration is a monitor: every
+reading, status, alarm and setting works, and nothing can make the unit act.
+
+#### Which enable gives which function
+
+| To do this from Home Assistant | Turn on (setup device) | Register | While it is off |
+|---|---|---|---|
+| Switch the unit **on and off**: climate *Off*, climate *turn on/off*, switching from *Off* to any mode, `switch.unit_on_off` | **Enable on/off via Modbus (PH02)** | 1778 | The unit's own controls switch it. The climate offers only the modes on the side the unit is on: no *Off* while it runs, only *Off* while it is off. |
+| **Dehumidify**: climate *Dry*, `switch.dehumidify` | **Enable dehumidify (DEU) via Modbus (PH28)** | 1870 | No *Dry*. A dehumidify request from the unit's own humidity logic or the DEU input still shows as *Dry*. |
+| **Cool in summer, heat in winter**: climate *Cool* / *Heat*, `switch.integration_request` | **Enable integration (INT) via Modbus (PH27)**; the unit also needs the integration function (PG02, `DC` models) | 1869 | No *Cool* / *Heat*. The unit's own integration (its room temperature logic, the INT input) still shows. |
+
+Good to know:
+
+* **Full control** from Home Assistant (a unit without a display): turn on all
+  three, then *Allow operational requests*.
+* The real unit this integration was developed on read PH02 **off** and
+  PH27/PH28 **on**: Dry and Cool were allowed, but Home Assistant could not
+  switch the unit on until PH02 was turned on.
+* The unit keeps the enables (and all its settings) across a power cycle.
+* The unit acts on a request register only while its enable is on, and it
+  remembers a request set earlier. Turning on an enable while its request is
+  still on in the unit starts that request at once, so it has to pass the same
+  checks as a start (the gate, the brine guard, the season).
+* Fan speed and every setting (setpoints, selects, setup entities) need no
+  enable.
+
+#### Allow operational requests
 
 > **This is the switch that makes the unit operational.** After a fresh install
 > **`switch.hrds_setup_allow_operational_requests`** (on the **HRDS+ setup**
@@ -301,15 +342,14 @@ Good to know:
 * Your choice is remembered across restarts and reloads.
 * Turning it off again does not stop a running unit; it only refuses new
   requests. To stop the unit, set the climate to *Off*: that clears both
-  requests (and switches the unit off when a display or room probe could start
-  it again on its own).
+  requests and switches the unit off (with PH02 on).
 
 ### 5. First run
 
 1. Set the climate entity to **Dry** (or turn on `switch.dehumidify`). Only
    turning on `switch.unit_on_off` is not enough on a unit without a display
-   or room probe: it then has nothing to act on, so the climate entity stays
-   *Off* with the action *Idle*.
+   or room probe: it then has nothing to act on, so the climate entity shows
+   *Standby* with the action *Idle*.
 2. Watch **Unit status**: a unit waiting for its first request reads *Off
    (Modbus)* and changes to *On*. The recirculation fan (`R` units) starts
    with the request.
@@ -446,7 +486,7 @@ in winter; see [Water circuit and brine](#water-circuit-and-brine).
    Climate *turn on* goes to Standby (Auto where the unit regulates by
    itself), *turn off* to Off. The
    switches `switch.dehumidify` and `switch.integration_request` do the same per
-   request. Every start needs [Allow operational requests](#4-switch-on-allow-operational-requests).
+   request. Every start needs the matching Modbus enable and [Allow operational requests](#4-choose-what-home-assistant-may-control).
 3. **Decide who regulates.** Without a display or room probe the unit runs
    while a request is on and ignores its setpoints, so let Home Assistant
    switch **Dry** / **Cool** on and off (for example a generic hygrostat or
@@ -820,9 +860,9 @@ Each sensor maps to a single bit of a packed alarm register. **ON = alarm is act
 | `switch.enable_time_programs` | 1779 | **Setup device.** PH03 — time programs can switch the unit off |
 | `switch.enable_onoff_by_di_request` | 1894 | **Setup device.** PC12 — a DEU/INT request on the digital inputs starts the unit even with the OFF contact open |
 | `switch.enable_onoff_display` | 1777 | PH01 — on/off by wired display. Forced **off** while `has_display` is off (the default); turning it on by hand is undone on the next poll |
-| `switch.enable_onoff_bms` | 1778 | PH02 — auto-set on startup; expose to inspect/reset |
-| `switch.enable_dehumidify_bms` | 1870 | PH28 — permits the DEU (dehumidify) request over Modbus; auto-set on startup |
-| `switch.enable_integration_bms` | 1869 | PH27 — permits the INT (integration) request over Modbus; auto-set on startup |
+| `switch.enable_onoff_bms` | 1778 | PH02 — lets Home Assistant switch the unit on and off. Yours to set; the integration never writes it ([step 4](#4-choose-what-home-assistant-may-control)) |
+| `switch.enable_dehumidify_bms` | 1870 | PH28 — lets Home Assistant request dehumidifying (DEU). Yours to set |
+| `switch.enable_integration_bms` | 1869 | PH27 — lets Home Assistant request integration (INT: cool in summer, heat in winter). Yours to set |
 | `switch.force_dehumidify_in_cooling` | 1692 | PU05 (factory on); an INT request also starts the compressor. Off: INT cools only with the water, see [Operating modes in summer](#operating-modes-in-summer) |
 | `switch.enable_free_cooling` | 1799 | PG03; while off, outdoor temperature drives nothing |
 

@@ -79,17 +79,6 @@ ENABLE_FOR = {
     INT_REQUEST: PH27_INT_BMS,
 }
 
-# Settings a power cycle drops back to their factory value.
-VOLATILE_SETTINGS = (
-    PH01_ONOFF_DISPLAY,
-    PH02_ONOFF_BMS,
-    PH27_INT_BMS,
-    PH28_DEU_BMS,
-    HA00_PROBE_SOURCE,
-    BMS_ON,
-    DEU_REQUEST,
-    INT_REQUEST,
-)
 
 # Unwired analog input (MODBUS_REGISTERS.md section 14.7).
 PROBE_SENTINEL = 0x8004

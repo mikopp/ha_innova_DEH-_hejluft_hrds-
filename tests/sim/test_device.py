@@ -194,13 +194,12 @@ def test_headless_unit_never_requests_by_itself():
     assert dev.input[R.DEHUM_REQUEST] == 0
 
 
-def test_power_cycle_restores_factory_settings():
+def test_power_cycle_keeps_every_setting():
     dev = HrdsDevice()
     _enable_and_wake(dev)
+    before = dict(dev.holding)
     dev.power_cycle()
-    assert dev.holding[R.PH02_ONOFF_BMS] == 0
-    assert dev.holding[R.PH01_ONOFF_DISPLAY] == 1
-    assert dev.input[R.UNIT_STATUS] == 0
+    assert dev.holding == before
 
 
 def test_display_switched_off_beats_modbus_on():
