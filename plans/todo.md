@@ -289,6 +289,35 @@ option is recommended.
 - [ ] Check whether registers above 1900 (PT05-PT11, PH31-PH35, PA61/PA62)
       are readable; add them to the installer device if they are.
 
+## Operating modes and the passive cold-water path (added 2026-10-21)
+
+The README section *How the unit works* describes these from handbook §6.3;
+none of them has been seen on the real unit yet.
+
+- [ ] **Passive path (water below PU08).** With water (`water_temperature`,
+      501) below PU08 (1695, factory 10 °C) and a DEU or INT request in
+      summer: `compressor_status` (1122) stays off, `water_valve_pump` (1126)
+      is On, supply air gets colder and drier (watch room humidity with an HA
+      sensor). Note which way `water_condenser_valve` (1124) goes.
+- [ ] **PU09 second step.** In the same state, does the compressor join after
+      PU10 (1697, factory 120 min) while the request is still on, and does it
+      stop again when the request is satisfied?
+- [ ] **INT with PU05 off (water above PU08).** Set
+      `switch.force_dehumidify_in_cooling` off, request Cool with no DEU and
+      (with a probe) room humidity under PU01: compressor should stay off. Does
+      the valve/pump run and does the supply air cool? This is the undocumented
+      "passive cooling" mode; restore PU05 on afterwards.
+- [ ] **INT + DEU with PU05 off.** Is it the same as INT with PU05 on
+      (internal valve closed, cold air), or does DEU's reheat win (air at room
+      temperature)? Read 1124 and the supply air temperature.
+- [ ] **Brine guard default 8 °C** (was 10). On the brine installation in early
+      summer, brine at 8–10 °C: requests start, the unit runs the passive path,
+      AL16 (PA43 = 3 °C) does not trip, and the register does not ice up.
+- [ ] **`water_below_compressor_limit` puts the water check on `attention`**
+      during normal passive operation. Decide whether it should become an
+      informational attribute instead of an issue once the passive path is
+      confirmed.
+
 ## Release housekeeping (added 2026-10-20)
 
 - [ ] **Manifest `categories`.** HACS warns "manifest has no categories". The
