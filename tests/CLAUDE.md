@@ -60,7 +60,8 @@ comes back from disk after a real boot is the e2e column.
 The Home Assistant frontend (names, categories, device pages as a user sees
 them), interplay with other integrations (recorder, automations), RTU/serial
 gateways, and real hardware. The device model's rules come from
-`references/MODBUS_REGISTERS.md` and one real dump, not from hardware: run
+`doc/references/UNIT_BEHAVIOUR.md`, `doc/references/MODBUS_REGISTERS.md` and one real
+dump, not from hardware: run
 `tests/diagnose_hrds.py` (read-only) against a unit to check the model.
 
 ## Running
@@ -81,10 +82,11 @@ from the image's modbus manifest and installs that. A bare `pytest` skips
 (`.github/ha-versions/Dockerfile`).
 
 ## The simulator (`sim/`)
-* It does **not** import `const.py`: addresses and behaviour come from
-  `references/MODBUS_REGISTERS.md` (`sim/registers.py`, `sim/device.py`). A
-  wrong address in the integration then fails a test instead of being copied.
-  When the device docs change, change the model.
+* It does **not** import `const.py`: addresses come from
+  `doc/references/MODBUS_REGISTERS.md` (`sim/registers.py`) and behaviour from
+  `doc/references/UNIT_BEHAVIOUR.md` (`sim/device.py`). A wrong address in the
+  integration then fails a test instead of being copied. When the device docs
+  change, change the model.
 * **Seeds** are real-device dumps in `devices/<model>_<display|headless>_<state>.json`
   (`diagnose_hrds.py --json` output). Every file there is smoke-tested
   automatically (`ha/test_seeds.py`). **Overlays** (`sim/overlays/`) patch a seed

@@ -689,8 +689,8 @@ def step_settings(
             INFO,
             f"recirculation damper output present (state '{damper}'): R unit. "
             "Every dehumidify/integration request opens the damper and runs "
-            "the fan; writing fan 0 does not prevent that (MODBUS_REGISTERS.md "
-            "13.5).",
+            "the fan; writing fan 0 does not prevent that (UNIT_BEHAVIOUR.md "
+            "9.3).",
         )
     if pg02 == 0:
         say(
@@ -1010,7 +1010,9 @@ SNAPSHOT_CHUNK = 10
 def doc_names() -> dict[tuple[int, int], str]:
     """{(function type, address): name} from the reference doc and entity table."""
     names: dict[tuple[int, int], str] = {}
-    text = (HERE.parent / "references/MODBUS_REGISTERS.md").read_text(encoding="utf-8")
+    text = (HERE.parent / "doc/references/MODBUS_REGISTERS.md").read_text(
+        encoding="utf-8"
+    )
     for _hex, dec, name in re.findall(
         r"`0x([0-9A-Fa-f]{4})`\s*\|\s*(\d+)\s*\|([^|]+)\|", text
     ):
@@ -1106,7 +1108,7 @@ def step_snapshot(dev: Dev) -> dict[str, dict[int, int]]:
     print(
         "  Unmapped analog-output allocations (HC03 AO3, HC04 AO4 = supply fan) and\n"
         "  the other HD0x relay allocations sit in the holding dump above; compare\n"
-        "  against the handbook parameter table (references/*Handbuch*.txt)."
+        "  against the handbook parameter table (doc/references/*Handbuch*.txt)."
     )
     return snap
 
