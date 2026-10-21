@@ -14,14 +14,14 @@ it.
 | **How the unit behaves**: variants, states, start/stop sequences, summer/winter, display/probe configurations, fan, compressor, water circuit, alarm effects, display and Modbus actions, what was tested on real hardware | [`UNIT_BEHAVIOUR.md`](UNIT_BEHAVIOUR.md) |
 | **Which registers exist**: addresses, names, encodings, ranges, value meanings, write recipes | [`MODBUS_REGISTERS.md`](MODBUS_REGISTERS.md) |
 | Technical data (airflow, capacity, power) and the fan-speed → airflow estimate | this file, below |
-| What the Home Assistant integration does on top of the unit | [`../../CLAUDE.md`](../../CLAUDE.md) (agents), [`../../README.md`](../../README.md) (users) |
+| What the Home Assistant integration does on top of the unit, and why | [`../adr/`](../adr/README.md) (decisions), [`../../README.md`](../../README.md) (users) |
 | Open hardware questions and test plans | [`../../plans/todo.md`](../../plans/todo.md) |
 
 ## Source documents
 
 | File | What it is | Cited as |
 |------|------------|----------|
-| [HRDS+_Technisches_Handbuch_DE.pdf](HRDS+_Technisches_Handbuch_DE.pdf) | Technical handbook — installation, operation, control logic (§6), alarms, technical data (German, 87 pp). | `HB §n` |
+| [HRDS+_Technisches_Handbuch_DE.pdf](HRDS+_Technisches_Handbuch_DE.pdf) | Technical handbook (German, 87 pp): operating modes (§2.7), terminals (§4.4–4.5), parameter list with defaults (§5.3), control logic (§6), alarms (§7), technical data (§10). Search the `.txt`, check tables here. | `HB §n` |
 | [HRDS+_Technisches_Handbuch_DE.txt](HRDS+_Technisches_Handbuch_DE.txt) | Full text of the handbook, for searching. Tables are flattened; check the PDF for column alignment. | `HB §n` |
 | [HRDS+_Modbus_RTU_RS485_DE.pdf](HRDS+_Modbus_RTU_RS485_DE.pdf) | Modbus RTU/RS-485 connection and register manual (German). Source of every register address. | `MB p.n` |
 | [HRDS+_Benutzerhandbuch_DE.pdf](HRDS+_Benutzerhandbuch_DE.pdf) | End-user handbook (German, 12 pp); a subset of the technical handbook. | `HB` |

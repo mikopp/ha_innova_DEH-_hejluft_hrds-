@@ -1,0 +1,1 @@
+../../../doc/adr/0010-headless-by-default.md

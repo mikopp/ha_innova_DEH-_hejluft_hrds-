@@ -1,0 +1,1 @@
+../../../doc/adr/0005-unavailable-rather-than-stale.md

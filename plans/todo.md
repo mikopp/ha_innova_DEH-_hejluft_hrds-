@@ -100,10 +100,11 @@ evidence log, replace the `[INFERRED]` tags it settles, and fix the code/docs.
 
 ## Climate entity behaviour
 
-- [ ] **Mode writes**: DRY = on + dehumidify + integration_request **off**;
-      COOL = on + dehumidify + integration_request **on**; OFF = both requests off
-      (unit off only if it could still act on its own). Confirm the
-      combinations produce the expected unit behaviour and feedback.
+- [ ] **Mode writes** (ADR-0025): DRY = on + dehumidify + integration_request
+      **off**; COOL = on + dehumidify + integration_request **on**; HEAT = on +
+      integration_request, dehumidify off; OFF = both requests off and the unit
+      off. Confirm the combinations produce the expected unit behaviour and
+      feedback.
 - [ ] **`hvac_action` derivation** from `unit_status` / `compressor_status` /
       `dehumidify_request` reflects reality (DRYING vs COOLING vs IDLE vs OFF).
 - [ ] **What does the condenser valve (1124, K4) read while cooling?** The
@@ -185,6 +186,11 @@ opened to 0/100.
 - [ ] Confirm `SupplyFan_Status` (1119) reports `1` (OFF) when fan mode = off
       and a mode is active, and that `recirculation_active` (1112) goes 0.
       Covered by the fan = 0 test below.
+- [ ] **Does the fan turn while 1119 reads `4` (wait_off, "Stopping")?** Record
+      1119, 639 and 1117 through a PF03 post-run after a request ends. Decides
+      the proposed
+      [ADR-0028](../doc/adr/0028-one-definition-of-fan-stopped.md) (today the
+      fan entity, the climate fan mode and the airflow disagree about it).
 - [ ] Verify the Low / Medium / High percentages (30 / 55 / 85 %) are
       reasonable for the real unit; adjust in `climate.py` `_FAN_MODE_PCT` if
       not. These are nominal choices, not values from the PDF.

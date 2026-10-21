@@ -1,0 +1,1 @@
+../../../doc/adr/0006-a-write-takes-or-raises-and-state-is-the-read-back.md

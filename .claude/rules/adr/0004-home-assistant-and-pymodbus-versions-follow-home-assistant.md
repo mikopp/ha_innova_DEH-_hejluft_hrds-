@@ -1,0 +1,1 @@
+../../../doc/adr/0004-home-assistant-and-pymodbus-versions-follow-home-assistant.md

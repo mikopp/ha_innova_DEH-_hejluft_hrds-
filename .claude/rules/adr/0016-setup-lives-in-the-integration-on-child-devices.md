@@ -1,0 +1,1 @@
+../../../doc/adr/0016-setup-lives-in-the-integration-on-child-devices.md

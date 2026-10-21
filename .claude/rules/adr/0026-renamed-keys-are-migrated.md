@@ -1,0 +1,1 @@
+../../../doc/adr/0026-renamed-keys-are-migrated.md

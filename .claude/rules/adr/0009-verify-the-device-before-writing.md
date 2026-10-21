@@ -1,0 +1,1 @@
+../../../doc/adr/0009-verify-the-device-before-writing.md

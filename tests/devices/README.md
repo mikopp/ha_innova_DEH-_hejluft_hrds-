@@ -15,7 +15,7 @@ writes, a dehumidify cycle) in `tests/ha/test_seeds.py` — no code change neede
 ## Adding a device
 
 ```
-pip install pymodbus==3.13.1
+pip install 'pymodbus>=3.13.1'
 python3 tests/diagnose_hrds.py <host> --port <port> --unit <id> \
     --json tests/devices/hrds_50_display_running.json
 ```

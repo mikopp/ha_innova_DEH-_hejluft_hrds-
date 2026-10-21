@@ -1,0 +1,363 @@
+"""Consistency check for the architecture decision records in ``doc/adr``.
+
+ADRs are written for agents as much as for people (ADR-0001), so their shape is
+checked like code:
+
+* frontmatter: ``status``, ``date``, ``decision-makers``, ``paths`` (accepted
+  and proposed ADRs) in the small YAML subset Claude Code parses
+* every ``paths`` glob matches a file in the repository (a stale scope means
+  the ADR silently stops loading)
+* an accepted or proposed ADR has a ``## Decision`` with RFC 2119 rules and a
+  ``## Confirmation`` whose test ids exist; its ``sh`` blocks exit 0
+* a superseded ADR names an existing successor that lists it in
+  ``supersedes`` (and the other way round)
+* ``.claude/rules/adr/`` links exactly the accepted ADRs, so Claude Code loads
+  each one when a file in its ``paths`` is read
+* the index table in ``doc/adr/README.md`` is current
+* instruction files (CLAUDE.md, .claude/) cite only accepted ADRs
+
+Only failures are printed, to keep the output short for agents.
+
+Run with:  python3 tests/adr_check.py          (check, as CI does)
+           python3 tests/adr_check.py --fix    (rewrite index and links)
+           python3 tests/adr_check.py --no-run (skip the sh blocks)
+           python3 tests/adr_check.py --for FILE...  (which ADRs govern these)
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import pathlib
+import re
+import subprocess
+import sys
+from dataclasses import dataclass, field
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+ADR_DIR = ROOT / "doc/adr"
+LINK_DIR = ROOT / ".claude/rules/adr"
+INDEX = ADR_DIR / "README.md"
+INDEX_START = "<!-- adr-index:start -->"
+INDEX_END = "<!-- adr-index:end -->"
+COMPONENT = "custom_components/innova_hrds/"
+
+ADR_FILE = re.compile(r"^(\d{4})-[a-z0-9-]+\.md$")
+ADR_REF = re.compile(r"\bADR-(\d{4})\b")
+TEST_REF = re.compile(r"\b(tests/[\w/]+\.py)::(\w+)")
+RFC2119 = re.compile(r"\b(MUST|MUST NOT|SHOULD|SHOULD NOT|MAY)\b")
+STATUSES = ("proposed", "accepted", "rejected", "deprecated")
+SUPERSEDED = re.compile(r"^superseded by ADR-(\d{4})$")
+MAX_LINES = 90  # an accepted ADR loads into an agent's context: keep it short
+TEMPLATE_LEFTOVERS = ("YYYY-MM-DD", "# ADR-NNNN", "one rule per bullet")
+
+FAILURES: list[str] = []
+
+
+def fail(message: str) -> None:
+    FAILURES.append(message)
+    print("  FAIL " + message)
+
+
+@dataclass
+class Adr:
+    number: str
+    path: pathlib.Path
+    meta: dict = field(default_factory=dict)
+    title: str = ""
+    sections: dict = field(default_factory=dict)
+    lines: int = 0
+
+    @property
+    def status(self) -> str:
+        return str(self.meta.get("status", ""))
+
+    @property
+    def paths(self) -> list[str]:
+        value = self.meta.get("paths", [])
+        return value if isinstance(value, list) else [value]
+
+
+def _scalar(text: str) -> str | list[str]:
+    text = text.strip()
+    if text.startswith("[") and text.endswith("]"):
+        inner = text[1:-1].strip()
+        return [_scalar(p) for p in inner.split(",")] if inner else []
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in "\"'":
+        return text[1:-1]
+    return text
+
+
+def parse_frontmatter(text: str, name: str) -> tuple[dict, str]:
+    """The ``key: value`` / ``key:`` + ``  - item`` subset, and the body."""
+    if not text.startswith("---\n"):
+        fail(f"{name}: no frontmatter")
+        return {}, text
+    end = text.find("\n---\n", 4)
+    if end < 0:
+        fail(f"{name}: frontmatter not closed")
+        return {}, text
+    meta: dict = {}
+    key = None
+    for line in text[4:end].splitlines():
+        if not line.strip():
+            continue
+        if line.startswith("  - ") and key is not None:
+            if not isinstance(meta[key], list):
+                meta[key] = []
+            meta[key].append(_scalar(line[4:]))
+        elif re.match(r"^[a-z][a-z-]*:", line):
+            key, _, value = line.partition(":")
+            meta[key] = _scalar(value) if value.strip() else []
+        else:
+            fail(f"{name}: frontmatter line not understood: {line!r}")
+    return meta, text[end + 5 :]
+
+
+def load_adrs() -> dict[str, Adr]:
+    adrs: dict[str, Adr] = {}
+    for path in sorted(ADR_DIR.glob("*.md")):
+        match = ADR_FILE.match(path.name)
+        if not match:
+            continue
+        text = path.read_text(encoding="utf-8")
+        adr = Adr(match.group(1), path, lines=text.count("\n") + 1)
+        adr.meta, body = parse_frontmatter(text, path.name)
+        current = None
+        for line in body.splitlines():
+            if line.startswith("# ") and not adr.title:
+                adr.title = line[2:].strip()
+            elif line.startswith("## "):
+                current = line[3:].strip().lower()
+                adr.sections[current] = []
+            elif current is not None:
+                adr.sections[current].append(line)
+        if adr.number in adrs:
+            fail(f"{path.name}: number {adr.number} used twice")
+        adrs[adr.number] = adr
+    return adrs
+
+
+def glob_regex(pattern: str) -> re.Pattern:
+    """Claude Code's ``paths`` globs: ``**``, ``*``, ``?`` and ``{a,b}``."""
+    out, i = "", 0
+    while i < len(pattern):
+        if pattern.startswith("**/", i):
+            out, i = out + "(?:.*/)?", i + 3
+        elif pattern.startswith("**", i):
+            out, i = out + ".*", i + 2
+        elif pattern[i] == "*":
+            out, i = out + "[^/]*", i + 1
+        elif pattern[i] == "?":
+            out, i = out + "[^/]", i + 1
+        elif pattern[i] == "{":
+            end = pattern.index("}", i)
+            options = pattern[i + 1 : end].split(",")
+            out, i = out + "(?:" + "|".join(map(re.escape, options)) + ")", end + 1
+        else:
+            out, i = out + re.escape(pattern[i]), i + 1
+    return re.compile(out + r"\Z")
+
+
+def repo_files() -> list[str]:
+    result = subprocess.run(
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.split()
+
+
+def link_target(adr: Adr) -> str:
+    return os.path.relpath(adr.path, LINK_DIR)
+
+
+def index_table(adrs: dict[str, Adr]) -> str:
+    rows = ["| ADR | Decision | Status | Loads for |", "|---|---|---|---|"]
+    for adr in adrs.values():
+        title = re.sub(r"^ADR-\d{4}:\s*", "", adr.title)
+        scope = (
+            ", ".join(f"`{p.removeprefix(COMPONENT)}`" for p in adr.paths)
+            if adr.status == "accepted"
+            else "-"
+        )
+        rows.append(
+            f"| [{adr.number}]({adr.path.name}) | {title} | {adr.status} | {scope} |"
+        )
+    return "\n".join(rows)
+
+
+def check_adr(adr: Adr, adrs: dict[str, Adr], files: list[str], run: bool) -> None:
+    name = adr.path.name
+    for key in ("status", "date", "decision-makers"):
+        if not adr.meta.get(key):
+            fail(f"{name}: frontmatter has no {key}")
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(adr.meta.get("date", ""))):
+        fail(f"{name}: date must be YYYY-MM-DD")
+    if not adr.title.startswith(f"ADR-{adr.number}: "):
+        fail(f"{name}: title must start with 'ADR-{adr.number}: '")
+    text = adr.path.read_text(encoding="utf-8")
+    for leftover in TEMPLATE_LEFTOVERS:
+        if leftover in text:
+            fail(f"{name}: template text left in: {leftover!r}")
+    if "<!--" in text:
+        fail(f"{name}: HTML comment (costs tokens, says nothing)")
+
+    superseded = SUPERSEDED.match(adr.status)
+    if superseded:
+        successor = adrs.get(superseded.group(1))
+        if successor is None:
+            fail(f"{name}: successor ADR-{superseded.group(1)} does not exist")
+        elif f"ADR-{adr.number}" not in successor.meta.get("supersedes", []):
+            fail(f"{name}: ADR-{successor.number} does not list it in supersedes")
+    elif adr.status not in STATUSES:
+        fail(
+            f"{name}: status {adr.status!r} is not one of {STATUSES} or 'superseded by ADR-NNNN'"
+        )
+    for ref in adr.meta.get("supersedes", []):
+        old = adrs.get(ref.removeprefix("ADR-"))
+        if old is None or old.status != f"superseded by ADR-{adr.number}":
+            fail(f"{name}: supersedes {ref}, whose status does not point back")
+
+    if "decision" not in adr.sections:
+        fail(f"{name}: no '## Decision' section")
+    if adr.status not in ("accepted", "proposed"):
+        return
+
+    # In force (or about to be): an agent must be able to act on it.
+    decision = "\n".join(adr.sections.get("decision", []))
+    if not RFC2119.search(decision):
+        fail(f"{name}: Decision has no MUST/SHOULD/MAY rule")
+    for section in ("context", "consequences", "confirmation"):
+        if section not in adr.sections:
+            fail(f"{name}: no '## {section.capitalize()}' section")
+    if adr.lines > MAX_LINES:
+        fail(f"{name}: {adr.lines} lines; keep an ADR under {MAX_LINES}")
+    if not adr.paths:
+        fail(f"{name}: no paths, so it never loads for an agent")
+    for pattern in adr.paths:
+        if not any(glob_regex(pattern).match(f) for f in files):
+            fail(f"{name}: paths glob {pattern!r} matches no file")
+
+    confirmation = "\n".join(adr.sections.get("confirmation", []))
+    for module, test in TEST_REF.findall(confirmation):
+        source = ROOT / module
+        if not source.is_file() or not re.search(
+            rf"^(?:async )?def {test}\(", source.read_text(encoding="utf-8"), re.M
+        ):
+            fail(f"{name}: confirmation cites {module}::{test}, which does not exist")
+    if run and adr.status == "accepted":  # a proposal's check may not hold yet
+        for block in re.findall(r"```sh\n(.*?)```", confirmation, re.S):
+            result = subprocess.run(
+                ["bash", "-euo", "pipefail", "-c", block],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode:
+                fail(
+                    f"{name}: confirmation command failed:\n{block}{result.stdout}{result.stderr}"
+                )
+
+
+def check_links(adrs: dict[str, Adr], fix: bool) -> None:
+    wanted = {
+        a.path.name: link_target(a) for a in adrs.values() if a.status == "accepted"
+    }
+    if fix:
+        LINK_DIR.mkdir(parents=True, exist_ok=True)
+        for link in LINK_DIR.iterdir():
+            if link.name not in wanted or not link.is_symlink():
+                link.unlink()
+        for name, target in wanted.items():
+            link = LINK_DIR / name
+            if not (link.is_symlink() and os.readlink(link) == target):
+                link.unlink(missing_ok=True)
+                link.symlink_to(target)
+    present = {p.name for p in LINK_DIR.iterdir()} if LINK_DIR.is_dir() else set()
+    for name in sorted(present - wanted.keys()):
+        fail(f".claude/rules/adr/{name}: not an accepted ADR, remove the link (--fix)")
+    for name, target in sorted(wanted.items()):
+        link = LINK_DIR / name
+        if not link.is_symlink() or os.readlink(link) != target:
+            fail(f".claude/rules/adr/{name}: missing or wrong link to {target} (--fix)")
+
+
+def check_index(adrs: dict[str, Adr], fix: bool) -> None:
+    text = INDEX.read_text(encoding="utf-8")
+    start, end = text.find(INDEX_START), text.find(INDEX_END)
+    if start < 0 or end < 0:
+        fail(f"{INDEX.name}: index markers missing")
+        return
+    current = text[start + len(INDEX_START) : end].strip()
+    table = index_table(adrs)
+    if current != table:
+        if fix:
+            INDEX.write_text(
+                text[: start + len(INDEX_START)] + "\n" + table + "\n" + text[end:],
+                encoding="utf-8",
+            )
+        else:
+            fail(f"{INDEX.name}: index is out of date (--fix)")
+
+
+def check_references(adrs: dict[str, Adr]) -> None:
+    """Instruction files cite accepted ADRs only; every ADR cites real ones."""
+    instruction_files = [
+        p
+        for p in ROOT.rglob("*.md")
+        if ".git" not in p.parts
+        and (p.name == "CLAUDE.md" or ".claude" in p.parts)
+        and not p.is_symlink()
+    ]
+    for path in instruction_files:
+        for number in ADR_REF.findall(path.read_text(encoding="utf-8")):
+            adr = adrs.get(number)
+            if adr is None or adr.status != "accepted":
+                status = adr.status if adr else "missing"
+                fail(f"{path.relative_to(ROOT)}: cites ADR-{number} ({status})")
+    for adr in adrs.values():
+        for number in ADR_REF.findall(adr.path.read_text(encoding="utf-8")):
+            if number not in adrs:
+                fail(f"{adr.path.name}: cites ADR-{number}, which does not exist")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--fix", action="store_true", help="rewrite index and links")
+    parser.add_argument("--no-run", action="store_true", help="skip sh blocks")
+    parser.add_argument(
+        "--for", dest="files", nargs="*", metavar="FILE", help="list governing ADRs"
+    )
+    args = parser.parse_args()
+
+    adrs = load_adrs()
+    if args.files is not None:
+        # Which accepted / proposed ADRs govern these files (e.g. a diff).
+        for adr in adrs.values():
+            if adr.status not in ("accepted", "proposed"):
+                continue
+            hits = [
+                f for f in args.files if any(glob_regex(p).match(f) for p in adr.paths)
+            ]
+            if hits:
+                print(f"{adr.path.relative_to(ROOT)} [{adr.status}] {adr.title}")
+        return 0
+    files = repo_files()
+    for adr in adrs.values():
+        check_adr(adr, adrs, files, run=not args.no_run)
+    check_links(adrs, args.fix)
+    check_index(adrs, args.fix)
+    check_references(adrs)
+    accepted = sum(a.status == "accepted" for a in adrs.values())
+    print(
+        f"ADRs: {len(adrs)} ({accepted} accepted) - "
+        + ("ALL PASS" if not FAILURES else f"{len(FAILURES)} FAILURE(S)")
+    )
+    return 1 if FAILURES else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

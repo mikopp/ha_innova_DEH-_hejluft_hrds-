@@ -1,0 +1,1 @@
+../../../doc/adr/0023-write-only-what-changes.md

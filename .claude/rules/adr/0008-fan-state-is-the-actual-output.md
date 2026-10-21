@@ -1,0 +1,1 @@
+../../../doc/adr/0008-fan-state-is-the-actual-output.md

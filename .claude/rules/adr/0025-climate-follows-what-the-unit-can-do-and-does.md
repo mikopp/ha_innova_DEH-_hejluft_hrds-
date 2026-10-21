@@ -1,0 +1,1 @@
+../../../doc/adr/0025-climate-follows-what-the-unit-can-do-and-does.md

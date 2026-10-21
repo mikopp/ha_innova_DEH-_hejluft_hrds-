@@ -69,8 +69,9 @@ probe faults, water circuit), and a unit with display and room probes.
   decoded each other's registers (a running unit showed `off_by_display`).
 * The debounced post-write refresh survived unload.
 
-Open (xfail in `tests/ha/test_seeds.py`): the climate entity offers COOL on a
-unit without active cooling (PG02 = 0).
+Found then and fixed since (PR #34): the climate entity offered COOL on a unit
+without active cooling (PG02 = 0); now
+`tests/ha/test_seeds.py::test_cool_not_offered_without_integration_function`.
 
 ## 5. Layering decision (2026-10-20)
 
@@ -82,5 +83,6 @@ only holds what an in-process HA cannot show, and each test says why
 surface, real scheduler, persistence over real restarts, boot order, runtime
 log. The restart contract (the initial setup survives a restart) is checked in
 both layers, from different sides: the code's behaviour on a fresh start
-in-process, the state coming back from disk after a real boot in e2e. Details:
-`tests/CLAUDE.md`.
+in-process, the state coming back from disk after a real boot in e2e. The decision is
+[ADR-0019](../doc/adr/0019-tests-run-the-real-client-against-a-simulated-unit.md);
+how-to: `tests/CLAUDE.md`.

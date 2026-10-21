@@ -1,0 +1,1 @@
+../../../doc/adr/0002-one-register-table-drives-every-entity.md

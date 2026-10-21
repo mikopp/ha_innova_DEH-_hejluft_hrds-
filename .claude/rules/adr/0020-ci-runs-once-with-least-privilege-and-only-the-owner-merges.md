@@ -1,0 +1,1 @@
+../../../doc/adr/0020-ci-runs-once-with-least-privilege-and-only-the-owner-merges.md

@@ -86,8 +86,8 @@ MODEL_SPECS: Dict[str, Dict[str, float]] = {
     "30": {"max": 300.0},
     "50": {"max": 500.0},
 }
-# Max airflow is a *model* property with no register (see CLAUDE.md, Device
-# variants), so it stays a config option. The fan *minimum*, by contrast, is
+# Max airflow is a *model* property with no register (ADR-0008), so it stays a
+# config option. The fan *minimum*, by contrast, is
 # per-mode and register-backed (PF27/PF28/PF07) - the device owns it, and it is
 # exposed as writable numbers rather than shadowed by a config option.
 CONF_AIRFLOW_MAX = "airflow_max_m3h"
@@ -1232,8 +1232,8 @@ HEADLESS_SETTINGS: Dict[str, tuple[str, int]] = {
 #
 # SETUP_KEYS live on a child device ("<name> setup"): everything the user must
 # look at or decide once, right after the integration connects - the gate for
-# operational requests, the setup check, the settings the integration asserts
-# or that make the unit stop (display, probes, Modbus enables, time programs,
+# operational requests, the setup check, the settings the integration keeps
+# (display, probes) or that decide what may run (Modbus enables, time programs,
 # remote contact), and the read-only facts that describe how the unit is wired.
 # CONFIG_KEYS are parameters tuned after setup (Configuration section of the main
 # device). DIAGNOSTIC_KEYS are read-only extras (Diagnostic section). Everything

@@ -1,0 +1,1 @@
+../../../doc/adr/0021-release-a-tagged-zip-with-local-brand-images.md

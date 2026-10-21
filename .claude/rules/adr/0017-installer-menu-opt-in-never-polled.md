@@ -1,0 +1,1 @@
+../../../doc/adr/0017-installer-menu-opt-in-never-polled.md

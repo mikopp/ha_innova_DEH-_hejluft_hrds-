@@ -1,0 +1,1 @@
+../../../doc/adr/0014-brine-guard-gates-starts-and-brine-never-heats.md

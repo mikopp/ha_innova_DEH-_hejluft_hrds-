@@ -1,0 +1,1 @@
+../../../doc/adr/0001-record-decisions-as-path-scoped-adrs.md

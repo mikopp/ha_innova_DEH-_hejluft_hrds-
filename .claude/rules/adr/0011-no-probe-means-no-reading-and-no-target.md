@@ -1,0 +1,1 @@
+../../../doc/adr/0011-no-probe-means-no-reading-and-no-target.md

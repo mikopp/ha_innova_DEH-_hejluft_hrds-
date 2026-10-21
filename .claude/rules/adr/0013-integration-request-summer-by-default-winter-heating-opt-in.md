@@ -1,0 +1,1 @@
+../../../doc/adr/0013-integration-request-summer-by-default-winter-heating-opt-in.md

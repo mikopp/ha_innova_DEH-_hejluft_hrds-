@@ -1,0 +1,1 @@
+../../../doc/adr/0024-request-switches-show-the-command-until-confirmed.md

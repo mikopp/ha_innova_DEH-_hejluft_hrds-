@@ -1,0 +1,1 @@
+../../../doc/adr/0018-read-in-small-blocks-and-fail-fast.md
