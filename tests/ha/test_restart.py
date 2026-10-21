@@ -35,7 +35,6 @@ REQUIRED_SETTINGS = {
     R.PH01_ONOFF_DISPLAY,
     R.HA00_PROBE_SOURCE,
 }
-OPERATIONAL_REGISTERS = {R.BMS_ON, R.INT_REQUEST, R.DEU_REQUEST, R.FAN_MANUAL}
 
 
 def restore_gate(hass: HomeAssistant, entity_id: str, state: str, owner: str) -> None:
@@ -89,9 +88,8 @@ async def test_restart_leaves_a_running_unit_alone(hass, setup, clock):
 
     await restart(hass, s)
 
-    written = {w.address for w in s.device.write_log}
-    assert written == REQUIRED_SETTINGS, "only the required settings, nothing else"
-    assert not written & OPERATIONAL_REGISTERS
+    # The unit still holds every required setting: nothing at all is written.
+    assert s.device.write_log == []
     assert s.device.input[R.UNIT_STATUS] == 5
     assert s.device.input[R.COMPRESSOR_STATUS] == 4
     climate = s.state("climate", CLIMATE)
@@ -127,7 +125,11 @@ async def test_restart_together_with_a_unit_power_cycle(hass, setup, clock):
     await hass.config_entries.async_setup(s.entry.entry_id)
     await hass.async_block_till_done()
 
-    assert {w.address for w in s.device.write_log} == REQUIRED_SETTINGS
+    # Only what the power cycle dropped (PH27/PH28 are 1 from factory).
+    assert {w.address for w in s.device.write_log} == REQUIRED_SETTINGS - {
+        R.PH27_INT_BMS,
+        R.PH28_DEU_BMS,
+    }
     assert s.state("sensor", "unit_status").state == "off_by_bms"
     await allow_operation(s)
     await set_hvac_mode(s, clock, "dry")

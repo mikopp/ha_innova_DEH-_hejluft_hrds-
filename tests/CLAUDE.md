@@ -47,7 +47,7 @@ any state of the unit:
 | # | Contract | In-process (`ha/test_restart.py`) | Real restart (`e2e/test_restart.py`) |
 |---|---|---|---|
 | 1 | What the user configured is still in force: options (a cleared brine sensor stays cleared), the *Allow operational requests* gate, registry edits (rename, enabled installer entity), entity and device ids | `test_options_are_authoritative_after_restart`, `test_gate_defaults_off_and_is_restored`, `test_restored_gate_allows_requests_straight_away`, `test_user_registry_changes_are_kept` | `test_setup_survives_restart` |
-| 2 | Nothing the unit is doing is disturbed: the first poll writes only the required settings, never on/off, requests or fan | `test_restart_leaves_a_running_unit_alone`, `test_restart_keeps_season_and_fan_setpoint` | `test_running_unit_is_untouched_and_polling_resumes` |
+| 2 | Nothing the unit is doing is disturbed: the first poll writes only required settings the unit lost (none, if it kept them), never on/off, requests or fan | `test_restart_leaves_a_running_unit_alone`, `test_restart_keeps_season_and_fan_setpoint` | `test_running_unit_is_untouched_and_polling_resumes` |
 | 3 | HA booting before the unit is reachable ends loaded by itself | `test_boot_before_the_unit_is_reachable` | `test_ha_booting_before_the_unit_is_reachable` |
 | 4 | Restart together with a unit power cycle: the lost settings come back | `test_restart_together_with_a_unit_power_cycle` | `test_restart_together_with_a_unit_power_cycle` |
 | 5 | Derived state comes back identical (setup check, hidden setpoints, brine guard, modes) | `test_every_entity_comes_back_identical` | (ids checked in contract 1) |

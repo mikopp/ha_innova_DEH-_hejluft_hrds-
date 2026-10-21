@@ -45,10 +45,20 @@ not backed by a single register, and are declared directly in `init()`
   are set: PH02 gates on/off, PH28 gates the DEU request, PH27 gates the INT
   request (key `enable_integration_bms`; it is not a cooling mode). PG02 (1798) is
   a different thing, an installer setting saying the unit has INT at all, and is
-  only shown read-only (`integration_available`). `_sync_required_settings_locked` re-asserts them **every poll**, driven
-  by the polled read-back rather than a one-shot flag, so a device power-cycle
-  that clears them self-heals. They are also exposed as switches — and because
-  the hub re-asserts them, turning one off by hand is undone on the next poll.
+  only shown read-only (`integration_available`). `_sync_required_settings_locked` checks them **every poll**, against
+  that same poll's read-back rather than a one-shot flag, so a device
+  power-cycle that clears them self-heals. It writes only a setting that reads
+  back wrong (never one that was not read), then reads the poll again; one the
+  unit does not keep is given up after `REQUIRED_SETTING_MAX_WRITES` (3) polls
+  in a row until it reads back right or the entry reloads. They are also exposed
+  as switches — and because the hub re-asserts them, turning one off by hand is
+  undone by the refresh after the write.
+* **EEPROM: write only what changes.** The unit's parameters are in EEPROM,
+  which wears with every write. Nothing in the integration writes periodically:
+  `_write_registers` reads the register first and skips a write the unit
+  already holds (except for a `PENDING_KEYS` request whose read-back may still
+  lag the last command), and the required-settings sync above is capped. Never
+  add a periodic or unconditional write.
 * **Headless by default (`has_display` option, default off).** With no CNU2
   display the unit must have **PH01 (1777) = 0** and **HA00 (1803) = 0**, else
   it sits in `off_by_display` forever (an OFF from any source beats a Modbus ON)

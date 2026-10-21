@@ -1372,6 +1372,10 @@ OPERATIONAL_KEYS = (C_UNIT_ON_OFF, C_DEHUMIDIFY, C_INTEGRATION_REQUEST, C_FAN_MA
 # The fan setpoint is not here: fan and climate report what the unit does.
 PENDING_KEYS = (C_UNIT_ON_OFF, C_DEHUMIDIFY, C_INTEGRATION_REQUEST)
 PENDING_RECHECK_SECONDS = (3, 6, 12, 25)
+# A required setting the unit does not keep is written this many polls in a
+# row, then left alone (the setup check keeps reporting it). The unit's
+# parameters live in EEPROM, which wears with every write.
+REQUIRED_SETTING_MAX_WRITES = 3
 
 
 # ------------------------------------------------------------------

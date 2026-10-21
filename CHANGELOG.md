@@ -6,6 +6,15 @@ All notable changes to this project are documented here, newest first.
 
 ## Unreleased
 
+**Changed:** the unit's settings live in EEPROM, which wears with every write,
+so nothing is written that the unit already holds. A write reads the register
+first and skips it when the value is already there (an automation repeating a
+mode, fan speed or setpoint no longer writes). The required settings
+(PH02/PH27/PH28, headless PH01/HA00) are judged on the same poll's read-back,
+so a restart or reload no longer rewrites them all. A setting the unit does not
+keep is written on three polls in a row at most, then left alone and reported
+by the setup check until it reads back right or the integration is reloaded.
+
 **Changed:** climate *Off* now always means the unit is off: it clears both
 requests and switches the unit off (Modbus on/off), so it stops the unit's own
 logic, digital-input requests and a manual fan, and never disagrees with

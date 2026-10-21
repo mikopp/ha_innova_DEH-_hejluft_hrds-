@@ -117,6 +117,7 @@ from .const import (
     OPERATIONAL_KEYS,
     PENDING_KEYS,
     PENDING_RECHECK_SECONDS,
+    REQUIRED_SETTING_MAX_WRITES,
     ROOM_HUMIDITY_PROBE_CODES,
     ROOM_TEMP_PROBE_CODES,
     TEMPERATURE_TARGET_KEYS,
@@ -459,6 +460,8 @@ class HrdsModbusHub:
         self._pending: Dict[str, Tuple[str, float, Any]] = {}
         self._pending_lock = threading.Lock()
         self._verify_handles: List[Any] = []
+        # Required setting -> writes in a row the unit has not kept yet.
+        self._required_writes: Dict[str, int] = {}
         # False until a full read cycle succeeds; entities key their
         # availability off this so a dead gateway is visible in HA.
         self.last_update_success = False
@@ -1044,17 +1047,22 @@ class HrdsModbusHub:
                 self.last_update_success = False
                 return False
             try:
-                # Uses the previous cycle's read-back, so on the very first
-                # cycle (empty data) every required setting is written.
-                self._sync_required_settings_locked()
                 raw = self._read_keys_locked(self._poll_keys)
+                if raw is not None:
+                    self._decode_all(*raw, self._poll_keys)
+                    # Judged on this cycle's read-back, so a setting is only
+                    # written when the unit really lost it; then read again so
+                    # the entities and the setup check show the result now.
+                    if self._sync_required_settings_locked():
+                        raw = self._read_keys_locked(self._poll_keys)
+                        if raw is not None:
+                            self._decode_all(*raw, self._poll_keys)
             finally:
                 self._client.close()
 
         if raw is None:
             self.last_update_success = False
             return False
-        self._decode_all(*raw, self._poll_keys)
         self._compute_derived()
         self.last_update_success = True
         return True
@@ -1248,13 +1256,16 @@ class HrdsModbusHub:
             ]
         return required
 
-    def _sync_required_settings_locked(self) -> None:
+    def _sync_required_settings_locked(self) -> bool:
         """Keep PH02/PH27/PH28 (and, headless, PH01/HA00) at the values we need.
 
         Driven by the polled read-back rather than a one-shot flag: if the unit
         power-cycles and loses a setting, every subsequent write would silently
-        no-op until Home Assistant restarted. Re-asserting each cycle self-heals
-        that, and only writes when the read-back differs.
+        no-op until Home Assistant restarted. Checking each cycle self-heals
+        that, but writes only when the read-back differs (the parameters are in
+        EEPROM): a register that was not read is left alone, and a setting the
+        unit does not keep is given up after REQUIRED_SETTING_MAX_WRITES polls.
+        Returns True if anything was written.
 
         Note this deliberately overrides the matching switches/select - these are
         required for the integration to control the unit at all, so changing one
@@ -1262,10 +1273,28 @@ class HrdsModbusHub:
         (else the unit stays OFF-by-display) and HA00 must be 0 (else it waits
         for room T/H from a display that is not there).
         """
+        written = False
         for key, expected, raw in self._required_settings():
-            if self.data.get(key) == expected:
+            if key not in self.data:
+                continue  # not read this cycle: no reason to write
+            if self.data[key] == expected:
+                self._required_writes.pop(key, None)
                 continue
+            attempts = self._required_writes.get(key, 0)
+            if attempts >= REQUIRED_SETTING_MAX_WRITES:
+                continue
+            self._required_writes[key] = attempts + 1
+            if attempts + 1 == REQUIRED_SETTING_MAX_WRITES:
+                _LOGGER.error(
+                    "The unit did not keep required setting %s after %s writes; "
+                    "not writing it again until it reads back as %s or the "
+                    "integration is reloaded",
+                    key,
+                    REQUIRED_SETTING_MAX_WRITES,
+                    expected,
+                )
             reg, _dt = get_entity_reg(get_entity_props(key))
+            written = True
             try:
                 resp = self._client.write_register(
                     address=reg, value=raw, device_id=self._hostid
@@ -1284,6 +1313,7 @@ class HrdsModbusHub:
                 _LOGGER.info(
                     "Set required setting %s (register %s) to %s", key, reg, raw
                 )
+        return written
 
     # ---- decoding ---------------------------------------------------------
     def _decode_all(
@@ -1511,7 +1541,13 @@ class HrdsModbusHub:
         self.check_write_allowed(entity_key, raw)
 
         words = ModbusTcpClient.convert_to_registers(value=int(raw), data_type=dt)
-        ok = await self._hass.async_add_executor_job(self._write_registers, reg, words)
+        # A pending request's register may still lag behind the last command,
+        # so its read-back cannot tell whether this write is needed.
+        with self._pending_lock:
+            compare = entity_key not in self._pending
+        ok = await self._hass.async_add_executor_job(
+            self._write_registers, reg, words, compare
+        )
         if not ok:
             raise HomeAssistantError(
                 f"Modbus write to {entity_key} (register {reg}) failed. If this "
@@ -1561,18 +1597,38 @@ class HrdsModbusHub:
             return int(inv[value])
         return int(value)
 
-    def _write_registers(self, base_reg: int, words) -> bool:
-        """Write one or more registers. Returns True only if every write took."""
+    def _write_registers(self, base_reg: int, words, compare: bool = True) -> bool:
+        """Write one or more registers. Returns True only if every write took.
+
+        With ``compare``, the registers are read first and nothing is written
+        if they already hold ``words``: the unit's parameters live in EEPROM,
+        and a service called again with the same value (an automation, a
+        repeated mode change) must not wear it.
+        """
+        words = [int(word) & 0xFFFF for word in words]
         with self._lock:
             if not self._client.connect():
                 _LOGGER.warning("Modbus connect failed during write")
                 return False
             try:
+                if compare:
+                    resp = self._read("holding", base_reg, len(words))
+                    if resp is not None and not resp.isError():
+                        if list(resp.registers) == words:
+                            _LOGGER.debug(
+                                "Register %s already holds %s; not written",
+                                base_reg,
+                                words,
+                            )
+                            return True
+                    elif resp is None and not self._client.connect():
+                        _LOGGER.warning("Modbus connect failed during write")
+                        return False
                 for offset, word in enumerate(words):
                     try:
                         resp = self._client.write_register(
                             address=base_reg + offset,
-                            value=int(word) & 0xFFFF,
+                            value=word,
                             device_id=self._hostid,
                         )
                     except Exception as exc:  # noqa: BLE001 - reported to caller

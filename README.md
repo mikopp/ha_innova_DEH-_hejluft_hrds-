@@ -212,7 +212,7 @@ show attributes, so this sensor is the one place to look.
    |--------|-------|-----|
    | Enable free cooling/heating (PG03) | **Off** unless an outdoor probe is wired | It acts on the outdoor temperature (bypass relay). With no probe there is no valid reading, so the unit may behave unpredictably. Also off when a central ventilation system handles free cooling. |
    | Enable on/off via display (PH01) | **Off** without a CNU2 display | Otherwise the unit stays off waiting for the display. |
-   | Enable on/off, dehumidify (DEU), integration (INT) via Modbus (PH02, PH28, PH27) | **On** | The unit ignores the matching requests without them. The integration sets them again on every poll, so switching one off by hand is undone. |
+   | Enable on/off, dehumidify (DEU), integration (INT) via Modbus (PH02, PH28, PH27) | **On** | The unit ignores the matching requests without them. The integration checks them on every poll and writes one only when the unit lost it, so switching one off by hand is undone. |
 2. **Probe settings** match what is wired. Without a display and without
    probes, *T/H probe source (HA00)* is *None / external probes* and both *T/H
    probe temperature / humidity input* selects are *Unused*; the integration
@@ -234,7 +234,7 @@ show attributes, so this sensor is the one place to look.
 
    | Issue | Meaning and what to do |
    |-------|------------------------|
-   | `modbus_enables_pending` | PH02/PH27/PH28 are not set on the unit yet. The integration writes them on the next poll; if this persists, the unit rejects the write (check the log). |
+   | `modbus_enables_pending` | PH02/PH27/PH28 are not set on the unit yet. The integration writes them on the next poll; if this persists, the unit does not keep the write, and after three tries the integration stops writing it (check the log). |
    | `headless_settings_pending` | Without a display, PH01 and HA00 must be 0. Same: written on the next poll. |
    | `unit_off_by_digital_input` | The remote on/off contact (OFF/OFF terminals, HB03) is open, so the unit is forced off. Close it (the factory bridge) or set HB03 accordingly. |
    | `unit_off_by_scheduler` / `unit_off_by_clock` | A time program or the internal clock holds the unit off. Check PH03 (**Time programs enabled**); switch it off for Modbus-only control. |
