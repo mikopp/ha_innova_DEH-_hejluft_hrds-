@@ -9,7 +9,8 @@ dehumidification module over **Modbus TCP**. Domain `innova_hrds`, code in
 
 Every design decision is an ADR in [`doc/adr/`](doc/adr/README.md) (index
 there). The accepted ADRs that govern a file load into your context
-automatically when you read that file (`.claude/rules/adr/`, path-scoped).
+automatically when you read that file (real files in `.claude/rules/adr/`,
+path-scoped; the rest are in `.claude/adr/`, never loaded).
 For logic in a file no ADR path covers (a new module), the topic map
 `.claude/rules/adr-topics.md` (loads with any code) names the ADRs per topic:
 read those before the first edit. ADRs are binding: follow them, or stop and
@@ -84,12 +85,12 @@ Each topic has one home; link to it instead of repeating it (ADR-0027).
 ```
 ruff check . && ruff format .
 python3 tests/wiring_check.py   # registers, translations, platforms, groups; no HA needed
-python3 tests/adr_check.py      # ADR format, scopes, links, index (--fix rewrites the last two)
+python3 tests/adr_check.py      # ADR format, scopes, folders, index, topic map (--fix)
 pytest tests/sim tests/ha tests/test_wiring.py   # needs requirements_test.txt, Python 3.14
 ```
 
 Run `wiring_check.py` after any entity change and `adr_check.py` after any
-change under `doc/adr/`.
+ADR change.
 
 ## CI
 

@@ -1,4 +1,9 @@
-"""Consistency check for the architecture decision records in ``doc/adr``.
+"""Consistency check for the architecture decision records (ADRs).
+
+Accepted ADRs are real files in ``.claude/rules/adr/``: Claude Code loads one
+when it reads a file matching its ``paths``. The template and the ADRs not in
+force (proposed, superseded, rejected, deprecated) are in ``.claude/adr/``,
+which nothing loads. ``doc/adr/README.md`` is the index people browse.
 
 ADRs are written for agents as much as for people (ADR-0001), so their shape is
 checked like code:
@@ -13,8 +18,7 @@ checked like code:
   has an accepted ADR
 * a superseded ADR names an existing successor that lists it in
   ``supersedes`` (and the other way round)
-* ``.claude/rules/adr/`` links exactly the accepted ADRs, so Claude Code loads
-  each one when a file in its ``paths`` is read
+* an ADR sits in the folder its status calls for (``--fix`` moves it)
 * the index table in ``doc/adr/README.md`` and the topic map
   ``.claude/rules/adr-topics.md`` are current. The map loads with any code,
   test or CI file, so a decision reaches logic in a file no ``paths`` glob
@@ -24,7 +28,7 @@ checked like code:
 Only failures are printed, to keep the output short for agents.
 
 Run with:  python3 tests/adr_check.py          (check, as CI does)
-           python3 tests/adr_check.py --fix    (rewrite index, topic map, links)
+           python3 tests/adr_check.py --fix    (rewrite index and topic map, move ADRs)
            python3 tests/adr_check.py --no-run (skip the sh blocks)
            python3 tests/adr_check.py --for FILE...  (which ADRs govern these)
            python3 tests/adr_check.py --topic TOPIC... (which ADRs have these)
@@ -41,9 +45,9 @@ import sys
 from dataclasses import dataclass, field
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-ADR_DIR = ROOT / "doc/adr"
-LINK_DIR = ROOT / ".claude/rules/adr"
-INDEX = ADR_DIR / "README.md"
+ACCEPTED_DIR = ROOT / ".claude/rules/adr"  # loaded by Claude Code, by `paths`
+OTHER_DIR = ROOT / ".claude/adr"  # template and ADRs not in force; never loaded
+INDEX = ROOT / "doc/adr/README.md"
 INDEX_START = "<!-- adr-index:start -->"
 INDEX_END = "<!-- adr-index:end -->"
 COMPONENT = "custom_components/innova_hrds/"
@@ -152,7 +156,8 @@ def parse_frontmatter(text: str, name: str) -> tuple[dict, str]:
 
 def load_adrs() -> dict[str, Adr]:
     adrs: dict[str, Adr] = {}
-    for path in sorted(ADR_DIR.glob("*.md")):
+    paths = [*ACCEPTED_DIR.glob("*.md"), *OTHER_DIR.glob("*.md")]
+    for path in sorted(paths, key=lambda p: p.name):
         match = ADR_FILE.match(path.name)
         if not match:
             continue
@@ -206,10 +211,6 @@ def repo_files() -> list[str]:
     return result.stdout.split()
 
 
-def link_target(adr: Adr) -> str:
-    return os.path.relpath(adr.path, LINK_DIR)
-
-
 def index_table(adrs: dict[str, Adr]) -> str:
     rows = ["| ADR | Decision | Status | Loads for |", "|---|---|---|---|"]
     for adr in adrs.values():
@@ -219,9 +220,8 @@ def index_table(adrs: dict[str, Adr]) -> str:
             if adr.status == "accepted"
             else "-"
         )
-        rows.append(
-            f"| [{adr.number}]({adr.path.name}) | {title} | {adr.status} | {scope} |"
-        )
+        link = os.path.relpath(adr.path, INDEX.parent)
+        rows.append(f"| [{adr.number}]({link}) | {title} | {adr.status} | {scope} |")
     return "\n".join(rows)
 
 
@@ -303,27 +303,26 @@ def check_adr(adr: Adr, adrs: dict[str, Adr], files: list[str], run: bool) -> No
                 )
 
 
-def check_links(adrs: dict[str, Adr], fix: bool) -> None:
-    wanted = {
-        a.path.name: link_target(a) for a in adrs.values() if a.status == "accepted"
-    }
-    if fix:
-        LINK_DIR.mkdir(parents=True, exist_ok=True)
-        for link in LINK_DIR.iterdir():
-            if link.name not in wanted or not link.is_symlink():
-                link.unlink()
-        for name, target in wanted.items():
-            link = LINK_DIR / name
-            if not (link.is_symlink() and os.readlink(link) == target):
-                link.unlink(missing_ok=True)
-                link.symlink_to(target)
-    present = {p.name for p in LINK_DIR.iterdir()} if LINK_DIR.is_dir() else set()
-    for name in sorted(present - wanted.keys()):
-        fail(f".claude/rules/adr/{name}: not an accepted ADR, remove the link (--fix)")
-    for name, target in sorted(wanted.items()):
-        link = LINK_DIR / name
-        if not link.is_symlink() or os.readlink(link) != target:
-            fail(f".claude/rules/adr/{name}: missing or wrong link to {target} (--fix)")
+def check_folders(adrs: dict[str, Adr], fix: bool) -> None:
+    """Accepted ADRs must be where Claude Code loads them, the rest must not."""
+    for adr in adrs.values():
+        folder = ACCEPTED_DIR if adr.status == "accepted" else OTHER_DIR
+        if adr.path.parent == folder:
+            continue
+        target = folder / adr.path.name
+        if fix:
+            folder.mkdir(parents=True, exist_ok=True)
+            moved = subprocess.run(
+                ["git", "mv", str(adr.path), str(target)], cwd=ROOT, capture_output=True
+            )
+            if moved.returncode:
+                adr.path.replace(target)
+            adr.path = target
+        else:
+            fail(
+                f"{adr.path.relative_to(ROOT)}: status {adr.status!r} belongs in "
+                f"{folder.relative_to(ROOT)}/ (--fix)"
+            )
 
 
 def check_index(adrs: dict[str, Adr], fix: bool) -> None:
@@ -353,7 +352,7 @@ def topic_map(adrs: dict[str, Adr]) -> str:
         "A decision binds the logic it is about, in any file. The ADRs whose",
         "`paths` match a file you read load by themselves. For code no path",
         "covers (a new module, logic moved elsewhere), read the ADRs of its",
-        "topics before the first edit: ADR-NNNN is `doc/adr/NNNN-*.md`, or run",
+        "topics before the first edit: ADR-NNNN is `.claude/rules/adr/NNNN-*.md`; run",
         "`python3 tests/adr_check.py --topic <topic>` for their titles.",
         "",
     ]
@@ -382,12 +381,13 @@ def check_topic_map(adrs: dict[str, Adr], fix: bool) -> None:
 
 def check_references(adrs: dict[str, Adr]) -> None:
     """Instruction files cite accepted ADRs only; every ADR cites real ones."""
+    adr_files = {a.path for a in adrs.values()}
     instruction_files = [
         p
         for p in ROOT.rglob("*.md")
         if ".git" not in p.parts
         and (p.name == "CLAUDE.md" or ".claude" in p.parts)
-        and not p.is_symlink()
+        and p not in adr_files
     ]
     for path in instruction_files:
         for number in ADR_REF.findall(path.read_text(encoding="utf-8")):
@@ -403,7 +403,9 @@ def check_references(adrs: dict[str, Adr]) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--fix", action="store_true", help="rewrite index and links")
+    parser.add_argument(
+        "--fix", action="store_true", help="rewrite index and topic map, move ADRs"
+    )
     parser.add_argument("--no-run", action="store_true", help="skip sh blocks")
     parser.add_argument(
         "--for", dest="files", nargs="*", metavar="FILE", help="list governing ADRs"
@@ -441,7 +443,7 @@ def main() -> int:
     files = repo_files()
     for adr in adrs.values():
         check_adr(adr, adrs, files, run=not args.no_run)
-    check_links(adrs, args.fix)
+    check_folders(adrs, args.fix)
     check_index(adrs, args.fix)
     check_topic_map(adrs, args.fix)
     check_references(adrs)

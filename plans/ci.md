@@ -84,5 +84,5 @@ surface, real scheduler, persistence over real restarts, boot order, runtime
 log. The restart contract (the initial setup survives a restart) is checked in
 both layers, from different sides: the code's behaviour on a fresh start
 in-process, the state coming back from disk after a real boot in e2e. The decision is
-[ADR-0019](../doc/adr/0019-tests-run-the-real-client-against-a-simulated-unit.md);
+[ADR-0019](../.claude/rules/adr/0019-tests-run-the-real-client-against-a-simulated-unit.md);
 how-to: `tests/CLAUDE.md`.

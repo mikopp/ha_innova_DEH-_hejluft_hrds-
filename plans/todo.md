@@ -189,7 +189,7 @@ opened to 0/100.
 - [ ] **Does the fan turn while 1119 reads `4` (wait_off, "Stopping")?** Record
       1119, 639 and 1117 through a PF03 post-run after a request ends. Decides
       the proposed
-      [ADR-0028](../doc/adr/0028-one-definition-of-fan-stopped.md) (today the
+      [ADR-0028](../.claude/adr/0028-one-definition-of-fan-stopped.md) (today the
       fan entity, the climate fan mode and the airflow disagree about it).
 - [ ] Verify the Low / Medium / High percentages (30 / 55 / 85 %) are
       reasonable for the real unit; adjust in `climate.py` `_FAN_MODE_PCT` if

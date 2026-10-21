@@ -1,13 +1,15 @@
 ---
 name: adr
-description: Records, supersedes and checks the architecture decision records in doc/adr. Use when a change makes or reverses a design decision (a rule the code must keep following), when asked to log, write or propose an ADR, when a planned change would contradict an ADR, or before opening a PR to check the diff against the ADRs that govern the changed files.
+description: Records, supersedes and checks the architecture decision records (index doc/adr/README.md, files in .claude/rules/adr and .claude/adr). Use when a change makes or reverses a design decision (a rule the code must keep following), when asked to log, write or propose an ADR, when a planned change would contradict an ADR, or before opening a PR to check the diff against the ADRs that govern the changed files.
 argument-hint: "new <decision> | supersede <ADR-NNNN> <decision> | check [base]"
 ---
 
 # ADRs
 
-Format and rules: `doc/adr/0001-record-decisions-as-path-scoped-adrs.md`.
-Template: `doc/adr/template.md`. Validator: `python3 tests/adr_check.py`.
+Format and rules: `.claude/rules/adr/0001-record-decisions-as-path-scoped-adrs.md`.
+Template: `.claude/adr/template.md`. Validator: `python3 tests/adr_check.py`.
+Accepted ADRs live in `.claude/rules/adr/` (loaded by path), all others in
+`.claude/adr/` (never loaded); `--fix` moves a file when its status changes.
 
 ## Is it an ADR?
 
@@ -22,7 +24,8 @@ skill), a fact about the unit (`doc/references/UNIT_BEHAVIOUR.md`).
 - [ ] 1. python3 tests/adr_check.py --for <files the decision governs>
         and --topic <its topics> → read those ADRs; if one already covers
         it, edit or supersede instead
-- [ ] 2. cp doc/adr/template.md doc/adr/NNNN-kebab-title.md (next free number)
+- [ ] 2. cp .claude/adr/template.md .claude/adr/NNNN-kebab-title.md
+        (next free number across both folders)
 - [ ] 3. Decision first: one RFC 2119 rule per bullet, naming code symbols
 - [ ] 4. paths: the narrowest globs that cover the governed files;
         topics: every topic in TOPICS (tests/adr_check.py) it is about.
@@ -43,7 +46,8 @@ enough.
 
 1. Write the new ADR as above with `supersedes: [ADR-OLD]`.
 2. In the old ADR set `status: superseded by ADR-NEW`, delete its `paths`, and
-   add a short "Why it was superseded" section.
+   add a short "Why it was superseded" section; `--fix` moves it out of
+   `.claude/rules/adr/` so it stops loading.
 3. Update CLAUDE.md lines that cite the old id; run the validator.
 
 ## check: a diff against the ADRs
