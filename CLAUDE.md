@@ -265,10 +265,26 @@ figures in the technical data are the tested spec range, **not** a firmware floo
 ## Climate entity mapping
 
 * `current_temperature` ← `room_temperature`; `current_humidity` ← `room_humidity`.
-* `hvac_mode` ∈ {OFF, DRY, COOL (summer), HEAT (winter, only with
-  `allow_winter_heating`, never on brine)}; setting it writes the request
-  registers first (so the guard refuses before the unit starts), then
-  `unit_on_off`.
+* `hvac_mode` ∈ {OFF, AUTO, DRY, COOL (summer), HEAT (winter, only with
+  `allow_winter_heating`, never on brine)}. The unit ORs its request sources
+  (handbook 6.1: its own room-probe logic, the DEU/INT digital inputs,
+  Modbus), so the mode says what can make it act. Derived in order: unit off →
+  OFF; INT (1139) on → COOL/HEAT; DEU (1140) on → DRY; `hub.auto_capable` →
+  AUTO; `dehumidify_request` (1121) on from another source → DRY; else OFF
+  (on but nothing can make it act, action IDLE).
+* `hub.auto_capable` (`_auto_sources`): a display or allocated probe
+  (`show_*_target`) with a healthy reading. Humidity also needs summer or PU02 on;
+  temperature also needs PG02 and summer (or `allow_winter_heating`). AUTO is
+  only offered while it holds. Switching the unit on while it holds counts as a
+  start for the brine guard, and on brine in winter it needs a passing guard
+  (the unit would dehumidify by itself).
+* Setting a mode writes the request registers first (so the guard refuses
+  before the unit starts), then `unit_on_off`. AUTO clears both requests and
+  turns the unit on. OFF clears both requests and turns the unit off only if
+  it could still act on its own (`auto_capable`, or a 1121 request not ours):
+  over Modbus that is the only way to stop the unit's own logic.
+* Auto mode is tested only against the derived `display_cnu2` overlay, never on
+  a real display unit; the README banner says so.
 * `hvac_action` derived from `unit_status` / `compressor_status` /
   `dehumidify_request`.
 * `target_humidity` ← `humidity_setpoint`; `target_temperature` ←

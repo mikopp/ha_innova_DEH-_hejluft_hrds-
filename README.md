@@ -25,6 +25,9 @@ module (sold in Austria by https://www.hejluft.at/ as the **HRDS+**) over **Modb
 >   (automatic setpoint control), brine circuits, winter heating, free cooling,
 >   and how the manual fan speed maps to the actual fan output. The open items
 >   are listed in [`plans/todo.md`](plans/todo.md).
+> * **Climate *Auto* mode is not tested on a real device.** It only appears
+>   with a display or room probe. CI tests it against a simulated display unit
+>   derived from the headless dump, not against a real display unit.
 >
 > Reports from other units are very welcome, see
 > [Reporting issues](#reporting-issues). The aim for 1.0 is in
@@ -99,7 +102,11 @@ for full detail.
 
 | Entity | What it shows / does |
 |--------|---------------------|
-| `climate.hrds_climate` | HVAC mode (Off/Dry, Cool in summer, Heat in winter if enabled), action, fan mode. Target T¹ / RH² only when a display or room probe is configured. `current_temperature`¹ and `current_humidity`² are suppressed when the corresponding probe is absent. Target-humidity bounds follow the unit's own PH29/PH30 clamps; the target temperature is SEtC in summer and SEtH in winter. |
+| `climate.hrds_climate` | HVAC mode (Off, Auto⁴, Dry, Cool in summer, Heat in winter if enabled), action, fan mode. The mode says what can make the unit act: **Off** also covers a unit that is on with nothing requested and no room sensor (action *Idle*), because such a unit never starts by itself. **Off** clears the dehumidify and integration requests, and switches the unit off only if its own logic could still start it. **Auto** turns the unit on with no request, so it regulates on its own setpoints. Target T¹ / RH² only when a display or room probe is configured. `current_temperature`¹ and `current_humidity`² are suppressed when the corresponding probe is absent. Target-humidity bounds follow the unit's own PH29/PH30 clamps; the target temperature is SEtC in summer and SEtH in winter. |
+
+⁴ Only offered when a display or a room probe lets the unit raise requests by
+itself (handbook §6.1), and while that reading is healthy. Not tested on a real
+device (see the banner at the top).
 
 ### Sensors
 
@@ -454,7 +461,7 @@ What it blocks, and what it does not:
 
 | Blocked while the switch is off | Always works |
 |---|---|
-| Turning the unit **on**, **dehumidify** (climate *Dry*, `switch.dehumidify`), **active cooling / integration** (climate *Cool* / *Heat*, `switch.active_cooling`), and any **non-zero fan speed** | Turning things **off** (climate *Off*, switches off, fan 0), reading every sensor, and every configuration write (setpoints, selects, setup entities) |
+| Turning the unit **on** (also climate *Auto*), **dehumidify** (climate *Dry*, `switch.dehumidify`), **active cooling / integration** (climate *Cool* / *Heat*, `switch.active_cooling`), and any **non-zero fan speed** | Turning things **off** (climate *Off*, switches off, fan 0), reading every sensor, and every configuration write (setpoints, selects, setup entities) |
 
 A blocked request fails with *"Operational requests are not allowed yet. Review
 the setup entities, then turn on 'Allow operational requests'."* That message
@@ -476,11 +483,16 @@ Good to know:
   entities. Turn it on once the setup check is `ok`.
 * Your choice is remembered across restarts and reloads.
 * Turning it off again does not stop a running unit; it only refuses new
-  requests. To stop the unit, set the climate to *Off*.
+  requests. To stop the unit, set the climate to *Off*: that clears both
+  requests (and switches the unit off when a display or room probe could start
+  it again on its own).
 
 ### 5. First run
 
-1. Set the climate entity to **Dry** (or turn on `switch.dehumidify`).
+1. Set the climate entity to **Dry** (or turn on `switch.dehumidify`). Only
+   turning on `switch.unit_on_off` is not enough on a unit without a display
+   or room probe: it then has nothing to act on, so the climate entity stays
+   *Off* with the action *Idle*.
 2. Watch **Unit status**: a unit waiting for its first request reads *Off
    (Modbus)* and changes to *On*. The recirculation fan (`R` units) starts
    with the request.

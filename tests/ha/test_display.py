@@ -1,16 +1,21 @@
-"""Unit with a CNU2 display and wired room probes (has_display option on)."""
+"""Unit with a CNU2 display and its built-in room sensors (has_display on).
+
+The scenario is the real headless dump patched best-effort into a display unit
+(overlay ``display_cnu2``); no dump of a real display unit exists yet.
+"""
 
 from __future__ import annotations
 
 import pytest
 from homeassistant.components.climate import ClimateEntityFeature
+from homeassistant.exceptions import ServiceValidationError
 
 from tests.sim import registers as R
 
 from .conftest import CLIMATE, allow_operation, set_hvac_mode
 
 pytestmark = [
-    pytest.mark.parametrize("sim_options", [{"overlays": ("display_with_probes",)}]),
+    pytest.mark.parametrize("sim_options", [{"overlays": ("display_cnu2",)}]),
     pytest.mark.parametrize("entry_options", [{"has_display": True}]),
 ]
 
@@ -108,3 +113,81 @@ async def test_operation_with_display(setup, clock, mode, action):
     s.device.set_display_on(False)
     await clock.poll()
     assert s.state("climate", CLIMATE).attributes["hvac_action"] == "off"
+
+
+# ---- auto: the unit's own room-sensor logic ------------------------------------
+async def test_auto_lets_the_unit_dehumidify_on_its_own(setup, clock):
+    s = setup
+    await allow_operation(s)
+    climate = s.state("climate", CLIMATE)
+    assert "auto" in climate.attributes["hvac_modes"]
+    s.device.clear_write_log()
+    await set_hvac_mode(s, clock, "auto")
+    # No Modbus request: the unit decides from its own humidity reading.
+    assert [(w.address, w.value) for w in s.device.write_log] == [
+        (R.INT_REQUEST, 0),
+        (R.DEU_REQUEST, 0),
+        (R.BMS_ON, 1),
+    ]
+    climate = s.state("climate", CLIMATE)
+    assert climate.state == "auto"
+    assert climate.attributes["hvac_action"] == "idle"  # 55 %RH, below PU01 + PU07
+
+    s.device.set_room_humidity(70)
+    await clock.poll()
+    climate = s.state("climate", CLIMATE)
+    assert climate.state == "auto"
+    assert climate.attributes["hvac_action"] == "drying"
+
+    # Off has to switch the unit off: nothing else stops its own logic.
+    s.device.clear_write_log()
+    await set_hvac_mode(s, clock, "off")
+    assert [(w.address, w.value) for w in s.device.write_log] == [
+        (R.INT_REQUEST, 0),
+        (R.DEU_REQUEST, 0),
+        (R.BMS_ON, 0),
+    ]
+    climate = s.state("climate", CLIMATE)
+    assert climate.state == "off"
+    assert climate.attributes["hvac_action"] == "off"
+    assert s.state("binary_sensor", "dehumidify_request").state == "off"
+
+
+async def test_explicit_request_wins_over_auto(setup, clock):
+    s = setup
+    await allow_operation(s)
+    await set_hvac_mode(s, clock, "dry")
+    assert s.state("climate", CLIMATE).state == "dry"
+    await set_hvac_mode(s, clock, "auto")
+    assert s.device.holding[R.DEU_REQUEST] == 0
+    assert s.state("climate", CLIMATE).state == "auto"
+
+
+async def test_turn_on_prefers_auto(setup, clock):
+    s = setup
+    await allow_operation(s)
+    await s.service("climate", "turn_on", CLIMATE)
+    await clock.settle()
+    assert s.state("climate", CLIMATE).state == "auto"
+
+
+async def test_auto_withdrawn_on_humidity_probe_fault(setup, clock):
+    s = setup
+    await allow_operation(s)
+    await s.service("switch", "turn_on", "unit_on_off")
+    await clock.settle()
+    s.device.raise_alarm("AL34")
+    s.device.unplug_probe(R.ROOM_HUMIDITY)
+    await clock.poll()
+    climate = s.state("climate", CLIMATE)
+    # The temperature sensor still drives INT in summer (PG02 = 1).
+    assert "auto" in climate.attributes["hvac_modes"]
+    s.device.raise_alarm("AL28")
+    s.device.unplug_probe(R.ROOM_TEMP)
+    await clock.poll()
+    climate = s.state("climate", CLIMATE)
+    assert "auto" not in climate.attributes["hvac_modes"]
+    assert climate.state == "off"
+    assert climate.attributes["hvac_action"] == "idle"
+    with pytest.raises(ServiceValidationError, match="auto"):
+        await s.service("climate", "set_hvac_mode", CLIMATE, hvac_mode="auto")

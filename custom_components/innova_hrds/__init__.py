@@ -42,6 +42,7 @@ from .const import (
     BMS_ENABLE_KEYS,
     BRINE_GUARD_MAX_AGE_HOURS,
     C_ACTIVE_COOLING,
+    C_ACTIVE_COOLING_AVAILABLE,
     C_AI2_ALLOCATION,
     C_AI3_ALLOCATION,
     C_ALARM_ANTIFREEZE,
@@ -53,6 +54,7 @@ from .const import (
     C_DT_INT16,
     C_ENABLE_FREE_COOLING,
     C_ENABLE_INT_BMS,
+    C_HUMIDITY_PROBE_OK,
     C_INSTALLER_LAST_READ,
     C_MAX_BLOCK,
     C_MAX_GAP,
@@ -69,6 +71,7 @@ from .const import (
     C_SUPPLY_FAN_MAX_AIRFLOW,
     C_SUPPLY_FAN_OUTPUT,
     C_SUPPLY_FAN_STATUS,
+    C_TEMP_PROBE_OK,
     C_TEMPERATURE_UNIT,
     C_TIME_PROGRAMS,
     C_UNIT_ON_OFF,
@@ -480,6 +483,38 @@ class HrdsModbusHub:
         """The season the unit reports (1583): summer, winter, auto or None."""
         return self.data.get(C_OPERATING_MODE)
 
+    def _auto_sources(self) -> Tuple[bool, bool]:
+        """(humidity, temperature): what the unit can request on its own.
+
+        The unit ORs its request sources (handbook 6.1): the room probes
+        (humidity above PU01 + PU07 -> DEU; temperature past SEtC/SEtH -> INT),
+        the DEU/INT digital inputs and Modbus. Without a healthy room reading
+        there is no automatic request, and a unit that is merely on does
+        nothing.
+        """
+        d = self.data
+        summer = self.season == "summer"
+        humidity = (
+            self.show_humidity_target
+            and d.get(C_ROOM_HUMIDITY) is not None
+            and d.get(C_HUMIDITY_PROBE_OK) != "off"
+            # PU02: no dehumidifying in winter unless enabled (factory: off).
+            and (summer or d.get(C_WINTER_DEHUM) != "disabled")
+        )
+        temperature = (
+            self.show_temperature_target
+            and d.get(C_ROOM_TEMPERATURE) is not None
+            and d.get(C_TEMP_PROBE_OK) != "off"
+            and d.get(C_ACTIVE_COOLING_AVAILABLE) == "on"
+            and (summer or self.allow_winter_heating)
+        )
+        return bool(humidity), bool(temperature)
+
+    @property
+    def auto_capable(self) -> bool:
+        """Whether the unit can raise a request on its own."""
+        return any(self._auto_sources())
+
     def update_hidden_keys(self) -> None:
         """Hide setpoints the unit cannot act on.
 
@@ -584,9 +619,11 @@ class HrdsModbusHub:
         winter = self.season != "summer"
         d = self.data
         requests_on = d.get(C_DEHUMIDIFY) == "on" or d.get(C_ACTIVE_COOLING) == "on"
+        # Switching the unit on starts it when a request is latched or when its
+        # own room-probe logic can raise one.
         starts = bool(raw) and (
             entity_key in (C_DEHUMIDIFY, C_ACTIVE_COOLING)
-            or (entity_key == C_UNIT_ON_OFF and requests_on)
+            or (entity_key == C_UNIT_ON_OFF and (requests_on or self.auto_capable))
         )
         if self.brine_entity:
             # Judge the sensor as of now, not as of the last poll.
@@ -620,6 +657,21 @@ class HrdsModbusHub:
                 "Dehumidifying in winter on a brine circuit needs a brine "
                 "temperature guard (the water register can freeze). Configure "
                 "one in the integration options."
+            )
+        if (
+            entity_key == C_UNIT_ON_OFF
+            and raw
+            and winter
+            and self.is_brine
+            and not brine_winter_ok
+            and self._auto_sources()[0]
+        ):
+            raise ServiceValidationError(
+                "The room probe would let the unit dehumidify in winter on its "
+                "own; on a brine circuit that needs a brine temperature guard "
+                "(the water register can freeze). Configure one in the "
+                "integration options, or set winter dehumidification (PU02) to "
+                "disabled."
             )
         if entity_key == C_SEASON and raw == 3:  # 3 = winter
             if (

@@ -43,6 +43,8 @@ HUMIDITY_SETPOINT = 1586
 FAN_HOURS = 1604  # PM01, write 0 resets AL22
 FAN_MANUAL = 1614  # PM20, x0.01 %
 PC07_MAX_WATER = 1633  # x0.1 degC
+PU02_WINTER_DEHUM = 1689  # 0 = no dehumidifying in winter (factory)
+PU07_DEHUM_DIFF = 1694  # %RH; auto DEU on above PU01 + PU07, off below PU01
 PF07_FAN_MIN_VMC = 1644  # x0.01 %
 PF09_FAN_MAX_INT = 1646
 PF10_FAN_MAX_DEU = 1647
@@ -91,6 +93,8 @@ PROBE_SENTINEL = 0x8004
 
 ROOM_TEMP_PROBE_CODES = (45,)
 ROOM_HUMIDITY_PROBE_CODES = (53, 54)
+# HA00 values whose display supplies the room humidity (CNU / EPJ / CNU2, T + H).
+DISPLAY_HUMIDITY_SOURCES = (2, 4, 6)
 
 SEASON_SUMMER = 4  # HB04 values
 SEASON_WINTER = 3

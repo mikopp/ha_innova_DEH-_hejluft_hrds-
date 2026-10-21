@@ -18,7 +18,8 @@ Stdlib only. All bodies are JSON; every POST answers with ``GET /state``.
                        (lists), ``delay`` (s), ``fc43`` (bool), ``identity``
                        (``{"0": vendor, "1": product, "2": revision}``),
                        ``pump_fault``, ``display_on`` (bool), ``fan_model``,
-                       ``water_temperature`` (degC), ``sequence_delay`` (s)
+                       ``water_temperature`` (degC), ``room_humidity`` (%RH),
+                       ``sequence_delay`` (s)
 =====================  =====================================================
 """
 
@@ -118,6 +119,8 @@ class ControlApi:
             dev.set_fan_model(body["fan_model"])
         if "water_temperature" in body:
             dev.set_water_temperature(float(body["water_temperature"]))
+        if "room_humidity" in body:
+            dev.set_room_humidity(int(body["room_humidity"]))
         if "sequence_delay" in body:
             dev.sequence_delay = float(body["sequence_delay"])
 

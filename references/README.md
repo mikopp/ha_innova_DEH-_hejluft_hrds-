@@ -365,9 +365,15 @@ sensors/numbers/switches:
   humidity (505).
 * `hvac_action` ← derived from `sm_UnitStatus` / `DehumRequest` / `CmpStatus`
   (OFF / IDLE / DRYING / COOLING / FAN).
-* `hvac_mode` ← used to drive the operating mode: OFF, DRY (dehumidify), COOL
-  (summer integration), HEAT (winter integration, opt-in). Writing a mode
-  toggles the on/off + dehum + integration request registers.
+* `hvac_mode` ← used to drive the operating mode: OFF, AUTO (the unit's own
+  room-probe logic), DRY (dehumidify), COOL (summer integration), HEAT (winter
+  integration, opt-in). Writing a mode toggles the on/off + dehum + integration
+  request registers. A unit that is on with no request and no room probe never
+  acts (see the request sources in
+  [`MODBUS_REGISTERS.md` §14.6](./MODBUS_REGISTERS.md#146-running-without-any-display-or-external-probes)),
+  so it shows as OFF with action IDLE. AUTO is offered only with a display or
+  room probe; OFF then switches the unit off, since nothing else stops its own
+  logic.
 * `target_humidity` ← `PU01` (1586); `target_temperature` ← season setpoint.
   Neither is offered headless without a room probe: the unit ignores them.
 

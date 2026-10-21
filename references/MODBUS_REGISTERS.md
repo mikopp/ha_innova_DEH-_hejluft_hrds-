@@ -590,7 +590,9 @@ display or any room sensors. In this mode:
 3. Automatic setpoint-based control (trigger dehumidify when room humidity >
    PU01) does **not** function — there is no room sensor to compare against.
    Issue dehumidify / cooling requests **explicitly via Modbus** (the climate
-   entity or individual switches).
+   entity or individual switches). A unit that is merely switched on does
+   nothing: the climate entity shows it as *Off* with action *Idle*, and offers
+   no *Auto*.
 4. `current_temperature` and `current_humidity` on the climate entity read
    `None`. An unwired input does not read 0: it reads a sentinel word
    (§14.7), which the integration decodes to "no value" (entity state
@@ -599,6 +601,18 @@ display or any room sensors. In this mode:
    OFF by display, so do not rely on them alone. This is expected, not an error.
 5. The evaporator and water-circuit probes remain active (factory-wired) and
    continue to protect the unit against AL03/AL04/AL11/AL12.
+
+**Request sources (handbook §6.1, §6.3).** The unit ORs them; any one starts
+the request:
+
+| Request | Automatic (room probe or display) | Digital input | Modbus |
+|---|---|---|---|
+| DEU | room humidity > PU01 + PU07, off below PU01; held off below PU13 (re-enabled above PU13 + PU14); in winter only if PU02 allows it | DEU input | 1140 with PH28 = 1 |
+| INT | summer: room temp > SEtC + PF12, off below SEtC − PF12; winter: room temp < SEtH − PF12 (SEtH capped by PH10, factory 14 °C) | INT input | 1139 with PH27 = 1 |
+
+An INT request in summer also requests DEU when PU05 is on. The effective DEU
+request is readable (`DehumRequest`, 1121); the INT one is not. Over Modbus the
+automatic requests can only be stopped by switching the unit off.
 
 ### 14.7 Unwired analog inputs read a sentinel, not a temperature
 

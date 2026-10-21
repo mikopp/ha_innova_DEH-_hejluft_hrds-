@@ -6,6 +6,22 @@ All notable changes to this project are documented here, newest first.
 
 ## Unreleased
 
+**Changed:** the climate entity no longer shows *Dry* for a unit that is just
+switched on. The unit acts only on a request (its own room-probe logic, a
+digital input or Modbus), so a unit that is on with nothing requested and no
+display or room probe now shows **Off** with the action *Idle*. Setting the
+climate to **Off** now clears the dehumidify and integration requests. It
+switches the unit off only when a display or room probe (or a request from
+another source) could start it again by itself; otherwise `switch.unit_on_off`
+stays as it is.
+
+**Added:** an **Auto** climate mode, offered only when a display or room probe
+lets the unit raise requests itself and its reading is healthy. Auto turns the
+unit on with no Modbus request, so it regulates on its own setpoints. With a
+brine temperature guard configured, turning the unit on in that state needs a
+passing guard. Auto mode is **not tested on a real device**: CI covers it with
+a simulated display unit derived from the headless dump.
+
 **Changed:** the *AI2 allocation (HA02)* and *AI3 allocation (HA03)* numbers on
 the setup device are now dropdowns named *T/H probe temperature input* and
 *T/H probe humidity input*, with the options *Unused*, *Room temperature probe
