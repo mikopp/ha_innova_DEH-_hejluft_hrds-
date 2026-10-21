@@ -10,8 +10,8 @@ body:
         (read-only, never writes):
 
         ```
-        git clone https://github.com/mikopp/ha_innova_DEH-_hejluft_hrds-.git
-        cd ha_innova_DEH-_hejluft_hrds-
+        git clone https://github.com/mikopp/homeassistant-innova-hrds.git
+        cd homeassistant-innova-hrds
         pip install 'pymodbus>=3.13.1'
         python3 tests/diagnose_hrds.py <gateway-ip> --json diag.json
         ```

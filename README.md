@@ -1,12 +1,12 @@
 # Innova DEH+ / hej.luft HRDS+ — Home Assistant integration
 
-[![Release](https://img.shields.io/github/v/release/mikopp/ha_innova_DEH-_hejluft_hrds-)](https://github.com/mikopp/ha_innova_DEH-_hejluft_hrds-/releases)
+[![Release](https://img.shields.io/github/v/release/mikopp/homeassistant-innova-hrds)](https://github.com/mikopp/homeassistant-innova-hrds/releases)
 [![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
-[![Lint](https://github.com/mikopp/ha_innova_deh-_hejluft_hrds-/actions/workflows/lint.yaml/badge.svg)](https://github.com/mikopp/ha_innova_deh-_hejluft_hrds-/actions/workflows/lint.yaml)
-[![hassfest](https://github.com/mikopp/ha_innova_deh-_hejluft_hrds-/actions/workflows/hassfest.yaml/badge.svg)](https://github.com/mikopp/ha_innova_deh-_hejluft_hrds-/actions/workflows/hassfest.yaml)
-[![HACS](https://github.com/mikopp/ha_innova_deh-_hejluft_hrds-/actions/workflows/hacs.yaml/badge.svg)](https://github.com/mikopp/ha_innova_deh-_hejluft_hrds-/actions/workflows/hacs.yaml)
+[![Lint](https://github.com/mikopp/homeassistant-innova-hrds/actions/workflows/lint.yaml/badge.svg)](https://github.com/mikopp/homeassistant-innova-hrds/actions/workflows/lint.yaml)
+[![hassfest](https://github.com/mikopp/homeassistant-innova-hrds/actions/workflows/hassfest.yaml/badge.svg)](https://github.com/mikopp/homeassistant-innova-hrds/actions/workflows/hassfest.yaml)
+[![HACS](https://github.com/mikopp/homeassistant-innova-hrds/actions/workflows/hacs.yaml/badge.svg)](https://github.com/mikopp/homeassistant-innova-hrds/actions/workflows/hacs.yaml)
 
-[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=mikopp&repository=ha_innova_DEH-_hejluft_hrds-&category=integration)
+[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=mikopp&repository=homeassistant-innova-hrds&category=integration)
 
 Home Assistant custom integration (installable with **HACS**) for the **Innova
 DEH+** / **hej.luft HRDS+** ducted dehumidifiers. It controls and monitors the
@@ -140,16 +140,16 @@ are in [`doc/references/MODBUS_REGISTERS.md`](doc/references/MODBUS_REGISTERS.md
 
 #### HACS (custom repository)
 
-[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=mikopp&repository=ha_innova_DEH-_hejluft_hrds-&category=integration)
+[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=mikopp&repository=homeassistant-innova-hrds&category=integration)
 
 Or by hand:
 
 1. In HACS, add this repository as a custom repository (category: *Integration*):
-   `https://github.com/mikopp/ha_innova_DEH-_hejluft_hrds-`
+   `https://github.com/mikopp/homeassistant-innova-hrds`
 2. Install **Innova HRDS+ / hej.luft Dehumidifier** and restart Home Assistant.
 
 HACS installs the `innova_hrds.zip` asset attached to each
-[GitHub release](https://github.com/mikopp/ha_innova_deh-_hejluft_hrds-/releases);
+[GitHub release](https://github.com/mikopp/homeassistant-innova-hrds/releases);
 the release workflow stamps the release tag into `manifest.json` before zipping,
 so the version Home Assistant shows is the release version. Updates appear in
 HACS when a new release is published. Releases 0.9.x are normal (not
@@ -1004,8 +1004,8 @@ unit. It needs a copy of this repository (the HACS download contains only the
 component) and `pymodbus`:
 
 ```
-git clone https://github.com/mikopp/ha_innova_DEH-_hejluft_hrds-.git
-cd ha_innova_DEH-_hejluft_hrds-
+git clone https://github.com/mikopp/homeassistant-innova-hrds.git
+cd homeassistant-innova-hrds
 pip install 'pymodbus>=3.13.1'
 python3 tests/diagnose_hrds.py <gateway-ip> --json diag.json
 ```
@@ -1019,7 +1019,7 @@ Please also say which unit it is (HRDS+ 30 or 50, `R` or non-`R`, display or
 headless, which probes are wired), the Home Assistant and integration versions,
 the `issues` of `sensor.setup_check`, and the relevant part of the Home
 Assistant log. The issue form asks for all of this.
-[Open an issue](https://github.com/mikopp/ha_innova_DEH-_hejluft_hrds-/issues/new/choose).
+[Open an issue](https://github.com/mikopp/homeassistant-innova-hrds/issues/new/choose).
 
 ## Road to 1.0
 

@@ -6,10 +6,10 @@
     ],
     "config_flow": true,
     "dependencies": [],
-    "documentation": "https://github.com/mikopp/ha_innova_deh-_hejluft_hrds-#readme",
+    "documentation": "https://github.com/mikopp/homeassistant-innova-hrds#readme",
     "integration_type": "device",
     "iot_class": "local_polling",
-    "issue_tracker": "https://github.com/mikopp/ha_innova_deh-_hejluft_hrds-/issues",
+    "issue_tracker": "https://github.com/mikopp/homeassistant-innova-hrds/issues",
     "loggers": [
         "pymodbus"
     ],
