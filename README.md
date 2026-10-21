@@ -9,7 +9,23 @@
 [![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=mikopp&repository=ha_innova_DEH-_hejluft_hrds-&category=integration)
 
 Home Assistant custom integration for the **Innova DEH+** air dehumidification
-module (sold in Austria by https://www.hejluft.at/ as the **HRDS+**) over **Modbus TCP**.
+module over **Modbus TCP**.
+
+## Compatible Devices & OEM Rebrands
+
+This Home Assistant integration communicates with ventilation and ducted dehumidification units manufactured by **[INNOVA S.r.l.](https://www.innova.it/)**. Because Innova supplies white-label hardware across different markets, your unit might be sold under various brand names, model series, or regional designations:
+
+* **Austria / DACH Region:** 
+  * **[HejLuft](https://www.hejluft.at/)** – Distributed as *HRDS+ 30* / *HRD+* series (e.g., *HejLuft HRDS+ 30 H R K DC*).
+  * **[INNOVA S.r.l.](https://www.innova.it/)** – Original manufacturer designation *[INNOVA DEH+ / HRD+ / HRDS+ Series](https://www.innova.it/en/products/vmc/active-integration/hrd/)* (Horizontal/Vertical ducted dehumidifiers with heat recovery and active radiant cooling integration).
+* **Italy & Europe (General HVAC Distribution):** 
+  * Sold directly via professional HVAC wholesalers as **Innova DEH+**, **Innova HRD**, or integrated into radiant cooling packages by system partners (such as *RDZ* or similar surface cooling providers).
+* **United Kingdom (UK):** 
+  * Marketed through specialist ventilation and radiant heating distributors under **Innova DEH+ Horizontal Ductable Dehumidifier** or customized as *Radiant System Air Treatment Units*.
+* **USA & North America:** 
+  * Distributed and integrated via specialized hydronic/radiant cooling system suppliers (such as **[Messana Radiant Cooling](https://messana.com/)** air treatment modules or equivalent ducted hydronic dehumidification lines utilizing Innova OEM cores).
+
+> *If your device uses the Innova electronic board / serial protocol and is sold under a different local brand name not listed here, feel free to open an issue or pull request to add it!*
 
 > ## Release 0.9 — beta, not 1.0 yet
 >
