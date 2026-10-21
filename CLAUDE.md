@@ -162,8 +162,8 @@ Classification rules (`_classify` in `const.py`):
   (`button.py`, `BUTTON_TYPES`), and one register is read back after a write.
   `sensor.installer_last_read` (timestamp) shows the last read. With the
   option off the device is removed with its entities, and only
-  `INSTALLER_LOGIC_KEYS` (PC07/PU08, used by the water check) are read once at
-  setup. The rest of the installer menu lives in
+  `INSTALLER_LOGIC_KEYS` (PC07/PC08/PU08, used by the water check and the
+  heating evidence) are read once at setup. The rest of the installer menu lives in
   `installer_params.py` (one row per parameter: code, register, kind
   n/s/r, scale, range, unit, en/de name, enabled-by-default). `const.py`
   appends the rows to `ENTITIES_DICT` as `inst_<code>` keys (`INSTALLER_KEYS`),

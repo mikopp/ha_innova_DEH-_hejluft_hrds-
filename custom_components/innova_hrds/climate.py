@@ -43,7 +43,7 @@ from homeassistant.components.climate import (
 )
 from homeassistant.const import ATTR_TEMPERATURE
 from homeassistant.core import callback
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
 from .const import (
     C_ACTIVE_COOLING,
@@ -123,7 +123,7 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
         if not hub.show_humidity_target:
             features &= ~ClimateEntityFeature.TARGET_HUMIDITY
         self._attr_supported_features = features
-        self._attr_hvac_modes = self._modes_for(hub.active_season)
+        self._attr_hvac_modes = self._modes_for()
         self._attr_hvac_mode = HVACMode.OFF
         self._attr_hvac_action = HVACAction.OFF
         self._attr_min_temp = 15.0
@@ -134,8 +134,9 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
         self._attr_fan_modes = _FAN_MODES
         self._attr_fan_mode = _FAN_OFF
 
-    def _modes_for(self, season) -> list[HVACMode]:
+    def _modes_for(self) -> list[HVACMode]:
         hub = self._hub
+        season = hub.active_season
         modes = [HVACMode.OFF]
         if hub.auto_capable:
             modes.append(HVACMode.AUTO)
@@ -151,7 +152,7 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
     @callback
     def _on_hub_update(self) -> None:
         data = self._hub.data
-        self._attr_hvac_modes = self._modes_for(self._hub.active_season)
+        self._attr_hvac_modes = self._modes_for()
 
         # No reading when the unit reports a probe fault (AL28 / AL34;
         # probe_ok == "off" means the alarm is active) or when the input carries
@@ -256,8 +257,14 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
                 and data.get(C_DEHUMIDIFY) != "on"
                 and data.get(C_ACTIVE_COOLING) != "on"
             )
-            await hub.write_entity_value(C_ACTIVE_COOLING, 0)
-            await hub.write_entity_value(C_DEHUMIDIFY, 0)
+            try:
+                await hub.write_entity_value(C_ACTIVE_COOLING, 0)
+                await hub.write_entity_value(C_DEHUMIDIFY, 0)
+            except HomeAssistantError:
+                # A request may still be latched: switching the unit off is
+                # then the only sure way to stop it.
+                await hub.write_entity_value(C_UNIT_ON_OFF, 0)
+                raise
             # The unit's own logic only stops when the unit is off.
             if hub.auto_capable or foreign_request:
                 await hub.write_entity_value(C_UNIT_ON_OFF, 0)
@@ -270,6 +277,9 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
                     "on; without one the unit never requests by itself. Use Dry"
                     + (" or Cool." if HVACMode.COOL in self.hvac_modes else ".")
                 )
+            # Refuse (gate, brine guard) before the requests are cleared, so a
+            # refused Auto leaves a running Dry/Cool alone.
+            hub.check_write_allowed(C_UNIT_ON_OFF, 1)
             await hub.write_entity_value(C_ACTIVE_COOLING, 0)
             await hub.write_entity_value(C_DEHUMIDIFY, 0)
             await hub.write_entity_value(C_UNIT_ON_OFF, 1)

@@ -459,7 +459,9 @@ heating, the integration guards it:
   unit reports summer**, unless you enabled **Allow winter heating** in the
   options. With the season on *auto* (1583), the mode status (1110) decides
   which season is in force; an unknown season counts as not summer.
-* Switching the season to winter is refused while an integration request is on.
+* Switching the season to winter is refused while an integration request is on,
+  and on brine without a passing brine guard while the unit is on and its room
+  probe could make it dehumidify in winter by itself (PU02 enabled).
 * Automatic heating needs a room probe and a winter setpoint above SEtH - PF12,
   and the factory PH10 cap (14 °C) prevents it; headless it cannot trigger.
 * Not something software controls: in OFF/standby the internal water valve is
