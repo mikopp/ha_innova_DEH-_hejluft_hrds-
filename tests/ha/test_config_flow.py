@@ -155,3 +155,32 @@ async def test_unload(hass, sim):
     assert await hass.config_entries.async_unload(s.entry.entry_id)
     await hass.async_block_till_done()
     assert s.entry.state is ConfigEntryState.NOT_LOADED
+
+
+async def test_user_flow_refuses_winter_heating_on_brine(hass, sim):
+    result = await _submit(
+        hass,
+        entry_data(sim, water_circuit="brine", allow_winter_heating=True),
+    )
+    assert result["errors"] == {"allow_winter_heating": "winter_heating_on_brine"}
+
+
+async def test_options_flow_refuses_winter_heating_on_brine(hass, sim):
+    s = await add_entry(hass, sim)
+    result = await hass.config_entries.options.async_init(s.entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            CONF_HOST: sim.host,
+            CONF_PORT: sim.port,
+            CONF_SCAN_INTERVAL: 30,
+            "hostid": 1,
+            "model": "30",
+            "has_display": False,
+            "water_circuit": "brine",
+            "allow_winter_heating": True,
+            "brine_min_temperature": 8.0,
+            "airflow_max_m3h": 300,
+        },
+    )
+    assert result["errors"] == {"allow_winter_heating": "winter_heating_on_brine"}

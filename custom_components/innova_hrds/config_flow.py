@@ -45,6 +45,7 @@ from .const import (
     DOMAIN,
     MODEL_SPECS,
     MODELS,
+    WATER_CIRCUIT_BRINE,
     WATER_CIRCUITS,
 )
 from .identity import CannotConnect, WrongDevice, verify_device
@@ -109,6 +110,13 @@ async def _check_device(
     return None
 
 
+def _winter_heating_on_brine(user_input: dict[str, Any]) -> bool:
+    """A brine circuit cannot heat (handbook 3.8.7): the option makes no sense."""
+    return bool(user_input.get(CONF_ALLOW_WINTER_HEATING)) and (
+        user_input.get(CONF_WATER_CIRCUIT) == WATER_CIRCUIT_BRINE
+    )
+
+
 def host_valid(host: str) -> bool:
     """Return True if hostname or IP address is valid."""
     try:
@@ -138,6 +146,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors[CONF_HOST] = "already_configured"
             elif not host_valid(host):
                 errors[CONF_HOST] = "invalid_host"
+            elif _winter_heating_on_brine(user_input):
+                errors[CONF_ALLOW_WINTER_HEATING] = "winter_heating_on_brine"
             else:
                 error = await _check_device(
                     self.hass,
@@ -168,7 +178,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class OptionsFlowHandler(config_entries.OptionsFlow):
     async def async_step_init(self, user_input: dict[str, Any] | None = None):
         errors: dict[str, str] = {}
-        if user_input is not None:
+        if user_input is not None and _winter_heating_on_brine(user_input):
+            errors[CONF_ALLOW_WINTER_HEATING] = "winter_heating_on_brine"
+        elif user_input is not None:
             data = self.config_entry.data
             options = self.config_entry.options
             error = await _check_device(

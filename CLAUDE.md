@@ -162,8 +162,9 @@ Classification rules (`_classify` in `const.py`):
   (`button.py`, `BUTTON_TYPES`), and one register is read back after a write.
   `sensor.installer_last_read` (timestamp) shows the last read. With the
   option off the device is removed with its entities, and only
-  `INSTALLER_LOGIC_KEYS` (PC07/PC08/PU08, used by the water check and the
-  heating evidence) are read once at setup. The rest of the installer menu lives in
+  `INSTALLER_LOGIC_KEYS` (PC07/PC08/PU08 for the water check and the heating
+  evidence, PF12/PH09/PH10 for the unit's own heating band) are read once at
+  setup. The rest of the installer menu lives in
   `installer_params.py` (one row per parameter: code, register, kind
   n/s/r, scale, range, unit, en/de name, enabled-by-default). `const.py`
   appends the rows to `ENTITIES_DICT` as `inst_<code>` keys (`INSTALLER_KEYS`),
@@ -205,6 +206,20 @@ Classification rules (`_classify` in `const.py`):
   `binary_sensor.brine_temperature_guard` (`COMPUTED_BINARY_SENSORS`,
   problem class, hidden when no sensor is set, always available). Options
   override data for these keys as a whole, so clearing the entity sticks.
+* **The unit heats on its own** (handbook 6.1.2): with a room temperature
+  source (display or AI2 probe) and PG02 it raises its own winter INT below
+  SEtH − PF12 (off above SEtH + PF12; SEtH clamped to PH09..PH10, factory 14 °C
+  both, so it heats below 13.5 °C). The INT request is not readable.
+  `allow_winter_heating` cannot stop it: it only governs Home Assistant's own
+  winter INT requests (and accepts the unit's). The integration reports it
+  instead: `binary_sensor.automatic_heating` (`C_AUTO_HEATING`,
+  `COMPUTED_BINARY_SENSORS`; on while the unit, on in winter, can heat by
+  itself; attributes give the band; hidden without a temperature source or
+  PG02), setup issues `unit_heats_on_its_own` (option off) /
+  `unit_heats_on_its_own_on_brine` (silenced when SEtH − PF12 <
+  `AUTO_HEATING_NEGLIGIBLE_BELOW`), and `winter_heating_without_integration`
+  (option on, PG02 = 0). The flows refuse the option together with brine
+  (`winter_heating_on_brine`); an older entry with both still forces it off.
 * Season without a display: `select.season` writes HB04 (1825): 4 = summer,
   3 = winter (Modbus manual). Anything else raises AL25.
 * Water valve/pump (1126, relay K5) and condenser valve (1124, K4) are
@@ -279,13 +294,14 @@ figures in the technical data are the tested spec range, **not** a firmware floo
 ## Climate entity mapping
 
 * `current_temperature` ← `room_temperature`; `current_humidity` ← `room_humidity`.
-* `hvac_mode` ∈ {OFF, AUTO, DRY, COOL (summer), HEAT (winter, only with
-  `allow_winter_heating`, never on brine)}; COOL/HEAT only offered when PG02
-  is not `off`. The unit ORs its request sources (handbook 6.1: its own
+* `hvac_mode` ∈ {OFF, AUTO, DRY, COOL (summer), HEAT (winter; offered with
+  `allow_winter_heating` or while a winter INT is on, never on brine)};
+  COOL/HEAT only offered when PG02 is not `off`. The unit ORs its request sources (handbook 6.1: its own
   room-probe logic, the DEU/INT digital inputs, Modbus), so the mode says what
   can make it act. Derived in order: unit off → OFF; `hub.int_effect`
-  (INT on and able to act: PG02, summer → cool; winter + `allow_winter_heating`
-  → heat) → COOL/HEAT; DEU (1140) on → DRY; `hub.auto_capable` → AUTO;
+  (INT on and able to act: PG02, summer → cool; winter and not brine → heat,
+  whatever `allow_winter_heating` says, since the unit does not know it) →
+  COOL/HEAT; DEU (1140) on → DRY; `hub.auto_capable` → AUTO;
   `dehumidify_request` (1121) on from another source → DRY; else OFF (on but
   nothing can make it act, action IDLE). An INT request that cannot act never
   decides the mode.
@@ -293,7 +309,8 @@ figures in the technical data are the tested spec range, **not** a firmware floo
   the prefix of `mode_status` (1110), falling back to `operating_mode` (1583,
   which reads `auto` under PC05). Unknown counts as not summer in the guards.
 * `hvac_action` is what the unit does, not what was asked. HEATING only with
-  `hub.is_heating`: `int_effect == "heat"`, valve/pump (1126) on, no AL04,
+  `hub.is_heating`: `int_effect == "heat"` or the unit's own winter INT
+  (`auto_heating_active`, room below SEtH + PF12, not brine), valve/pump (1126) on, no AL04,
   compressor off, water ≥ PC08 (in `INSTALLER_LOGIC_KEYS`, read at setup). The
   unit has no heat source: winter INT only opens valve and pump, so only warm
   water from a heating circuit heats (never on brine). COOLING only with
@@ -303,7 +320,8 @@ figures in the technical data are the tested spec range, **not** a firmware floo
 * INT writes are refused when PG02 reads `off` (`_check_request_allowed`).
 * `hub.auto_capable` (`_auto_sources`): a display or allocated probe
   (`show_*_target`) with a healthy reading. Humidity also needs summer or PU02 on;
-  temperature also needs PG02 and summer (or `allow_winter_heating`). AUTO is
+  temperature also needs PG02 (in winter the unit heats by itself, whatever
+  `allow_winter_heating` says). AUTO is
   only offered while it holds. Switching the unit on while it holds counts as a
   start for the brine guard, and on brine in winter it needs a passing guard
   (the unit would dehumidify by itself).

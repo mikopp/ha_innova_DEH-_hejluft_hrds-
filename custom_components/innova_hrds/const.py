@@ -69,6 +69,10 @@ DEFAULT_WATER_CIRCUIT = WATER_CIRCUIT_HEATING_COOLING
 CONF_BRINE_TEMPERATURE_ENTITY = "brine_temperature_entity"
 CONF_BRINE_MIN_TEMPERATURE = "brine_min_temperature"
 DEFAULT_BRINE_MIN_TEMPERATURE = 8.0
+# A winter setpoint (SEtH) minus dead band (PF12) below this never makes the
+# unit heat in a lived-in room: the lowest winter setpoint the integration
+# offers. The setup check then stops reporting the unit's own heating.
+AUTO_HEATING_NEGLIGIBLE_BELOW = 5.0
 BRINE_GUARD_MAX_AGE_HOURS = 24
 # The unit is driven over Modbus; a wired CNU2 display is the exception.
 DEFAULT_HAS_DISPLAY = False
@@ -274,6 +278,8 @@ C_ALARM_LOW_WATER_TEMP = "alarm_low_water_temperature"
 # Computed: water-circuit health (pump/valve, water temperature limits).
 C_WATER_CHECK = "water_check"
 C_BRINE_GUARD = "brine_temperature_guard"
+# Computed: the unit's own room-temperature logic can heat (winter INT).
+C_AUTO_HEATING = "automatic_heating"
 C_SEASON_OWNER = "season_owner"
 C_TEMPERATURE_UNIT = "temperature_unit"
 C_FAN_OUTPUT_ALLOCATION = "fan_output_allocation"
@@ -1010,10 +1016,11 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
 INSTALLER_KEYS: frozenset[str] = frozenset(
     installer_key(row[0]) for row in INSTALLER_PARAMS
 )
-# Installer values the hub's own checks use (water check, heating evidence);
-# read once at setup even without the installer device.
+# Installer values the hub's own checks use (water check, heating evidence,
+# the unit's own heating band); read once at setup even without the installer
+# device.
 INSTALLER_LOGIC_KEYS: frozenset[str] = frozenset(
-    {installer_key("PC07"), installer_key("PC08"), installer_key("PU08")}
+    installer_key(code) for code in ("PC07", "PC08", "PU08", "PF12", "PH09", "PH10")
 )
 # Button on the installer device: the only regular way its registers are read.
 C_INSTALLER_REFRESH = "refresh_installer"
@@ -1164,6 +1171,18 @@ SETUP_ISSUE_TEXTS: Dict[str, tuple[str, str]] = {
         "Brine circuit without a temperature guard allows winter dehumidifying (coil can freeze): set 'Winter dehumidification' (PU02) to Disabled or configure a brine guard",
         "Solekreis ohne Temperaturwächter erlaubt Winter-Entfeuchtung (Register kann einfrieren): 'Winter-Entfeuchtung' (PU02) deaktivieren oder Soleüberwachung einrichten",
     ),
+    "unit_heats_on_its_own": (
+        "In winter the unit heats on its own when the room falls below its winter setpoint minus PF12 (see 'Unit heats on its own'), whatever 'Allow winter heating' says. Accept it by turning that option on, or stop it: lower 'PH09 Winter setpoint min' (installer device) and then the winter setpoint to 5 °C, or switch the unit off in winter",
+        "Im Winter heizt das Gerät selbständig, sobald der Raum unter den Winter-Sollwert minus PF12 fällt (siehe 'Gerät heizt selbständig'), unabhängig von 'Heizen im Winter erlauben'. Akzeptieren: diese Option einschalten. Verhindern: 'PH09 Min. Sollwert Winter' (Installateur-Gerät) und danach den Winter-Sollwert auf 5 °C senken, oder das Gerät im Winter ausschalten",
+    ),
+    "unit_heats_on_its_own_on_brine": (
+        "On a brine circuit the unit cannot heat, yet in winter its room-temperature logic still raises an integration request and pumps cold brine through the register when the room falls below its winter setpoint minus PF12: lower 'PH09 Winter setpoint min' (installer device) and then the winter setpoint to 5 °C, or switch the unit off in winter",
+        "Am Solekreis kann das Gerät nicht heizen, stellt aber im Winter trotzdem eine Integrationsanforderung und pumpt kalte Sole durch das Register, sobald der Raum unter den Winter-Sollwert minus PF12 fällt: 'PH09 Min. Sollwert Winter' (Installateur-Gerät) und danach den Winter-Sollwert auf 5 °C senken, oder das Gerät im Winter ausschalten",
+    ),
+    "winter_heating_without_integration": (
+        "'Allow winter heating' is on, but the unit has no integration function (PG02 = 0) and cannot heat: turn the option off",
+        "'Heizen im Winter erlauben' ist an, aber das Gerät hat keine Integrationsfunktion (PG02 = 0) und kann nicht heizen: Option ausschalten",
+    ),
 }
 
 # Registers written (in order) when the integration is set up, to make sure
@@ -1308,6 +1327,10 @@ COMPUTED_BINARY_SENSORS: Dict[str, Dict[str, Any]] = {
         "NAME": "Brine temperature guard",
         "DC": BinarySensorDeviceClass.PROBLEM,
     },
+    # On while the unit, switched on in winter, can heat by itself; its
+    # attributes say on what. Hidden when the unit has no room temperature
+    # source or no integration function.
+    C_AUTO_HEATING: {"NAME": "Unit heats on its own"},
 }
 
 # Requests that make the unit do something. They are refused until the user

@@ -614,6 +614,12 @@ An INT request in summer also requests DEU when PU05 is on. The effective DEU
 request is readable (`DehumRequest`, 1121); the INT one is not. Over Modbus the
 automatic requests can only be stopped by switching the unit off.
 
+The factory PH10 cap does not prevent automatic winter heating: SEtH is clamped
+to PH09..PH10 (factory 14.0 °C both), so with PF12 = 0.5 K the unit heats
+whenever the room is below 13.5 °C. To keep it from heating, lower PH09 first
+and then SEtH (e.g. 5 °C). The integration reports the band
+(`binary_sensor.automatic_heating`) and lists it in the setup check.
+
 ### 14.7 Unwired analog inputs read a sentinel, not a temperature
 
 Observed on an HRDS+ 30 with no display and no external probes (HA00 = 2,
@@ -834,7 +840,7 @@ are read at setup and on the device's refresh button.
 | `0x06F7` | 1783 | PH07 | Summer setpoint min | x0.1 | -15…70 °C | R/W |
 | `0x06F8` | 1784 | PH08 | Summer setpoint max | x0.1 | -15…70 °C | R/W |
 | `0x06F9` | 1785 | PH09 | Winter setpoint min | x0.1 | -15…70 °C | R/W |
-| `0x06FA` | 1786 | PH10 | Winter setpoint max (factory 14 °C blocks auto heating) | x0.1 | -15…70 °C | R/W |
+| `0x06FA` | 1786 | PH10 | Winter setpoint max (caps SEtH; factory 14 °C, so the unit still heats by itself below 14 °C − PF12) | x0.1 | -15…70 °C | R/W |
 | `0x06FC` | 1788 | PH16 | CAN baud rate code | x1 | 1…4  | shown R/O, disabled by default |
 | `0x06FD` | 1789 | PH17 | CAN node | x1 | 1…127  | shown R/O, disabled by default |
 | `0x06FF` | 1791 | PH19 | Air quality probe min | x1 | 0…9999  | shown R/O, disabled by default |

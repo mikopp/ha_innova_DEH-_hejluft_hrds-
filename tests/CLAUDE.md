@@ -93,9 +93,10 @@ from the image's modbus manifest and installs that. A bare `pytest` skips
   best-effort into a CNU2 unit with built-in room sensors. `ha/test_display.py`
   and the climate *Auto* tests run on it; nothing about a real display unit is
   verified.
-* The model ORs the unit's automatic DEU request (room humidity vs PU01/PU07,
-  from a display with H or an AI3 probe) with the Modbus request. Temperature
-  auto (INT) is not modelled.
+* The model ORs the unit's automatic requests with the Modbus ones: DEU from
+  the room humidity (PU01/PU07, a display with H or an AI3 probe) and INT from
+  the room temperature (summer above SEtC + PF12, winter below SEtH − PF12 with
+  SEtH clamped to PH09..PH10; a display or an AI2 probe, PG02).
 * The PM20 → fan output mapping is unconfirmed on hardware, so the model offers
   `fan_model` = `rescale` (default) / `clamp` / `direct`; the fan tests cover
   all three. Remove two once the hardware answer is known (`plans/todo.md`).

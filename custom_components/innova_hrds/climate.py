@@ -145,7 +145,11 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
         if hub.data.get(C_ACTIVE_COOLING_AVAILABLE) != "off":
             if season == "summer":
                 modes.append(HVACMode.COOL)
-            elif season == "winter" and hub.allow_winter_heating:
+            # Heat is offered when allowed; a winter INT set elsewhere still
+            # heats, so it is shown then too.
+            elif season == "winter" and (
+                hub.allow_winter_heating or hub.int_effect == "heat"
+            ):
                 modes.append(HVACMode.HEAT)
         return modes
 

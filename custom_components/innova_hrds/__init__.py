@@ -39,6 +39,7 @@ from homeassistant.util.unit_conversion import TemperatureConverter
 from pymodbus.client import ModbusTcpClient
 
 from .const import (
+    AUTO_HEATING_NEGLIGIBLE_BELOW,
     BMS_ENABLE_KEYS,
     BRINE_GUARD_MAX_AGE_HOURS,
     C_ACTIVE_COOLING,
@@ -48,6 +49,7 @@ from .const import (
     C_ALARM_ANTIFREEZE,
     C_ALARM_HIGH_WATER_TEMP,
     C_ALARM_LOW_WATER_TEMP,
+    C_AUTO_HEATING,
     C_BRINE_GUARD,
     C_COMPRESSOR_STATUS,
     C_DEHUMIDIFY,
@@ -81,6 +83,7 @@ from .const import (
     C_WATER_TEMPERATURE,
     C_WATER_VALVE_PUMP,
     C_WINTER_DEHUM,
+    C_WINTER_SETPOINT,
     CONF_AIRFLOW_MAX,
     CONF_ALLOW_WINTER_HEATING,
     CONF_BRINE_MIN_TEMPERATURE,
@@ -488,6 +491,10 @@ class HrdsModbusHub:
         return self.water_circuit == WATER_CIRCUIT_BRINE
 
     @property
+    def has_display(self) -> bool:
+        return self._has_display
+
+    @property
     def season(self) -> Optional[str]:
         """The season the unit reports (1583): summer, winter, auto or None."""
         return self.data.get(C_OPERATING_MODE)
@@ -510,13 +517,15 @@ class HrdsModbusHub:
 
     @property
     def int_effect(self) -> Optional[str]:
-        """What the integration (INT) request can do now: cool, heat or None.
+        """What the integration (INT) request makes the unit do: cool, heat or None.
 
-        INT cools in summer and heats in winter, but only on a unit with the
-        integration function (PG02), and heating only with warm water from a
-        heating circuit: never on brine (handbook 3.8.7), and only with the
-        user's permission (``allow_winter_heating``, forced off on brine).
-        None while INT is off or cannot act; the unit then at most dehumidifies.
+        INT cools in summer and heats in winter on a unit with the integration
+        function (PG02). The unit does not know ``allow_winter_heating``: that
+        option only governs the requests Home Assistant sends, so a winter INT
+        set elsewhere (display, a season change under a latched Cool) heats all
+        the same. Whether it really warms the air is ``is_heating``. On brine a
+        winter INT only circulates cold brine (handbook 3.8.7: no heating). None
+        while INT is off or cannot act; the unit then at most dehumidifies.
         """
         d = self.data
         if (
@@ -527,9 +536,54 @@ class HrdsModbusHub:
         season = self.active_season
         if season == "summer":
             return "cool"
-        if season == "winter" and self.allow_winter_heating:
+        if season == "winter" and not self.is_brine:
             return "heat"
         return None
+
+    @property
+    def auto_heating_band(self) -> Tuple[Optional[float], Optional[float]]:
+        """(starts below, stops above) for the unit's own winter heating, in °C.
+
+        Its room logic raises INT when the room falls below SEtH - PF12 and
+        drops it above SEtH + PF12 (handbook 6.1.2). None where not read.
+        """
+        setpoint = self.data.get(C_WINTER_SETPOINT)
+        if setpoint is None:
+            return None, None
+        band = self.data.get(installer_key("PF12")) or 0.0
+        return setpoint - band, setpoint + band
+
+    @property
+    def can_heat_on_its_own(self) -> bool:
+        """Whether the unit's room logic can raise a winter INT by itself.
+
+        It needs a room temperature it regulates on (display or allocated
+        probe, healthy) and the integration function (PG02). The integration
+        option ``allow_winter_heating`` does not enter: the unit knows nothing
+        of it. Judged for winter, whatever the season now.
+        """
+        return self._auto_sources("winter")[1]
+
+    @property
+    def auto_heating_active(self) -> bool:
+        """Whether the unit, on and in winter, is set to heat by itself now."""
+        return (
+            self.active_season == "winter"
+            and self.data.get(C_UNIT_STATUS) == "on"
+            and self.can_heat_on_its_own
+        )
+
+    def _own_heating_request(self) -> bool:
+        """Whether the unit's own winter INT may be standing now.
+
+        The INT request is not readable (only DEU is, 1121): judged from the
+        room temperature against the band, counting the hysteresis as on.
+        """
+        if not self.auto_heating_active or self.is_brine:
+            return False
+        room = self.data.get(C_ROOM_TEMPERATURE)
+        _starts, stops = self.auto_heating_band
+        return room is not None and stops is not None and room < stops
 
     @property
     def is_heating(self) -> bool:
@@ -537,12 +591,13 @@ class HrdsModbusHub:
 
         The unit has no heat source of its own: winter INT opens the water
         valve, runs the pump and fan, and keeps the compressor off (handbook
-        2.6.2, 6.4). Only warm water warms the air, so this needs the valve /
+        2.6.2, 6.4). Only warm water warms the air, so this needs an INT (a
+        latched one, or the unit's own from the room temperature), the valve /
         pump output on, no AL04, and water at or above PC08 (the unit's own
         minimum for winter integration; only judged while water circulates).
         """
         d = self.data
-        if self.int_effect != "heat":
+        if self.int_effect != "heat" and not self._own_heating_request():
             return False
         if d.get(C_WATER_VALVE_PUMP) != "on" or d.get(C_COMPRESSOR_STATUS) == "on":
             return False
@@ -592,8 +647,9 @@ class HrdsModbusHub:
             self.show_temperature_target
             and d.get(C_ROOM_TEMPERATURE) is not None
             and d.get(C_TEMP_PROBE_OK) != "off"
+            # In winter the unit heats by itself (SEtH), whatever the
+            # integration's allow_winter_heating says.
             and d.get(C_ACTIVE_COOLING_AVAILABLE) == "on"
-            and (summer or self.allow_winter_heating)
         )
         return bool(humidity), bool(temperature)
 
@@ -625,6 +681,11 @@ class HrdsModbusHub:
             hidden |= HUMIDITY_TARGET_KEYS
         if not self.brine_entity:
             hidden.add(C_BRINE_GUARD)
+        if not self.show_temperature_target or (
+            d.get(C_ACTIVE_COOLING_AVAILABLE) == "off"
+        ):
+            # No room temperature to regulate on, or no INT: it never heats.
+            hidden.add(C_AUTO_HEATING)
         if not self.installer_enabled:
             # The logic limits (INSTALLER_LOGIC_KEYS) are still read, but not
             # shown.
@@ -1282,6 +1343,19 @@ class HrdsModbusHub:
             and d.get(C_WINTER_DEHUM) not in (None, "disabled")
         ):
             issues.append("winter_dehumidify_on_brine")
+        # The unit's own winter heating (room temperature below SEtH - PF12)
+        # does not ask the integration: say so, unless its band is too low to
+        # matter. On brine it only pumps cold brine through the register.
+        starts, _stops = self.auto_heating_band
+        if self.can_heat_on_its_own and (
+            starts is None or starts >= AUTO_HEATING_NEGLIGIBLE_BELOW
+        ):
+            if self.is_brine:
+                issues.append("unit_heats_on_its_own_on_brine")
+            elif not self.allow_winter_heating:
+                issues.append("unit_heats_on_its_own")
+        if self.allow_winter_heating and d.get(C_ACTIVE_COOLING_AVAILABLE) == "off":
+            issues.append("winter_heating_without_integration")
         return issues
 
     def _compute_water_issues(self) -> list[str]:
@@ -1326,6 +1400,7 @@ class HrdsModbusHub:
         self.data[C_SETUP_CHECK] = "attention" if self.setup_issues else "ok"
         self.water_issues = self._compute_water_issues()
         self.data[C_WATER_CHECK] = "attention" if self.water_issues else "ok"
+        self.data[C_AUTO_HEATING] = "on" if self.auto_heating_active else "off"
         self.data[C_MAX_TOTAL_AIRFLOW] = self._airflow_max
         self.data[C_SUPPLY_FAN_MAX_AIRFLOW] = self._airflow_max
         out = self.data.get(C_SUPPLY_FAN_OUTPUT)

@@ -225,7 +225,7 @@ INSTALLER_PARAMS: list[tuple] = [
     ("PH07", 1783, "n", T, -15, 70, "°C", "PH07 Summer setpoint min", "PH07 Min. Sollwert Sommer", True),
     ("PH08", 1784, "n", T, -15, 70, "°C", "PH08 Summer setpoint max", "PH08 Max. Sollwert Sommer", True),
     ("PH09", 1785, "n", T, -15, 70, "°C", "PH09 Winter setpoint min", "PH09 Min. Sollwert Winter", True),
-    ("PH10", 1786, "n", T, -15, 70, "°C", "PH10 Winter setpoint max (factory 14 °C blocks auto heating)", "PH10 Max. Sollwert Winter (werkseitig 14 °C sperrt Auto-Heizen)", True),
+    ("PH10", 1786, "n", T, -15, 70, "°C", "PH10 Winter setpoint max (caps the unit's own heating, factory 14 °C)", "PH10 Max. Sollwert Winter (begrenzt selbständiges Heizen, werkseitig 14 °C)", True),
     ("PH16", 1788, "r", 1, 1, 4, None, "PH16 CAN baud rate code", "PH16 CAN-Baudrate (Code)", False),
     ("PH17", 1789, "r", 1, 1, 127, None, "PH17 CAN node", "PH17 CAN-Knoten", False),
     ("PH19", 1791, "r", 1, 0, 9999, None, "PH19 Air quality probe min", "PH19 Min. Wert Luftqualitätsfühler", False),

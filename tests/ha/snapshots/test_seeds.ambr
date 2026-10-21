@@ -9,6 +9,7 @@
     'binary_sensor.alarm_high_water_temperature': 'off',
     'binary_sensor.alarm_low_water_temperature': 'off',
     'binary_sensor.alarm_water_antifreeze': 'off',
+    'binary_sensor.automatic_heating': 'off',
     'binary_sensor.dehumidify_request': 'off',
     'binary_sensor.humidity_probe_ok': 'on',
     'binary_sensor.recirculation_active': 'off',

@@ -325,8 +325,12 @@ async def test_heating_needs_warm_water(setup, clock):
     assert s.state("climate", CLIMATE).attributes["hvac_action"] == "idle"
 
 
-async def test_winter_int_from_elsewhere_is_not_heating(setup, clock):
-    """INT set at the unit in winter, heating not allowed: no Heat anywhere."""
+async def test_winter_int_from_elsewhere_heats(setup, clock):
+    """INT set at the unit in winter heats, whatever the option says.
+
+    "Allow winter heating" only governs what Home Assistant requests; the unit
+    knows nothing of it, so the card shows what the unit does.
+    """
     s = setup
     await allow_operation(s)
     await s.service("select", "select_option", "season", option="winter")
@@ -337,9 +341,12 @@ async def test_winter_int_from_elsewhere_is_not_heating(setup, clock):
     await clock.poll()
     assert s.state("switch", "active_cooling").state == "on"
     climate = s.state("climate", CLIMATE)
-    assert "heat" not in climate.attributes["hvac_modes"]
-    assert climate.state == "off"
-    assert climate.attributes["hvac_action"] == "idle"
+    assert "heat" in climate.attributes["hvac_modes"]
+    assert climate.state == "heat"
+    assert climate.attributes["hvac_action"] == "heating"
+    # Home Assistant itself still does not request heating.
+    with pytest.raises(ServiceValidationError, match="Allow winter heating"):
+        await s.service("climate", "set_hvac_mode", CLIMATE, hvac_mode="heat")
 
 
 async def test_summer_int_blocked_by_al03_is_drying(setup, clock):
@@ -417,6 +424,40 @@ async def test_brine_guard_gates_starts_only(hass, setup, clock):
 
 
 # A display unit (overlay display_cnu2): its own room logic can start it.
+@pytest.mark.parametrize("sim_options", [{"overlays": ("display_cnu2",)}])
+@pytest.mark.parametrize(
+    "entry_options", [{"has_display": True, "allow_winter_heating": True}]
+)
+async def test_accepted_own_heating_is_not_an_issue(setup):
+    s = setup
+    assert "unit_heats_on_its_own" not in _issues(s)
+    assert s.state("binary_sensor", "automatic_heating") is not None
+
+
+@pytest.mark.parametrize("sim_options", [{"overlays": ("display_cnu2",)}])
+@pytest.mark.parametrize(
+    "entry_options", [{"has_display": True, "water_circuit": "brine"}]
+)
+async def test_brine_unit_with_room_logic_is_told_it_pumps_brine(setup):
+    s = setup
+    issues = _issues(s)
+    assert "unit_heats_on_its_own_on_brine" in issues
+    assert "unit_heats_on_its_own" not in issues
+
+
+@pytest.mark.parametrize("sim_options", [{"overlays": ("no_dc",)}])
+@pytest.mark.parametrize("entry_options", [{"allow_winter_heating": True}])
+async def test_winter_heating_option_without_integration_function(setup):
+    s = setup
+    assert "winter_heating_without_integration" in _issues(s)
+
+
+async def test_headless_unit_without_probe_never_heats_on_its_own(setup):
+    s = setup
+    assert s.entity_id("binary_sensor", "automatic_heating") is None
+    assert "unit_heats_on_its_own" not in _issues(s)
+
+
 @pytest.mark.parametrize("sim_options", [{"overlays": ("display_cnu2",)}])
 @pytest.mark.parametrize(
     "entry_options",
