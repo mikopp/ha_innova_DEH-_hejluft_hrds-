@@ -6,6 +6,14 @@ All notable changes to this project are documented here, newest first.
 
 ## Unreleased
 
+**Changed:** the repository is now `mikopp/homeassistant-innova-hrds` (it was
+`ha_innova_DEH-_hejluft_hrds-`). GitHub redirects the old address and HACS
+follows it, so installed copies keep updating. If updates stop appearing in
+HACS, remove the custom repository and add
+`https://github.com/mikopp/homeassistant-innova-hrds` again. The integration
+domain (`innova_hrds`) and all entity IDs are unchanged. The README intro and
+model names were reworded to be easier to find.
+
 **Breaking:** the Modbus enables **PH02** (on/off), **PH28** (dehumidify) and
 **PH27** (integration) are now yours: the integration no longer writes them at
 setup or on any poll, and switching one off stays off. With an enable off,

@@ -1,7 +1,7 @@
 # Repository settings
 
 GitHub settings that are not files. Check the live state with
-`gh api repos/mikopp/ha_innova_DEH-_hejluft_hrds-/rulesets` before relying on
+`gh api repos/mikopp/homeassistant-innova-hrds/rulesets` before relying on
 this page; it can go stale.
 
 ## About panel (discoverability)
