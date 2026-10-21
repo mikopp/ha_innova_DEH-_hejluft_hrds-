@@ -45,7 +45,7 @@ not backed by a single register, and are declared directly in `init()`
   are set: PH02 gates on/off, PH28 gates the DEU request, PH27 gates the INT
   request (key `enable_integration_bms`; it is not a cooling mode). PG02 (1798) is
   a different thing, an installer setting saying the unit has INT at all, and is
-  only shown read-only (`active_cooling_available`). `_sync_required_settings_locked` re-asserts them **every poll**, driven
+  only shown read-only (`integration_available`). `_sync_required_settings_locked` re-asserts them **every poll**, driven
   by the polled read-back rather than a one-shot flag, so a device power-cycle
   that clears them self-heals. They are also exposed as switches — and because
   the hub re-asserts them, turning one off by hand is undone on the next poll.
@@ -154,6 +154,10 @@ Classification rules (`_classify` in `const.py`):
   `unique_id` always uses the config entry id, so moving a key between devices
   keeps its entity. All devices are registered in `async_setup_entry`.
   `wiring_check.py` guards the sets.
+* **Renaming a key** changes its unique id: add it to `RENAMED_KEYS` in
+  `__init__.py`, whose `_migrate_renamed_keys` moves the registry entry (and an
+  entity id still carrying the old key) at setup, so history is kept. 1139 /
+  PG02 were `active_cooling` / `active_cooling_available` up to 0.9.1.
 * **Installer device:** opt-in (`installer_device` option, default off, only in
   the options flow, not at first install). Its registers are **never part of
   the regular poll** (`_poll_keys` excludes `INSTALLER_KEYS`, and a block never
@@ -162,8 +166,9 @@ Classification rules (`_classify` in `const.py`):
   (`button.py`, `BUTTON_TYPES`), and one register is read back after a write.
   `sensor.installer_last_read` (timestamp) shows the last read. With the
   option off the device is removed with its entities, and only
-  `INSTALLER_LOGIC_KEYS` (PC07/PC08/PU08, used by the water check and the
-  heating evidence) are read once at setup. The rest of the installer menu lives in
+  `INSTALLER_LOGIC_KEYS` (PC07/PC08/PU08 for the water check and the heating
+  evidence, PF12/PH09/PH10 for the unit's own heating band) are read once at
+  setup. The rest of the installer menu lives in
   `installer_params.py` (one row per parameter: code, register, kind
   n/s/r, scale, range, unit, en/de name, enabled-by-default). `const.py`
   appends the rows to `ENTITIES_DICT` as `inst_<code>` keys (`INSTALLER_KEYS`),
@@ -179,7 +184,7 @@ Classification rules (`_classify` in `const.py`):
 
 ## Operating modes, season, water circuit
 
-* Two requests only: **DEU** (`dehumidify`, 1140) and **INT** (`active_cooling`,
+* Two requests only: **DEU** (`dehumidify`, 1140) and **INT** (`integration_request`,
   1139). INT is dehumidify + cool in summer and **heating** in winter (compressor
   off, warm water through the register). INT starts the compressor only
   because PU05 (1692, factory on) couples a dehumidify request to it. With
@@ -205,6 +210,20 @@ Classification rules (`_classify` in `const.py`):
   `binary_sensor.brine_temperature_guard` (`COMPUTED_BINARY_SENSORS`,
   problem class, hidden when no sensor is set, always available). Options
   override data for these keys as a whole, so clearing the entity sticks.
+* **The unit heats on its own** (handbook 6.1.2): with a room temperature
+  source (display or AI2 probe) and PG02 it raises its own winter INT below
+  SEtH − PF12 (off above SEtH + PF12; SEtH clamped to PH09..PH10, factory 14 °C
+  both, so it heats below 13.5 °C). The INT request is not readable.
+  `allow_winter_heating` cannot stop it: it only governs Home Assistant's own
+  winter INT requests (and accepts the unit's). The integration reports it
+  instead: `binary_sensor.automatic_heating` (`C_AUTO_HEATING`,
+  `COMPUTED_BINARY_SENSORS`; on while the unit, on in winter, can heat by
+  itself; attributes give the band; hidden without a temperature source or
+  PG02), setup issues `unit_heats_on_its_own` (option off) /
+  `unit_heats_on_its_own_on_brine` (silenced when SEtH − PF12 <
+  `AUTO_HEATING_NEGLIGIBLE_BELOW`), and `winter_heating_without_integration`
+  (option on, PG02 = 0). The flows refuse the option together with brine
+  (`winter_heating_on_brine`); an older entry with both still forces it off.
 * Season without a display: `select.season` writes HB04 (1825): 4 = summer,
   3 = winter (Modbus manual). Anything else raises AL25.
 * Water valve/pump (1126, relay K5) and condenser valve (1124, K4) are
@@ -279,49 +298,64 @@ figures in the technical data are the tested spec range, **not** a firmware floo
 ## Climate entity mapping
 
 * `current_temperature` ← `room_temperature`; `current_humidity` ← `room_humidity`.
-* `hvac_mode` ∈ {OFF, AUTO, DRY, COOL (summer), HEAT (winter, only with
-  `allow_winter_heating`, never on brine)}; COOL/HEAT only offered when PG02
-  is not `off`. The unit ORs its request sources (handbook 6.1: its own
+* `hvac_mode` ∈ {OFF, AUTO or FAN_ONLY (shown as "Standby"), DRY, COOL
+  (summer), HEAT (winter; offered with `allow_winter_heating` or while a winter
+  INT is on, never on brine)};
+  COOL/HEAT only offered when PG02 is not `off`. The unit ORs its request sources (handbook 6.1: its own
   room-probe logic, the DEU/INT digital inputs, Modbus), so the mode says what
   can make it act. Derived in order: unit off → OFF; `hub.int_effect`
-  (INT on and able to act: PG02, summer → cool; winter + `allow_winter_heating`
-  → heat) → COOL/HEAT; DEU (1140) on → DRY; `hub.auto_capable` → AUTO;
-  `dehumidify_request` (1121) on from another source → DRY; else OFF (on but
-  nothing can make it act, action IDLE). An INT request that cannot act never
-  decides the mode.
+  (INT on and able to act: PG02, summer → cool; winter and not brine → heat,
+  whatever `allow_winter_heating` says, since the unit does not know it) →
+  COOL/HEAT; DEU (1140) on → DRY; `hub.auto_capable` → AUTO;
+  `dehumidify_request` (1121) on from another source → DRY; else FAN_ONLY
+  ("Standby": on, but nothing can make it act). OFF only ever means the unit
+  is off, so it never contradicts `switch.unit_on_off`. An INT request that
+  cannot act never decides the mode. FAN_ONLY is offered only while
+  `auto_capable` is false (otherwise "on, nothing requested" is AUTO).
 * Season for the climate logic and the request guards is `hub.active_season`:
   the prefix of `mode_status` (1110), falling back to `operating_mode` (1583,
   which reads `auto` under PC05). Unknown counts as not summer in the guards.
 * `hvac_action` is what the unit does, not what was asked. HEATING only with
-  `hub.is_heating`: `int_effect == "heat"`, valve/pump (1126) on, no AL04,
+  `hub.is_heating`: `int_effect == "heat"` or the unit's own winter INT
+  (`auto_heating_active`, room below SEtH + PF12, not brine), valve/pump (1126) on, no AL04,
   compressor off, water ≥ PC08 (in `INSTALLER_LOGIC_KEYS`, read at setup). The
   unit has no heat source: winter INT only opens valve and pump, so only warm
   water from a heating circuit heats (never on brine). COOLING only with
   `hub.is_cooling`: `int_effect == "cool"`, compressor on, no AL03. Else
-  DRYING (compressor on or 1121 on), else IDLE. The condenser valve (1124, K4)
+  DRYING (compressor on or 1121 on), else FAN (R unit, fan status on), else
+  IDLE. The condenser valve (1124, K4)
   is not evidence: the real unit reads it ON in standby, against the handbook.
 * INT writes are refused when PG02 reads `off` (`_check_request_allowed`).
 * `hub.auto_capable` (`_auto_sources`): a display or allocated probe
   (`show_*_target`) with a healthy reading. Humidity also needs summer or PU02 on;
-  temperature also needs PG02 and summer (or `allow_winter_heating`). AUTO is
+  temperature also needs PG02 (in winter the unit heats by itself, whatever
+  `allow_winter_heating` says). AUTO is
   only offered while it holds. Switching the unit on while it holds counts as a
   start for the brine guard, and on brine in winter it needs a passing guard
   (the unit would dehumidify by itself).
 * Setting a mode writes the request registers first (so the guard refuses
-  before the unit starts), then `unit_on_off`. AUTO clears both requests and
-  turns the unit on. OFF clears both requests and turns the unit off only if
-  it could still act on its own (`auto_capable`, or a 1121 request not ours):
-  over Modbus that is the only way to stop the unit's own logic.
+  before the unit starts), then `unit_on_off`. AUTO and FAN_ONLY clear both
+  requests and turn the unit on. OFF clears both requests and always turns
+  the unit off: that alone stops the unit's own logic, digital-input requests
+  and a manual fan. `turn_on` = AUTO if `auto_capable` else FAN_ONLY;
+  `turn_off` = OFF.
 * Auto mode is tested only against the derived `display_cnu2` overlay, never on
   a real display unit; the README banner says so.
 * `target_humidity` ← `humidity_setpoint`; `target_temperature` ←
   `summer_setpoint` in summer, `winter_setpoint` in winter. Both features are
   removed when the hub hides the setpoints (headless, no probe).
-* `min_humidity` / `max_humidity` follow the unit's own PH29/PH30 clamps.
+* `min_humidity` / `max_humidity` follow the unit's own PH29/PH30 clamps;
+  `min_temp` / `max_temp` are SEtC's 15..35 °C in summer and SEtH's PH09..PH10
+  clamp (within 5..35 °C) in winter.
 * `current_temperature` / `current_humidity` report `None` while the matching
   probe-fault alarm is active.
 
 ## Fan entity
+
+Only the R variant has a fan. `hub.has_fan` (from the primed read-back: damper
+output 1134 not `disabled`) decides; on a non-R unit `FAN_KEYS` (fan entity,
+fan speed numbers, fan sensors, 1112) are hidden and the climate entity drops
+`FAN_MODE`.
 
 Read and write are deliberately separate, because on this device they are not
 the same number.

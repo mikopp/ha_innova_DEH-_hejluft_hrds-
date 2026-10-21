@@ -323,6 +323,40 @@ async def test_renamed_setup_switches_are_migrated(hass, setup):
     assert s.entity_id("switch", "enable_integration") is None
 
 
+async def test_active_cooling_keys_become_integration(hass, setup):
+    """Up to 0.9.1 register 1139 and PG02 were keyed ``active_cooling``."""
+    s = setup
+    registry = er.async_get(hass)
+    prefix = f"{s.entry.entry_id}-"
+    switch = s.entity_id("switch", "integration_request")
+    pg02 = s.entity_id("binary_sensor", "integration_available")
+    assert await hass.config_entries.async_unload(s.entry.entry_id)
+    await hass.async_block_till_done()
+    # The registry of an older install: the switch's id still says "active
+    # cooling" (its name was "Active cooling (Modbus)"); the binary sensor's
+    # id does not.
+    registry.async_update_entity(
+        switch,
+        new_unique_id=prefix + "active_cooling",
+        new_entity_id="switch.hrds_active_cooling_modbus",
+    )
+    registry.async_update_entity(
+        pg02, new_unique_id=prefix + "active_cooling_available"
+    )
+
+    await hass.config_entries.async_setup(s.entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert s.entity_id("switch", "active_cooling") is None
+    assert s.entity_id("binary_sensor", "active_cooling_available") is None
+    assert (
+        s.entity_id("switch", "integration_request")
+        == "switch.hrds_integration_request_modbus"
+    )
+    assert s.entity_id("binary_sensor", "integration_available") == pg02
+    assert s.state("switch", "integration_request").state == "off"
+
+
 # ---- 5. derived state comes back identical -----------------------------------
 @pytest.mark.parametrize(
     ("sim_options", "entry_options"),

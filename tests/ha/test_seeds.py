@@ -49,17 +49,17 @@ async def test_seed_sets_up_and_dehumidifies(hass, clock, seed, variant):
         await server.stop()
 
 
-async def test_cool_not_offered_without_active_cooling(hass, clock):
+async def test_cool_not_offered_without_integration_function(hass, clock):
     """PG02 = 0: the unit has no integration function and ignores INT."""
     server = HrdsSimServer(HrdsDevice(overlays=("no_dc",)))
     await server.start()
     try:
         s = await add_entry(hass, server)
-        assert s.state("binary_sensor", "active_cooling_available").state == "off"
+        assert s.state("binary_sensor", "integration_available").state == "off"
         modes = s.state("climate", CLIMATE).attributes["hvac_modes"]
         await allow_operation(s)
         with pytest.raises(ServiceValidationError, match="PG02"):
-            await s.service("switch", "turn_on", "active_cooling")
+            await s.service("switch", "turn_on", "integration_request")
         refused_write = server.device.holding[R.INT_REQUEST]
         await hass.config_entries.async_unload(s.entry.entry_id)
         await hass.async_block_till_done()

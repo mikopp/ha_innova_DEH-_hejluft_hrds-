@@ -98,6 +98,17 @@ async def test_off_switches_the_unit_off_when_a_request_cannot_be_cleared(setup,
     assert s.device.holding[R.BMS_ON] == 0
 
 
+async def test_off_reports_the_request_failure_when_the_unit_off_fails_too(
+    setup, clock
+):
+    s = setup
+    await allow_operation(s)
+    await set_hvac_mode(s, clock, "dry")
+    s.sim.reject_writes = {R.DEU_REQUEST, R.BMS_ON}
+    with pytest.raises(HomeAssistantError, match="Modbus write to dehumidify"):
+        await s.service("climate", "set_hvac_mode", CLIMATE, hvac_mode="off")
+
+
 @pytest.mark.parametrize(
     ("alarm", "key"),
     [

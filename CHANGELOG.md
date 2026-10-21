@@ -6,10 +6,68 @@ All notable changes to this project are documented here, newest first.
 
 ## Unreleased
 
+**Changed:** climate *Off* now always means the unit is off: it clears both
+requests and switches the unit off (Modbus on/off), so it stops the unit's own
+logic, digital-input requests and a manual fan, and never disagrees with
+`switch.unit_on_off`. A unit that is on with nothing requested and no display
+or room probe (nothing can start it) now shows the new mode **Standby** (Home
+Assistant's *fan only*, renamed) instead of *Off*; its action is *Idle*, or
+*Fan* while a manual fan speed runs an R unit's fan. Climate *turn on* clears
+both requests and switches the unit on (Standby, or Auto where the unit
+regulates by itself; it used to start Dry); *turn off* is Off.
+
+**Fixed:** a non-R unit has no fan of its own, yet got a fan entity, climate
+fan modes, fan speed numbers and fan sensors. They are no longer created when
+the damper output (1134) reads *disabled*.
+
+**Breaking:** register 1139 is the integration (INT) request, not "active
+cooling": it cools in summer and heats in winter. Its keys now say so:
+`switch.active_cooling` is `integration_request`, and
+`binary_sensor.active_cooling_available` (PG02) is `integration_available`.
+The entities are migrated at startup with their history; an entity id that
+still carries the old key follows (e.g. `switch.hrds_active_cooling_modbus`
+becomes `switch.hrds_integration_request_modbus`), other entity ids stay.
+Update automations, scripts and dashboards that use the old entity ids.
+
+**Changed:** the unit's own winter heating is reported instead of ignored. With
+a room temperature source (display or AI2 probe) and the integration function
+(PG02), the unit raises a winter integration request by itself when the room
+falls below its winter setpoint minus PF12 (with the factory PH09/PH10 = 14 °C
+and PF12 = 0.5 K: below 13.5 °C). *Allow winter heating* never stopped that,
+since the unit knows nothing of the option. Now:
+the new `binary_sensor.automatic_heating` (*Unit heats on its own*) is on while
+the unit, switched on in winter, can heat by itself, and its attributes give
+the band (`starts_below`, `stops_above`), the setpoint and its PH09/PH10 clamp,
+and whether it heats now. The setup check lists `unit_heats_on_its_own` while
+the option is off (turning the option on accepts it; lowering PH09 and the
+winter setpoint to 5 °C stops it) and `unit_heats_on_its_own_on_brine` on a
+brine circuit. The climate shows *Auto* with the action *Heating* while it
+heats, and *Off* switches such a unit off. A winter integration request set
+elsewhere (display, a season change under a latched *Cool*) now shows as
+*Heat* / *Heating* whatever the option says; on brine it never does. PF12,
+PH09 and PH10 are read once at setup.
+
+**Changed:** *Allow winter heating* can no longer be turned on together with a
+brine circuit (the setup and options forms refuse it; an older entry with both
+keeps ignoring it), and the setup check lists
+`winter_heating_without_integration` when it is on for a unit without the
+integration function (PG02 = 0).
+
+**Fixed:** on brine without a passing guard, switching the season to winter
+(or the unit on in winter) is also refused while a dehumidify request from
+another source (a digital input) is on, not only when the room probe could
+start one. The climate's target temperature range follows the season: in
+winter it is the unit's own SEtH clamp PH09..PH10 (factory 14 °C both), so the
+card no longer offers a winter setpoint the unit cannot take (it offered 15-35
+°C while SEtH was 14 °C). The options form starts with *Allow winter heating*
+unticked on a brine circuit, so an older entry holding both can be saved.
+
 **Fixed:** climate *Off* switches the unit off if clearing a request fails,
-instead of leaving the request latched on a running unit. A refused *Auto*
-(operation gate, brine guard) no longer clears a running *Dry*/*Cool* request
-first. On brine without a passing guard, switching the season to winter is
+instead of leaving the request latched on a running unit (and reports the
+request's failure if that fails too). A refused climate mode (operation gate,
+brine guard) no longer clears a running request first: every write of a mode
+change is checked before the first one, so a refused *Auto* or *Dry* leaves a
+running *Dry*/*Cool* alone. On brine without a passing guard, switching the season to winter is
 refused while the unit is on and its room probe could make it dehumidify in
 winter by itself.
 
@@ -17,13 +75,13 @@ winter by itself.
 requested. The unit has no heat source of its own: a winter integration
 request only opens the water valve and runs the pump, so it warms the air only
 with warm water from a heating circuit. *Heating* is shown only when the
-request may heat (winter, *Allow winter heating*, never on brine), the
+unit has a winter integration request (never on brine), the
 valve/pump output is on, AL04 is not active, the compressor is off and the
 water is at least PC08 (now read once at setup). *Cooling* needs a summer
 integration request the unit acts on, the compressor running and no AL03;
 otherwise the action is *Drying* or *Idle*. An integration request that cannot
-act (winter without the option, brine, no integration function) no longer
-shows the mode as *Heat*/*Cool*. *Cool*/*Heat* are not offered, and an
+act (brine in winter, no integration function) no longer shows the mode as
+*Heat*/*Cool*. *Cool*/*Heat* are not offered, and an
 integration request is refused, on a unit without the integration function
 (PG02 = 0). With the season on *auto*, the mode status decides which season is
 in force.

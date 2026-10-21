@@ -29,9 +29,11 @@ async def test_display_settings_left_alone(setup):
     assert written == {R.PH02_ONOFF_BMS, R.PH27_INT_BMS, R.PH28_DEU_BMS}
     assert s.device.holding[R.PH01_ONOFF_DISPLAY] == 1
     assert s.state("sensor", "setup_check").state == "attention"
-    # Only free cooling without an outdoor probe - the display is on.
+    # Free cooling without an outdoor probe, and the display's room
+    # temperature lets the unit heat by itself in winter - the display is on.
     assert s.state("sensor", "setup_check").attributes["issues"] == [
-        "free_cooling_without_outdoor_probe"
+        "free_cooling_without_outdoor_probe",
+        "unit_heats_on_its_own",
     ]
 
 
@@ -79,9 +81,13 @@ async def test_setpoints_offered_and_written_per_season(setup, clock):
     await s.service("select", "select_option", "season", option="winter")
     await clock.settle()
     assert s.state("climate", CLIMATE).attributes["temperature"] == 14.0
-    await s.service("climate", "set_temperature", CLIMATE, temperature=18.0)
+    # The unit clamps SEtH to PH09..PH10 (factory 14 degC both): the climate
+    # offers only that range.
+    with pytest.raises(ServiceValidationError, match="14.0 to 14.0"):
+        await s.service("climate", "set_temperature", CLIMATE, temperature=18.0)
+    await s.service("climate", "set_temperature", CLIMATE, temperature=14.0)
     await clock.settle()
-    assert s.device.holding[R.WINTER_SETPOINT] == 180
+    assert s.device.holding[R.WINTER_SETPOINT] == 140
     assert s.device.holding[R.SUMMER_SETPOINT] == 265
 
 
@@ -187,7 +193,70 @@ async def test_auto_withdrawn_on_humidity_probe_fault(setup, clock):
     await clock.poll()
     climate = s.state("climate", CLIMATE)
     assert "auto" not in climate.attributes["hvac_modes"]
-    assert climate.state == "off"
+    # On with nothing that can make it act: Standby.
+    assert climate.state == "fan_only"
     assert climate.attributes["hvac_action"] == "idle"
     with pytest.raises(ServiceValidationError, match="auto"):
         await s.service("climate", "set_hvac_mode", CLIMATE, hvac_mode="auto")
+
+
+# ---- the unit's own winter heating (room temperature below SEtH - PF12) -------
+async def test_unit_heats_on_its_own_and_says_on_what(setup, clock):
+    """'Allow winter heating' is off, yet the unit heats: the user is told."""
+    s = setup
+    await allow_operation(s)
+    await s.service("select", "select_option", "season", option="winter")
+    await clock.settle()
+    await set_hvac_mode(s, clock, "auto")
+    sensor = s.state("binary_sensor", "automatic_heating")
+    assert sensor.state == "on"
+    assert sensor.attributes["heating"] is False  # room 22.5, SEtH 14
+    assert sensor.attributes["temperature_source"] == "display"
+    assert sensor.attributes["winter_setpoint"] == 14.0
+    assert sensor.attributes["starts_below"] == 13.5  # PF12 = 0.5
+    assert sensor.attributes["winter_setpoint_max"] == 14.0  # PH10
+    assert sensor.attributes["winter_heating_allowed"] is False
+    assert (
+        "unit_heats_on_its_own"
+        in (s.state("sensor", "setup_check").attributes["issues"])
+    )
+
+    s.device.set_input(R.ROOM_TEMP, 130)  # 13.0 degC
+    await clock.poll()
+    assert s.state("sensor", "water_valve_pump").state == "on"
+    assert s.state("sensor", "compressor_status").state == "off"
+    assert s.state("binary_sensor", "automatic_heating").attributes["heating"]
+    climate = s.state("climate", CLIMATE)
+    assert climate.state == "auto"
+    assert climate.attributes["hvac_action"] == "heating"
+
+    # Off has to switch the unit off: nothing else stops its own heating.
+    s.device.clear_write_log()
+    await set_hvac_mode(s, clock, "off")
+    assert (R.BMS_ON, 0) in [(w.address, w.value) for w in s.device.write_log]
+    assert s.state("sensor", "water_valve_pump").state == "off"
+    assert s.state("binary_sensor", "automatic_heating").state == "off"
+
+
+async def test_lowered_winter_setpoint_ends_the_own_heating_issue(setup, clock):
+    s = setup
+    # Done at the unit: PH09 first (it clamps SEtH), then SEtH to 5 degC.
+    s.device.set_holding(R.PH09_WINTER_SETPOINT_MIN, 50)
+    s.device.set_holding(R.WINTER_SETPOINT, 50)
+    await clock.poll()
+    assert (
+        "unit_heats_on_its_own"
+        not in (s.state("sensor", "setup_check").attributes["issues"])
+    )
+
+
+async def test_target_temperature_range_follows_the_season(setup, clock):
+    """SEtH is clamped to PH09..PH10 (factory 14 degC both)."""
+    s = setup
+    climate = s.state("climate", CLIMATE).attributes
+    assert (climate["min_temp"], climate["max_temp"]) == (15.0, 35.0)
+    await s.service("select", "select_option", "season", option="winter")
+    await clock.settle()
+    climate = s.state("climate", CLIMATE).attributes
+    assert (climate["min_temp"], climate["max_temp"]) == (14.0, 14.0)
+    assert climate["temperature"] == 14.0
