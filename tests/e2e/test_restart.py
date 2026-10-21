@@ -21,8 +21,6 @@ from .ha_client import ServiceError
 CLIMATE = "hrds_climate"
 BRINE_SENSOR = "sensor.brine_supply"
 BRINE_INPUT = "input_number.brine_temperature"
-REQUIRED_SETTINGS = {1778, 1869, 1870, 1777, 1803}  # PH02 PH27 PH28 PH01 HA00
-OPERATIONAL_REGISTERS = {1105, 1139, 1140, 1614}
 
 
 def _unique_ids(entry) -> dict[str, str]:
@@ -129,9 +127,8 @@ def test_running_unit_is_untouched_and_polling_resumes(hl, restart_ha):
 
     _booted(hl, restart_ha)
 
-    written = {address for address, _value in hl.sim.writes()}
-    assert written == REQUIRED_SETTINGS, "only the required settings are written"
-    assert not written & OPERATIONAL_REGISTERS
+    # The unit still holds every required setting: nothing at all is written.
+    assert hl.sim.writes() == []
     state = hl.sim.state()
     assert state["unit_status"] == 5 and state["compressor_status"] == 4
     hl.assert_state(CLIMATE, "dry", {"hvac_action": "drying"})
@@ -167,18 +164,13 @@ def test_ha_booting_before_the_unit_is_reachable(hl, restart_ha):
 
 @pytest.mark.needs_real_ha("persistence")
 def test_restart_together_with_a_unit_power_cycle(hl, restart_ha):
-    """Contract 4: a unit that lost its settings gets them back."""
+    """Contract 4: a unit power cycle loses nothing, so nothing is rewritten."""
+    hl.allow_operation()
+    hl.sim.call("/clear_writes")
     _booted(hl, restart_ha, while_down=lambda: hl.sim.call("/power_cycle"))
 
-    hl.sim.wait_for(
-        lambda s: (
-            s["holding"]["1778"] == 1
-            and s["holding"]["1777"] == 0
-            and s["holding"]["1803"] == 0
-        ),
-        what="required settings restored",
-    )
     hl.assert_state("unit_status", "off_by_bms")
-    hl.allow_operation()
+    hl.assert_state("enable_onoff_bms", "on")
+    assert hl.sim.writes() == []
     hl.service("climate", "set_hvac_mode", CLIMATE, hvac_mode="dry")
     hl.assert_state(CLIMATE, "dry", {"hvac_action": "drying"})

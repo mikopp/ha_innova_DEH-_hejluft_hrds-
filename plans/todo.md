@@ -50,11 +50,11 @@ evidence log, replace the `[INFERRED]` tags it settles, and fix the code/docs.
 ## BMS enables
 
 - [ ] **PH02 (1778) / PH27 (1869) / PH28 (1870) must be set before writes are
-      honoured.** Confirm `_sync_bms_enables_locked()` actually unlocks on/off,
-      dehumidify and cooling. The hub now re-asserts these every poll from the
-      read-back, so a power-cycle that clears them should self-heal within one
-      scan interval — verify that it does, by power-cycling the unit and then
-      issuing a write.
+      honoured.** They are the user's switches now (the integration never
+      writes them). Confirm on hardware that with one off the unit ignores
+      the matching request register, that it keeps a request written while
+      the enable was off, and that a power cycle keeps the enables and the
+      requests (1105/1139/1140).
 - [ ] Confirm an **OFF command always wins** over an ON from any source
       (display/DI/Modbus), per the manual.
 - [ ] **`PU13_MinTRoom_disableDEU` (1889) can veto a Modbus dehumidify request.**
@@ -211,7 +211,7 @@ option is recommended.
          off. Run the central MVHR at 150 m³/h or more (the lowest flow in the
          handbook's capacity table for the HRDS+ 30).
       3. **Start dehumidification:** 1105 ← 1 (on), 1140 ← 1 (dehumidify),
-         1139 ← 0 (no active cooling). The hub sets the BMS enables PH02/PH28.
+         1139 ← 0 (no active cooling). Turn on the PH02/PH28 enables first (the integration never sets them).
       4. **Pass 1:** write 1614 ← 0 with the factory band (PF28 = 50 %,
          PF10 = 85 %).
       5. **Pass 2:** write 1853 (PF28) ← 0, then 1614 ← 0 again.

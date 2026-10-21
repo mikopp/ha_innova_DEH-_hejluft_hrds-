@@ -590,14 +590,15 @@ def step_settings(
 
     # --- 8a. What the integration writes on connect ----------------------
     # Mirrors HrdsModbusHub._required_settings (keep in sync).
-    required = [(key, "on", 1) for key in const.BMS_ENABLE_KEYS]
+    required = []
     if not has_display:
         required += [(k, d, raw) for k, (d, raw) in const.HEADLESS_SETTINGS.items()]
     mode = "display fitted" if has_display else "headless (no display)"
     print(f"  What the integration WRITES when it connects [{mode}]:")
-    print("    Cycle 1 has no cached data, so it writes ALL of these, even if")
-    print("    they already hold the value; later cycles only re-write one that")
-    print("    reads differently.")
+    print("    Only a setting that reads differently (never one that already")
+    print("    holds the value); the Modbus enables below are yours to set.")
+    if not required:
+        print("    nothing")
     for key, want, raw in required:
         props = const.get_entity_props(key)
         reg = const.get_entity_reg(props)[0]
@@ -897,7 +898,12 @@ def step_headless(dev: Dev, rows: dict, extras: dict) -> dict[str, Any]:
         say(
             OK if v == "on" else INFO,
             f"{code} via Modbus = {v}"
-            + ("" if v == "on" else ": the integration writes 1 on connect"),
+            + (
+                ""
+                if v == "on"
+                else ": Home Assistant can only observe this function; turn the "
+                "matching 'Enable ... via Modbus' switch on to control it"
+            ),
         )
 
     # Remote ON/OFF contact (DI3, OFF/OFF terminals): open = forced OFF.

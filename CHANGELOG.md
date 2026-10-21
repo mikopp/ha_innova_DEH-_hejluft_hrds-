@@ -6,6 +6,34 @@ All notable changes to this project are documented here, newest first.
 
 ## Unreleased
 
+**Breaking:** the Modbus enables **PH02** (on/off), **PH28** (dehumidify) and
+**PH27** (integration) are now yours: the integration no longer writes them at
+setup or on any poll, and switching one off stays off. With an enable off,
+Home Assistant observes that function and refuses to operate it (climate
+modes, `switch.unit_on_off`, `switch.dehumidify`, `switch.integration_request`)
+with a message naming the switch to turn on; a request register the unit
+ignores no longer decides the climate mode. To control the unit from Home
+Assistant, turn on the enables you need on the setup device (the README's
+setup step 4 lists which gives what), then *Allow operational requests*. A unit
+whose PH02 was set by an earlier version keeps it: nothing changes there. A
+display unit is no longer switched off when the integration is added (writing
+PH02 used to hand on/off to a Modbus register that read off). The
+`modbus_enables_pending` setup issue is gone.
+
+**Fixed (tests):** the simulator no longer resets PH01/PH02/PH27/PH28/HA00 on a
+power cycle. The unit keeps its settings (a real unit kept PH01 and PH02, and
+the Innova display-panel manual says its memory survives a power failure), so
+nothing has to be re-asserted after one.
+
+**Changed:** the unit's settings live in EEPROM, which wears with every write,
+so nothing is written that the unit already holds. A write reads the register
+first and skips it when the value is already there (an automation repeating a
+mode, fan speed or setpoint no longer writes). The required settings
+(headless PH01/HA00) are judged on the same poll's read-back,
+so a restart or reload no longer rewrites them all. A setting the unit does not
+keep is written on three polls in a row at most, then left alone and reported
+by the setup check until it reads back right or the integration is reloaded.
+
 **Changed:** climate *Off* now always means the unit is off: it clears both
 requests and switches the unit off (Modbus on/off), so it stops the unit's own
 logic, digital-input requests and a manual fan, and never disagrees with

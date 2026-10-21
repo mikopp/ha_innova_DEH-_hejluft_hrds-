@@ -208,7 +208,19 @@ async def setup(
         await hass.async_block_till_done()
 
 
+MODBUS_ENABLES = ("enable_onoff_bms", "enable_dehumidify_bms", "enable_integration_bms")
+
+
+async def enable_modbus_control(s: Setup) -> None:
+    """The user's setup step: turn on the Modbus enables that are off."""
+    for key in MODBUS_ENABLES:
+        if s.state("switch", key).state != "on":
+            await s.service("switch", "turn_on", key)
+
+
 async def allow_operation(s: Setup) -> None:
+    """Full control: the Modbus enables, then the operation gate."""
+    await enable_modbus_control(s)
     await s.service("switch", "turn_on", "operation_allowed")
 
 

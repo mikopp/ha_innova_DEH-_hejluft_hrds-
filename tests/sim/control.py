@@ -5,7 +5,7 @@ Stdlib only. All bodies are JSON; every POST answers with ``GET /state``.
 =====================  =====================================================
 ``GET  /state``        device summary incl. the write log (``writes``)
 ``POST /reset``        back to the seed, faults cleared, write log emptied, online
-``POST /power_cycle``  volatile settings back to factory values
+``POST /power_cycle``  mains off/on: every setting is kept
 ``POST /offline``      stop answering Modbus (port closed)
 ``POST /online``       answer again
 ``POST /clear_writes`` empty the write log

@@ -58,13 +58,16 @@ async def test_unconfirmed_request_falls_back_to_the_units_value(setup, clock, c
     assert s.state("switch", "unit_on_off").state == "on"
 
 
-async def test_enables_and_fan_are_not_pending(setup, clock):
+async def test_fan_is_not_pending_but_enables_are(setup, clock):
     s = setup
     await allow_operation(s)
+    await clock.settle()
     hub = s.entry.runtime_data
     await s.service("number", "set_value", "fan_manual_speed", value=30)
-    await s.service("switch", "turn_off", "enable_onoff_bms")
     assert hub._pending == {}
+    # What may be requested follows an enable at once, before the read-back.
+    await s.service("switch", "turn_off", "enable_onoff_bms")
+    assert set(hub._pending) == {"enable_onoff_bms"}
     await clock.settle()
 
 

@@ -22,11 +22,9 @@ pytestmark = [
 
 async def test_display_settings_left_alone(setup):
     s = setup
-    written = {w.address for w in s.device.write_log}
-    assert R.PH01_ONOFF_DISPLAY not in written
-    assert R.HA00_PROBE_SOURCE not in written
-    # The first cycle has no read-back yet, so it writes every enable.
-    assert written == {R.PH02_ONOFF_BMS, R.PH27_INT_BMS, R.PH28_DEU_BMS}
+    # With a display nothing is written at all: the Modbus enables are the
+    # user's, and PH01/HA00 belong to the display.
+    assert s.device.write_log == []
     assert s.device.holding[R.PH01_ONOFF_DISPLAY] == 1
     assert s.state("sensor", "setup_check").state == "attention"
     # Free cooling without an outdoor probe, and the display's room
@@ -129,12 +127,9 @@ async def test_auto_lets_the_unit_dehumidify_on_its_own(setup, clock):
     assert "auto" in climate.attributes["hvac_modes"]
     s.device.clear_write_log()
     await set_hvac_mode(s, clock, "auto")
-    # No Modbus request: the unit decides from its own humidity reading.
-    assert [(w.address, w.value) for w in s.device.write_log] == [
-        (R.INT_REQUEST, 0),
-        (R.DEU_REQUEST, 0),
-        (R.BMS_ON, 1),
-    ]
+    # No Modbus request: the unit decides from its own humidity reading. The
+    # requests are already clear, so only the unit is switched on.
+    assert [(w.address, w.value) for w in s.device.write_log] == [(R.BMS_ON, 1)]
     climate = s.state("climate", CLIMATE)
     assert climate.state == "auto"
     assert climate.attributes["hvac_action"] == "idle"  # 55 %RH, below PU01 + PU07
@@ -145,14 +140,11 @@ async def test_auto_lets_the_unit_dehumidify_on_its_own(setup, clock):
     assert climate.state == "auto"
     assert climate.attributes["hvac_action"] == "drying"
 
-    # Off has to switch the unit off: nothing else stops its own logic.
+    # Off has to switch the unit off: nothing else stops its own logic. Our
+    # requests are already clear, so that is the only write.
     s.device.clear_write_log()
     await set_hvac_mode(s, clock, "off")
-    assert [(w.address, w.value) for w in s.device.write_log] == [
-        (R.INT_REQUEST, 0),
-        (R.DEU_REQUEST, 0),
-        (R.BMS_ON, 0),
-    ]
+    assert [(w.address, w.value) for w in s.device.write_log] == [(R.BMS_ON, 0)]
     climate = s.state("climate", CLIMATE)
     assert climate.state == "off"
     assert climate.attributes["hvac_action"] == "off"

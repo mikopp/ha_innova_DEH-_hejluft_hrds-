@@ -113,10 +113,13 @@ from .const import (
     INSTALLER_DEVICE_SUFFIX,
     INSTALLER_KEYS,
     INSTALLER_LOGIC_KEYS,
+    MODBUS_DISABLED_MESSAGES,
+    MODBUS_ENABLE_FOR,
     MODEL_SPECS,
     OPERATIONAL_KEYS,
     PENDING_KEYS,
     PENDING_RECHECK_SECONDS,
+    REQUIRED_SETTING_MAX_WRITES,
     ROOM_HUMIDITY_PROBE_CODES,
     ROOM_TEMP_PROBE_CODES,
     TEMPERATURE_TARGET_KEYS,
@@ -459,6 +462,8 @@ class HrdsModbusHub:
         self._pending: Dict[str, Tuple[str, float, Any]] = {}
         self._pending_lock = threading.Lock()
         self._verify_handles: List[Any] = []
+        # Required setting -> writes in a row the unit has not kept yet.
+        self._required_writes: Dict[str, int] = {}
         # False until a full read cycle succeeds; entities key their
         # availability off this so a dead gateway is visible in HA.
         self.last_update_success = False
@@ -560,6 +565,24 @@ class HrdsModbusHub:
         season = self.season
         return season if season in ("summer", "winter") else None
 
+    def modbus_enabled(self, key: str) -> bool:
+        """Does the unit act on this Modbus request (its PH02/PH27/PH28 enable)?
+
+        Unknown (not read yet) counts as enabled.
+        """
+        return self.data.get(MODBUS_ENABLE_FOR[key]) != "off"
+
+    def request_active(self, key: str) -> bool:
+        """A Modbus request (on/off, DEU, INT) that is on and that the unit uses."""
+        return self.data.get(key) == "on" and self.modbus_enabled(key)
+
+    @property
+    def unit_running(self) -> bool:
+        """The unit is on, or Home Assistant has just switched it on."""
+        return self.data.get(C_UNIT_STATUS) == "on" or self.request_active(
+            C_UNIT_ON_OFF
+        )
+
     @property
     def int_effect(self) -> Optional[str]:
         """What the integration (INT) request makes the unit do: cool, heat or None.
@@ -572,10 +595,9 @@ class HrdsModbusHub:
         winter INT only circulates cold brine (handbook 3.8.7: no heating). None
         while INT is off or cannot act; the unit then at most dehumidifies.
         """
-        d = self.data
         if (
-            d.get(C_INTEGRATION_REQUEST) != "on"
-            or d.get(C_INTEGRATION_AVAILABLE) == "off"
+            not self.request_active(C_INTEGRATION_REQUEST)
+            or self.data.get(C_INTEGRATION_AVAILABLE) == "off"
         ):
             return None
         season = self.active_season
@@ -816,8 +838,8 @@ class HrdsModbusHub:
         """
         winter = self.active_season != "summer"
         d = self.data
-        requests_on = (
-            d.get(C_DEHUMIDIFY) == "on" or d.get(C_INTEGRATION_REQUEST) == "on"
+        requests_on = self.request_active(C_DEHUMIDIFY) or self.request_active(
+            C_INTEGRATION_REQUEST
         )
         # Switching the unit on starts it when a request is latched or when its
         # own room-probe logic can raise one.
@@ -872,11 +894,7 @@ class HrdsModbusHub:
         # source (a digital input: 1121 on while neither of our requests is):
         # refuse switching it on in winter, and switching a running unit to
         # winter.
-        foreign_dehum = (
-            d.get(C_DEHUM_REQUEST) == "on"
-            and d.get(C_DEHUMIDIFY) != "on"
-            and d.get(C_INTEGRATION_REQUEST) != "on"
-        )
+        foreign_dehum = d.get(C_DEHUM_REQUEST) == "on" and not requests_on
         unguarded_winter_dehum = (
             self.is_brine
             and not brine_winter_ok
@@ -891,8 +909,7 @@ class HrdsModbusHub:
                 "dehumidification (PU02) to disabled."
             )
         if entity_key == C_SEASON and raw == 3:  # 3 = winter
-            unit_on = d.get(C_UNIT_ON_OFF) == "on" or d.get(C_UNIT_STATUS) == "on"
-            if unit_on and unguarded_winter_dehum:
+            if self.unit_running and unguarded_winter_dehum:
                 raise ServiceValidationError(
                     "The unit would dehumidify in winter on its own (room probe "
                     "or a digital-input request); on a brine circuit that needs "
@@ -901,7 +918,7 @@ class HrdsModbusHub:
                     "dehumidification (PU02) to disabled."
                 )
             if (
-                self.data.get(C_INTEGRATION_REQUEST) == "on"
+                self.request_active(C_INTEGRATION_REQUEST)
                 and not self.allow_winter_heating
             ):
                 raise ServiceValidationError(
@@ -909,7 +926,7 @@ class HrdsModbusHub:
                     "heating in winter. Turn it off first."
                 )
             if (
-                self.data.get(C_DEHUMIDIFY) == "on"
+                self.request_active(C_DEHUMIDIFY)
                 and self.is_brine
                 and not brine_winter_ok
             ):
@@ -1044,17 +1061,22 @@ class HrdsModbusHub:
                 self.last_update_success = False
                 return False
             try:
-                # Uses the previous cycle's read-back, so on the very first
-                # cycle (empty data) every required setting is written.
-                self._sync_required_settings_locked()
                 raw = self._read_keys_locked(self._poll_keys)
+                if raw is not None:
+                    self._decode_all(*raw, self._poll_keys)
+                    # Judged on this cycle's read-back, so a setting is only
+                    # written when the unit really lost it; then read again so
+                    # the entities and the setup check show the result now.
+                    if self._sync_required_settings_locked():
+                        raw = self._read_keys_locked(self._poll_keys)
+                        if raw is not None:
+                            self._decode_all(*raw, self._poll_keys)
             finally:
                 self._client.close()
 
         if raw is None:
             self.last_update_success = False
             return False
-        self._decode_all(*raw, self._poll_keys)
         self._compute_derived()
         self.last_update_success = True
         return True
@@ -1240,32 +1262,54 @@ class HrdsModbusHub:
         return any_ok
 
     def _required_settings(self) -> list[tuple[str, str, int]]:
-        """(entity key, decoded value, raw value) the unit must hold for us."""
-        required = [(key, "on", 1) for key in BMS_ENABLE_KEYS]
-        if not self._has_display:
-            required += [
-                (key, decoded, raw) for key, (decoded, raw) in HEADLESS_SETTINGS.items()
-            ]
-        return required
+        """(entity key, decoded value, raw value) the unit must hold for us.
 
-    def _sync_required_settings_locked(self) -> None:
-        """Keep PH02/PH27/PH28 (and, headless, PH01/HA00) at the values we need.
+        Only the headless settings: the Modbus enables are the user's
+        (MODBUS_ENABLE_FOR), never written by the integration on its own.
+        """
+        if self._has_display:
+            return []
+        return [
+            (key, decoded, raw) for key, (decoded, raw) in HEADLESS_SETTINGS.items()
+        ]
+
+    def _sync_required_settings_locked(self) -> bool:
+        """Keep PH01/HA00 at 0 on a unit without a display.
 
         Driven by the polled read-back rather than a one-shot flag: if the unit
         power-cycles and loses a setting, every subsequent write would silently
-        no-op until Home Assistant restarted. Re-asserting each cycle self-heals
-        that, and only writes when the read-back differs.
+        no-op until Home Assistant restarted. Checking each cycle self-heals
+        that, but writes only when the read-back differs (the parameters are in
+        EEPROM): a register that was not read is left alone, and a setting the
+        unit does not keep is given up after REQUIRED_SETTING_MAX_WRITES polls.
+        Returns True if anything was written.
 
-        Note this deliberately overrides the matching switches/select - these are
-        required for the integration to control the unit at all, so changing one
-        by hand is undone on the next poll. Without a display, PH01 must be 0
-        (else the unit stays OFF-by-display) and HA00 must be 0 (else it waits
-        for room T/H from a display that is not there).
+        Note this deliberately overrides the matching switch/select: without a
+        display, PH01 must be 0 (else the unit stays OFF-by-display) and HA00
+        must be 0 (else it waits for room T/H from a display that is not there).
         """
+        written = False
         for key, expected, raw in self._required_settings():
-            if self.data.get(key) == expected:
+            if key not in self.data:
+                continue  # not read this cycle: no reason to write
+            if self.data[key] == expected:
+                self._required_writes.pop(key, None)
                 continue
+            attempts = self._required_writes.get(key, 0)
+            if attempts >= REQUIRED_SETTING_MAX_WRITES:
+                continue
+            self._required_writes[key] = attempts + 1
+            if attempts + 1 == REQUIRED_SETTING_MAX_WRITES:
+                _LOGGER.error(
+                    "The unit did not keep required setting %s after %s writes; "
+                    "not writing it again until it reads back as %s or the "
+                    "integration is reloaded",
+                    key,
+                    REQUIRED_SETTING_MAX_WRITES,
+                    expected,
+                )
             reg, _dt = get_entity_reg(get_entity_props(key))
+            written = True
             try:
                 resp = self._client.write_register(
                     address=reg, value=raw, device_id=self._hostid
@@ -1284,6 +1328,7 @@ class HrdsModbusHub:
                 _LOGGER.info(
                     "Set required setting %s (register %s) to %s", key, reg, raw
                 )
+        return written
 
     # ---- decoding ---------------------------------------------------------
     def _decode_all(
@@ -1346,10 +1391,7 @@ class HrdsModbusHub:
         """
         d = self.data
         issues: list[str] = []
-        pending = [k for k, want, _raw in self._required_settings() if d.get(k) != want]
-        if any(k in BMS_ENABLE_KEYS for k in pending):
-            issues.append("modbus_enables_pending")
-        if any(k not in BMS_ENABLE_KEYS for k in pending):
+        if any(d.get(k) != want for k, want, _raw in self._required_settings()):
             issues.append("headless_settings_pending")
 
         status = d.get(C_UNIT_STATUS)
@@ -1483,9 +1525,33 @@ class HrdsModbusHub:
     def check_write_allowed(self, entity_key: str, raw: int) -> None:
         """Raise ServiceValidationError if writing ``raw`` would be refused.
 
-        The request guards and the operation gate, without writing; lets a
-        multi-write change refuse before its first write.
+        The Modbus enables, the request guards and the operation gate, without
+        writing; lets a multi-write change refuse before its first write.
         """
+        if entity_key in MODBUS_ENABLE_FOR and not self.modbus_enabled(entity_key):
+            raise ServiceValidationError(MODBUS_DISABLED_MESSAGES[entity_key])
+        if raw and entity_key in BMS_ENABLE_KEYS:
+            # Enabling makes the unit act on the request register as it is:
+            # a latched request starts now, so it must pass as a start.
+            request = next(k for k, v in MODBUS_ENABLE_FOR.items() if v == entity_key)
+            if self.data.get(request) == "on":
+                try:
+                    self._check_operation(request, 1)
+                except ServiceValidationError as err:
+                    name = {
+                        C_UNIT_ON_OFF: "Unit on/off (Modbus)",
+                        C_DEHUMIDIFY: "Dehumidify (Modbus)",
+                        C_INTEGRATION_REQUEST: "Integration request",
+                    }[request]
+                    raise ServiceValidationError(
+                        f"'{name}' is still on in the unit and would start as "
+                        f"soon as this is enabled: {err}"
+                    ) from err
+            return
+        self._check_operation(entity_key, raw)
+
+    def _check_operation(self, entity_key: str, raw: int) -> None:
+        """The request guards and the operation gate."""
         self._check_request_allowed(entity_key, raw)
         if entity_key in OPERATIONAL_KEYS and raw != 0 and not self.operation_allowed:
             raise ServiceValidationError(
@@ -1511,7 +1577,13 @@ class HrdsModbusHub:
         self.check_write_allowed(entity_key, raw)
 
         words = ModbusTcpClient.convert_to_registers(value=int(raw), data_type=dt)
-        ok = await self._hass.async_add_executor_job(self._write_registers, reg, words)
+        # A pending request's register may still lag behind the last command,
+        # so its read-back cannot tell whether this write is needed.
+        with self._pending_lock:
+            compare = entity_key not in self._pending
+        ok = await self._hass.async_add_executor_job(
+            self._write_registers, reg, words, compare
+        )
         if not ok:
             raise HomeAssistantError(
                 f"Modbus write to {entity_key} (register {reg}) failed. If this "
@@ -1561,18 +1633,38 @@ class HrdsModbusHub:
             return int(inv[value])
         return int(value)
 
-    def _write_registers(self, base_reg: int, words) -> bool:
-        """Write one or more registers. Returns True only if every write took."""
+    def _write_registers(self, base_reg: int, words, compare: bool = True) -> bool:
+        """Write one or more registers. Returns True only if every write took.
+
+        With ``compare``, the registers are read first and nothing is written
+        if they already hold ``words``: the unit's parameters live in EEPROM,
+        and a service called again with the same value (an automation, a
+        repeated mode change) must not wear it.
+        """
+        words = [int(word) & 0xFFFF for word in words]
         with self._lock:
             if not self._client.connect():
                 _LOGGER.warning("Modbus connect failed during write")
                 return False
             try:
+                if compare:
+                    resp = self._read("holding", base_reg, len(words))
+                    if resp is not None and not resp.isError():
+                        if list(resp.registers) == words:
+                            _LOGGER.debug(
+                                "Register %s already holds %s; not written",
+                                base_reg,
+                                words,
+                            )
+                            return True
+                    elif resp is None and not self._client.connect():
+                        _LOGGER.warning("Modbus connect failed during write")
+                        return False
                 for offset, word in enumerate(words):
                     try:
                         resp = self._client.write_register(
                             address=base_reg + offset,
-                            value=int(word) & 0xFFFF,
+                            value=word,
                             device_id=self._hostid,
                         )
                     except Exception as exc:  # noqa: BLE001 - reported to caller

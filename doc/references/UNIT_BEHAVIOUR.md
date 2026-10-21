@@ -253,6 +253,8 @@ Each request is the **OR** of its sources; any one raises it [HB 6.1]:
   lower `PH09` first, then `SEtH` [INFERRED].
 * Writes to the "by BMS" registers are ignored while the matching enable
   (`PH02`/`PH27`/`PH28`) is 0 [MB p.5].
+* A request written while its enable is 0 is probably kept by the unit and
+  starts once the enable is turned on [INFERRED; untested, `plans/todo.md`].
 
 ### 3.4 Setpoints
 
@@ -270,6 +272,25 @@ See [§9](#9-fan). In short: display request, 0–10 V and the Modbus manual
 setpoint feed the fan; the **highest** wins; each is scaled into the active
 mode's min–max band [HB 4.5, 6.2]. Whether the Modbus setpoint `PM20` follows
 the same scaling is [INFERRED], not tested.
+
+### 3.6 Persistence across a power cycle
+
+* Parameters are kept. The Innova display-panel manual lists "internal memory
+  with data storage even in the event of abnormal shutdown or power failure"
+  [IM p.28]; that text describes the older panel, not the K board, so for the
+  K board it is only supporting evidence.
+* On the reference unit `PH01 = 0` and `PH02 = 1` survived a power cycle: the
+  first Modbus ON took effect immediately afterwards, which an OFF-by-display
+  priority (`PH01` back at 1) or an ignored write (`PH02` back at 0) would
+  have prevented [T7; the reading of T7 is INFERRED]. `HA00` and the other
+  parameters were not observed directly [INFERRED].
+* Whether the request registers (`Status_OnOff_byBMS`, `Status_Integ_byBMS`,
+  `Status_Dehum_byBMS`) survive a power cycle is untested
+  [`plans/todo.md`].
+* The clock does not survive a long power cut (AL26) [HB 5.2.4].
+* Parameters are held in non-volatile memory [IM p.28 wording "internal
+  memory"]; a write-cycle limit is not documented anywhere [INFERRED that
+  there is one].
 
 ---
 
@@ -663,7 +684,7 @@ probes), RS-485→TCP gateway, behind a Zehnder ComfoAir Q350. "Dump" means
 | T4 | 2026-10 | No alarm bits set (768/769/770 = 0, `OR_Alarms` = 0) while OFF by display with no probes | dump |
 | T5 | 2026-10 | `R` unit: `PG01 = 0`; damper output 1134 = 0 (off); fan status OFF; compressor status OFF; 1112 = 0; K5 (1126) = 0; **K4 (1124) = 1** and `Packed_DO1` bits 12–13 = 1 in standby | dump |
 | T6 | 2026-10 | Season: `HB04 = 4`, `ModeStatus` = Summer DI, `Mode_OperatingMode` = summer, `PC05 = 0` | dump |
-| T7 | 2026-10-20 | `PH01 = 0`, `HA00 = 0`, `PH02 = 1` and a power cycle: still `off_by_display`. First Modbus ON → `on` at once | [`plans/todo.md`](../../plans/todo.md), PR #31 |
+| T7 | 2026-10-20 | `PH01 = 0`, `HA00 = 0`, `PH02 = 1` and a power cycle: still `off_by_display`. First Modbus ON → `on` at once (so `PH01` and `PH02` kept their values, §3.6) | [`plans/todo.md`](../../plans/todo.md), PR #31 |
 | T8 | 2026-10-21 | OFF written to `Status_OnOff_byBMS`: register read ON for several polls; register and `sm_UnitStatus` changed together at one later poll | PR #32 |
 | T9 | 2026-10-20 | Through the RS-485→TCP gateway a 120-register read got no reply at all; 10-register reads covered the whole map | PR #28 |
 | T10 | 2026-10 | Installation context: HRDS+ 30 behind a Zehnder ComfoAir Q350 | PR #14 |
