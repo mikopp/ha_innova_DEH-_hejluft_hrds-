@@ -1315,6 +1315,15 @@ COMPUTED_BINARY_SENSORS: Dict[str, Dict[str, Any]] = {
 # configuration writes always go through. A fan setpoint of 0 is not a request.
 OPERATIONAL_KEYS = (C_UNIT_ON_OFF, C_DEHUMIDIFY, C_ACTIVE_COOLING, C_FAN_MANUAL)
 
+# The request switches among them mean "what was commanded". The unit mirrors a
+# request into its register late (seen: OFF read back as ON for several polls),
+# so after a write the hub shows the command until the read-back agrees, and
+# re-reads just that register at these offsets (seconds after the write). The
+# last one is the cap: a request still unconfirmed then shows the unit's value.
+# The fan setpoint is not here: fan and climate report what the unit does.
+PENDING_KEYS = (C_UNIT_ON_OFF, C_DEHUMIDIFY, C_ACTIVE_COOLING)
+PENDING_RECHECK_SECONDS = (3, 6, 12, 25)
+
 
 # ------------------------------------------------------------------
 # Entity description dataclasses

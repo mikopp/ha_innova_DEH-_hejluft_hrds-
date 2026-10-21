@@ -260,6 +260,15 @@ figures in the technical data are the tested spec range, **not** a firmware floo
   schedules a **debounced** refresh. It raises `HomeAssistantError` if the write
   did not take, so a rejected write is not silently reported as success.
   `setter_function_callback` is the entity-facing wrapper.
+* **Request switches show the command until confirmed.** The unit mirrors a
+  request into its register late (a real unit read OFF back as ON for several
+  polls). For `PENDING_KEYS` (on/off, dehumidify, integration) the hub keeps
+  the commanded value in `hub.data` after the write (`_pending`), re-reads just
+  that register at `PENDING_RECHECK_SECONDS` (`_async_verify_pending`, never a
+  full cycle) and drops the entry as soon as the read-back agrees; after the last
+  re-read the unit's value stands and a warning is logged. The BMS enables are
+  deliberately not pending (the hub re-asserts them from the read-back), and
+  neither are fan and climate, which stay actual-only (see below).
 * Entity callbacks register via `hub.async_add_my_modbus_sensor(callback)`.
 
 ## Climate entity mapping

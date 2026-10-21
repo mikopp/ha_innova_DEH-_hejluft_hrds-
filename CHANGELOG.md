@@ -6,6 +6,14 @@ All notable changes to this project are documented here, newest first.
 
 ## Unreleased
 
+**Fixed:** switching *Unit on/off (Modbus)* (and the dehumidify and integration
+requests) off could flick back to on for several seconds. The unit mirrors a
+request into its register late, so the next poll read the old value. The switch
+now shows what you commanded until the unit agrees, re-reading just that
+register after 3, 6, 12 and 25 s. If the unit has not confirmed after 25 s the
+switch shows the unit's value and the log says so. The fan and the climate
+entity still show what the unit actually does.
+
 **Changed:** the *AI2 allocation (HA02)* and *AI3 allocation (HA03)* numbers on
 the setup device are now dropdowns named *T/H probe temperature input* and
 *T/H probe humidity input*, with the options *Unused*, *Room temperature probe

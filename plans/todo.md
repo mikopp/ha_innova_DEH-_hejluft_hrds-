@@ -62,6 +62,16 @@ verified on hardware.
       compressor, and whether setting PU13 to 0 lifts the interlock. This is the
       most likely cause of "the write was accepted but nothing happened".
 
+## Request read-back lag (added 2026-10-21)
+
+- [ ] **How late does the unit mirror a request?** A real unit read the on/off
+      request back as ON for several polls after OFF was written (switch and
+      `unit_status` changed together at the same poll). The hub now shows the
+      command until confirmed and re-reads at 3/6/12/25 s (`PENDING_RECHECK_SECONDS`).
+      With debug logging for `custom_components.innova_hrds`, the line
+      "HRDS+ confirmed <key>=<value> after N s" gives the real lag: size the
+      schedule from it (and check whether OFF and ON lag alike).
+
 ## Headless operation, identity, sentinel (added 2026-10-19)
 
 - [x] **PH01 = 0 does not clear `off_by_display` by itself** (2026-10-20, real
