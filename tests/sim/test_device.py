@@ -164,6 +164,29 @@ def test_display_humidity_raises_auto_dehumidify():
     assert dev.input[R.DEHUM_REQUEST] == 0
 
 
+def test_display_temperature_heats_by_itself_in_winter():
+    """Handbook 6.1.2: INT below SEtH - PF12, off above SEtH + PF12."""
+    dev = HrdsDevice(overlays=("display_cnu2",))
+    dev.write(R.PH02_ONOFF_BMS, 1)
+    dev.write(R.HB04_SEASON, R.SEASON_WINTER)
+    dev.write(R.BMS_ON, 1)
+    assert dev.input[R.WATER_VALVE_PUMP] == 0  # 22.5 degC, SEtH 14
+    dev.set_input(R.ROOM_TEMP, 134)  # below 14.0 - 0.5
+    assert dev.input[R.WATER_VALVE_PUMP] == 1
+    assert dev.input[R.COMPRESSOR_STATUS] == 6  # heats with water only
+    assert dev.input[R.DEHUM_REQUEST] == 0
+    dev.set_input(R.ROOM_TEMP, 144)  # inside the dead band: keeps heating
+    assert dev.input[R.WATER_VALVE_PUMP] == 1
+    dev.set_input(R.ROOM_TEMP, 146)
+    assert dev.input[R.WATER_VALVE_PUMP] == 0
+    # PH10 caps SEtH: a higher setpoint does not raise the threshold.
+    dev.set_holding(R.WINTER_SETPOINT, 200)
+    assert dev.input[R.WATER_VALVE_PUMP] == 0
+    dev.set_holding(R.PG02_INTEGRATION, 0)  # no INT function: never heats
+    dev.set_input(R.ROOM_TEMP, 100)
+    assert dev.input[R.WATER_VALVE_PUMP] == 0
+
+
 def test_headless_unit_never_requests_by_itself():
     dev = HrdsDevice()
     _enable_and_wake(dev)

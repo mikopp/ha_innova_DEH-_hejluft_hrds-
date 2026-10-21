@@ -17,7 +17,7 @@
         },
         "data_description": {
           "water_circuit": "Brine (ground-source heat pump) circuits cannot heat and must not dehumidify in winter.",
-          "allow_winter_heating": "In winter the unit's integration request heats the air with water from the heating circuit. Off by default; ignored on a brine circuit.",
+          "allow_winter_heating": "Lets Home Assistant request heating in winter (Heat mode): the integration request then heats the air with water from the heating circuit. The unit can also heat on its own with a room temperature source (see 'Unit heats on its own'); turning this on accepts that. Not possible on a brine circuit.",
           "brine_temperature_entity": "Optional. A temperature sensor on the brine supply (e.g. from the heat pump). When set, dehumidify and integration requests only start while it reads at least the minimum and has reported within 24 h, in every season. On a brine circuit it is required for dehumidifying in winter.",
           "brine_min_temperature": "Lowest brine temperature at which a request may start."
         }
@@ -27,7 +27,8 @@
       "already_configured": "This host is already configured",
       "invalid_host": "Invalid host or IP address",
       "cannot_connect": "Cannot reach the unit. Check host, port and Modbus slave ID",
-      "wrong_device": "The device at this address is not an HRDS+ (EVCO EPB9 controller)"
+      "wrong_device": "The device at this address is not an HRDS+ (EVCO EPB9 controller)",
+      "winter_heating_on_brine": "A brine circuit cannot heat: turn off 'Allow winter heating' or choose another water circuit"
     }
   },
   "options": {
@@ -50,7 +51,7 @@
         },
         "data_description": {
           "water_circuit": "Brine (ground-source heat pump) circuits cannot heat and must not dehumidify in winter.",
-          "allow_winter_heating": "In winter the unit's integration request heats the air with water from the heating circuit. Off by default; ignored on a brine circuit.",
+          "allow_winter_heating": "Lets Home Assistant request heating in winter (Heat mode): the integration request then heats the air with water from the heating circuit. The unit can also heat on its own with a room temperature source (see 'Unit heats on its own'); turning this on accepts that. Not possible on a brine circuit.",
           "brine_temperature_entity": "Optional. A temperature sensor on the brine supply (e.g. from the heat pump). When set, dehumidify and integration requests only start while it reads at least the minimum and has reported within 24 h, in every season. On a brine circuit it is required for dehumidifying in winter.",
           "brine_min_temperature": "Lowest brine temperature at which a request may start.",
           "installer_device": "Adds the installer device with the installer menu parameters. They are not part of the regular poll: they are read when this option is turned on, at each start, and when you press 'Refresh installer parameters'. Turning it off removes the device."
@@ -59,13 +60,17 @@
     },
     "error": {
       "cannot_connect": "Cannot reach the unit. Check host, port and Modbus slave ID",
-      "wrong_device": "The device at this address is not an HRDS+ (EVCO EPB9 controller)"
+      "wrong_device": "The device at this address is not an HRDS+ (EVCO EPB9 controller)",
+      "winter_heating_on_brine": "A brine circuit cannot heat: turn off 'Allow winter heating' or choose another water circuit"
     }
   },
   "entity": {
     "climate": {
       "hrds_climate": {
-        "name": "Climate"
+        "name": "Climate",
+        "state": {
+          "fan_only": "Standby"
+        }
       }
     },
     "sensor": {
@@ -458,7 +463,7 @@
       "humidity_probe_ok": {
         "name": "Room humidity probe OK"
       },
-      "active_cooling_available": {
+      "integration_available": {
         "name": "Unit has integration function (PG02)"
       },
       "alarm_compressor_lowpressure": {
@@ -484,6 +489,9 @@
       },
       "brine_temperature_guard": {
         "name": "Brine temperature guard"
+      },
+      "automatic_heating": {
+        "name": "Unit heats on its own"
       }
     },
     "switch": {
@@ -493,7 +501,7 @@
       "dehumidify": {
         "name": "Dehumidify (Modbus)"
       },
-      "active_cooling": {
+      "integration_request": {
         "name": "Integration request (cool in summer, heat in winter)"
       },
       "enable_onoff_display": {
@@ -1139,7 +1147,7 @@
         "name": "PH09 Winter setpoint min"
       },
       "inst_ph10": {
-        "name": "PH10 Winter setpoint max (factory 14 °C blocks auto heating)"
+        "name": "PH10 Winter setpoint max (caps the unit's own heating, factory 14 °C)"
       }
     },
     "button": {

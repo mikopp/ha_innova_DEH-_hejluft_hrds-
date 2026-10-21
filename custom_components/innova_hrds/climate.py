@@ -46,13 +46,13 @@ from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
 from .const import (
-    C_ACTIVE_COOLING,
-    C_ACTIVE_COOLING_AVAILABLE,
     C_COMPRESSOR_STATUS,
     C_DEHUM_REQUEST,
     C_DEHUMIDIFY,
     C_FAN_MANUAL,
     C_HUMIDITY_PROBE_OK,
+    C_INTEGRATION_AVAILABLE,
+    C_INTEGRATION_REQUEST,
     C_SUPPLY_FAN_OUTPUT,
     C_SUPPLY_FAN_STATUS,
     C_TEMP_PROBE_OK,
@@ -66,9 +66,11 @@ from .const import (
     CLIMATE_TARGET_HUMIDITY,
     CLIMATE_TARGET_TEMP,
     CLIMATE_TYPES,
+    ENTITIES_DICT,
     MyClimateEntityDescription,
 )
 from .entity_common import HubBackedEntity, setup_platform_from_types
+from .installer_params import installer_key
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -96,6 +98,12 @@ _FAN_MODE_PCT: dict[str, float] = {
 _FAN_LOW_THRESHOLD = (_FAN_MODE_PCT[_FAN_LOW] + _FAN_MODE_PCT[_FAN_MEDIUM]) / 2  # 42.5
 _FAN_MED_THRESHOLD = (_FAN_MODE_PCT[_FAN_MEDIUM] + _FAN_MODE_PCT[_FAN_HIGH]) / 2  # 70.0
 
+# Target temperature range: the setpoint registers' own limits (SEtC in summer,
+# SEtH in winter, where the unit's PH09/PH10 clamp narrows it).
+_SUMMER_MIN_TEMP = ENTITIES_DICT[CLIMATE_TARGET_TEMP]["MIN"]
+_WINTER_MIN_TEMP = ENTITIES_DICT[C_WINTER_SETPOINT]["MIN"]
+_MAX_TEMP = ENTITIES_DICT[CLIMATE_TARGET_TEMP]["MAX"]
+
 
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up the climate entity from a config entry."""
@@ -122,30 +130,39 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
             features &= ~ClimateEntityFeature.TARGET_TEMPERATURE
         if not hub.show_humidity_target:
             features &= ~ClimateEntityFeature.TARGET_HUMIDITY
+        # A non-R unit has no fan of its own.
+        if not hub.has_fan:
+            features &= ~ClimateEntityFeature.FAN_MODE
         self._attr_supported_features = features
         self._attr_hvac_modes = self._modes_for()
         self._attr_hvac_mode = HVACMode.OFF
         self._attr_hvac_action = HVACAction.OFF
-        self._attr_min_temp = 15.0
-        self._attr_max_temp = 35.0
+        self._attr_min_temp = _SUMMER_MIN_TEMP
+        self._attr_max_temp = _MAX_TEMP
         self._attr_target_temperature_step = 0.5
         self._attr_min_humidity = 30
         self._attr_max_humidity = 90
-        self._attr_fan_modes = _FAN_MODES
-        self._attr_fan_mode = _FAN_OFF
+        if hub.has_fan:
+            self._attr_fan_modes = _FAN_MODES
+            self._attr_fan_mode = _FAN_OFF
 
     def _modes_for(self) -> list[HVACMode]:
         hub = self._hub
         season = hub.active_season
         modes = [HVACMode.OFF]
-        if hub.auto_capable:
-            modes.append(HVACMode.AUTO)
+        # On with no request: the unit's own logic can act (Auto), or nothing
+        # can and it waits (Standby, shown through HA's fan_only mode).
+        modes.append(HVACMode.AUTO if hub.auto_capable else HVACMode.FAN_ONLY)
         modes.append(HVACMode.DRY)
         # INT needs the integration function (PG02); unknown counts as present.
-        if hub.data.get(C_ACTIVE_COOLING_AVAILABLE) != "off":
+        if hub.data.get(C_INTEGRATION_AVAILABLE) != "off":
             if season == "summer":
                 modes.append(HVACMode.COOL)
-            elif season == "winter" and hub.allow_winter_heating:
+            # Heat is offered when allowed; a winter INT set elsewhere still
+            # heats, so it is shown then too.
+            elif season == "winter" and (
+                hub.allow_winter_heating or hub.int_effect == "heat"
+            ):
                 modes.append(HVACMode.HEAT)
         return modes
 
@@ -183,7 +200,19 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
         if target_hum is not None:
             self._attr_target_humidity = int(target_hum)
 
-        # SEtC drives summer integration, SEtH winter integration.
+        # SEtC drives summer integration, SEtH winter integration. The unit
+        # clamps SEtH to PH09..PH10 (factory 14 degC both); offer that range
+        # in winter, within the winter setpoint's own 5..35 degC.
+        if self._hub.active_season == "winter":
+            low = data.get(installer_key("PH09"))
+            high = data.get(installer_key("PH10"))
+            self._attr_min_temp = max(_WINTER_MIN_TEMP, low or _WINTER_MIN_TEMP)
+            self._attr_max_temp = max(
+                self._attr_min_temp, min(_MAX_TEMP, high or _MAX_TEMP)
+            )
+        else:
+            self._attr_min_temp = _SUMMER_MIN_TEMP
+            self._attr_max_temp = _MAX_TEMP
         target_temp = data.get(
             C_WINTER_SETPOINT
             if self._hub.active_season == "winter"
@@ -194,7 +223,8 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
 
         self._attr_hvac_mode = self._derive_mode(data)
         self._attr_hvac_action = self._derive_action(data)
-        self._attr_fan_mode = self._derive_fan_mode(data)
+        if self._hub.has_fan:
+            self._attr_fan_mode = self._derive_fan_mode(data)
         self.async_write_ha_state()
 
     def _derive_mode(self, data) -> HVACMode:
@@ -210,8 +240,9 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
         # A request we did not set (digital input, PU05): show what it does.
         if data.get(C_DEHUM_REQUEST) == "on":
             return HVACMode.DRY
-        # On, but nothing can make it act: effectively off (action: idle).
-        return HVACMode.OFF
+        # On, but nothing can make it act: standby. Off is only ever a unit
+        # that is off, so the mode never contradicts switch.unit_on_off.
+        return HVACMode.FAN_ONLY
 
     def _derive_fan_mode(self, data) -> str:
         status = data.get(C_SUPPLY_FAN_STATUS)
@@ -243,31 +274,31 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
             return HVACAction.COOLING
         if data.get(C_COMPRESSOR_STATUS) == "on" or data.get(C_DEHUM_REQUEST) == "on":
             return HVACAction.DRYING
+        # No request, but the fan runs (a manual fan speed on an R unit).
+        if self._hub.has_fan and data.get(C_SUPPLY_FAN_STATUS) == "on":
+            return HVACAction.FAN
         return HVACAction.IDLE
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Translate the HVAC mode into on/off + request registers."""
         hub = self._hub
         if hvac_mode == HVACMode.OFF:
-            data = hub.data
-            # Judged before the writes: a request we did not set means some
-            # other source (digital input, PU05) keeps the unit going.
-            foreign_request = (
-                data.get(C_DEHUM_REQUEST) == "on"
-                and data.get(C_DEHUMIDIFY) != "on"
-                and data.get(C_ACTIVE_COOLING) != "on"
-            )
+            # Off is the unit off: that alone stops every request source (its
+            # own room logic, digital inputs) and a manually set fan. The
+            # requests are cleared too, so switching on starts nothing.
             try:
-                await hub.write_entity_value(C_ACTIVE_COOLING, 0)
+                await hub.write_entity_value(C_INTEGRATION_REQUEST, 0)
                 await hub.write_entity_value(C_DEHUMIDIFY, 0)
             except HomeAssistantError:
                 # A request may still be latched: switching the unit off is
-                # then the only sure way to stop it.
-                await hub.write_entity_value(C_UNIT_ON_OFF, 0)
+                # then the only sure way to stop it. Report the original
+                # failure, not the fallback's (a dead link fails both).
+                try:
+                    await hub.write_entity_value(C_UNIT_ON_OFF, 0)
+                except HomeAssistantError as err:
+                    _LOGGER.warning("Could not switch the unit off either: %s", err)
                 raise
-            # The unit's own logic only stops when the unit is off.
-            if hub.auto_capable or foreign_request:
-                await hub.write_entity_value(C_UNIT_ON_OFF, 0)
+            await hub.write_entity_value(C_UNIT_ON_OFF, 0)
             return
 
         if hvac_mode == HVACMode.AUTO:
@@ -277,32 +308,40 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
                     "on; without one the unit never requests by itself. Use Dry"
                     + (" or Cool." if HVACMode.COOL in self.hvac_modes else ".")
                 )
-            # Refuse (gate, brine guard) before the requests are cleared, so a
-            # refused Auto leaves a running Dry/Cool alone.
-            hub.check_write_allowed(C_UNIT_ON_OFF, 1)
-            await hub.write_entity_value(C_ACTIVE_COOLING, 0)
-            await hub.write_entity_value(C_DEHUMIDIFY, 0)
-            await hub.write_entity_value(C_UNIT_ON_OFF, 1)
-            return
-
-        # Requests first: the hub refuses heating (or brine winter dehumidify)
-        # before the unit is switched on.
-        if hvac_mode in (HVACMode.COOL, HVACMode.HEAT):
-            await hub.write_entity_value(C_ACTIVE_COOLING, 1)
-            await hub.write_entity_value(
-                C_DEHUMIDIFY, 1 if hvac_mode == HVACMode.COOL else 0
-            )
+            writes = [(C_INTEGRATION_REQUEST, 0), (C_DEHUMIDIFY, 0)]
+        elif hvac_mode == HVACMode.FAN_ONLY:
+            if hub.auto_capable:
+                raise ServiceValidationError(
+                    "With a display or room probe the unit regulates by itself "
+                    "while it is on and nothing is requested: that is Auto."
+                )
+            writes = [(C_INTEGRATION_REQUEST, 0), (C_DEHUMIDIFY, 0)]
+        elif hvac_mode in (HVACMode.COOL, HVACMode.HEAT):
+            writes = [
+                (C_INTEGRATION_REQUEST, 1),
+                (C_DEHUMIDIFY, 1 if hvac_mode == HVACMode.COOL else 0),
+            ]
         elif hvac_mode == HVACMode.DRY:
-            await hub.write_entity_value(C_ACTIVE_COOLING, 0)
-            await hub.write_entity_value(C_DEHUMIDIFY, 1)
-        await hub.write_entity_value(C_UNIT_ON_OFF, 1)
+            writes = [(C_INTEGRATION_REQUEST, 0), (C_DEHUMIDIFY, 1)]
+        else:
+            writes = []
+        # Requests first, so the unit is never switched on with a refused
+        # request. Every write is checked (gate, brine guard, season) before
+        # the first one, so a refused mode leaves a running request alone.
+        writes.append((C_UNIT_ON_OFF, 1))
+        for key, raw in writes:
+            hub.check_write_allowed(key, raw)
+        for key, raw in writes:
+            await hub.write_entity_value(key, raw)
 
     async def async_turn_on(self) -> None:
+        """Unit on, nothing requested: Standby, or Auto where it regulates."""
         await self.async_set_hvac_mode(
-            HVACMode.AUTO if self._hub.auto_capable else HVACMode.DRY
+            HVACMode.AUTO if self._hub.auto_capable else HVACMode.FAN_ONLY
         )
 
     async def async_turn_off(self) -> None:
+        """Requests cleared and the unit off (Modbus on/off = off)."""
         await self.async_set_hvac_mode(HVACMode.OFF)
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:

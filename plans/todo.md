@@ -100,8 +100,8 @@ evidence log, replace the `[INFERRED]` tags it settles, and fix the code/docs.
 
 ## Climate entity behaviour
 
-- [ ] **Mode writes**: DRY = on + dehumidify + active_cooling **off**;
-      COOL = on + dehumidify + active_cooling **on**; OFF = both requests off
+- [ ] **Mode writes**: DRY = on + dehumidify + integration_request **off**;
+      COOL = on + dehumidify + integration_request **on**; OFF = both requests off
       (unit off only if it could still act on its own). Confirm the
       combinations produce the expected unit behaviour and feedback.
 - [ ] **`hvac_action` derivation** from `unit_status` / `compressor_status` /

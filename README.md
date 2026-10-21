@@ -52,15 +52,23 @@ module (sold in Austria by https://www.hejluft.at/ as the **HRDS+**) over **Modb
 The integration talks to the unit's control board via Modbus TCP and exposes:
 
 * A **climate entity** showing room temperature & humidity, with the current
-  HVAC action (off / idle / drying / cooling / heating) and an HVAC mode you can
-  set to pick the operating mode (see [How the unit works](#how-the-unit-works)):
-  * **Off** — turns the unit off
+  HVAC action (off / idle / fan / drying / cooling / heating) and an HVAC mode
+  you can set to pick the operating mode (see [How the unit works](#how-the-unit-works)):
+  * **Off** — clears both requests and turns the unit off (Modbus on/off off).
+    Off always means the unit is off, so it never disagrees with
+    `switch.unit_on_off`
+  * **Standby** (Home Assistant's *fan only* mode, renamed) — the unit is on
+    with nothing requested and nothing on the unit that could start a request
+    (no display, no room probe): it waits. On an `R` unit a manual fan speed
+    runs the fan (action *Fan*); otherwise the action is *Idle*. Offered
+    instead of Auto; climate *turn on* goes here
   * **Dry** — dehumidification; supply air leaves at about room temperature
   * **Cool** — the "integration" request in **summer**: dehumidifies *and* cools
     (with cold enough water without the compressor, see
     [Operating modes in summer](#operating-modes-in-summer))
-  * **Heat** — the "integration" request in **winter**, only offered when you
-    enable winter heating in the options (never on a brine circuit)
+  * **Heat** — the "integration" request in **winter**, offered when you
+    enable winter heating in the options (never on a brine circuit), and shown
+    whenever the unit has a winter integration request from elsewhere
   * Target humidity / temperature are only offered when a display or a room
     probe makes the unit act on them; without one Home Assistant does the
     regulating.
@@ -146,7 +154,7 @@ Innova HRDS+**, then provide:
 | Model | `30`    | Device size: `30` = HRDS+30 (max 300 m³/h), `50` = HRDS+50 (max 500 m³/h). Sets airflow defaults. |
 | A wired CNU2 display is connected | off | Leave **off** for a unit driven only from Home Assistant. See below. |
 | Water register connected to | Heating/cooling circuit | Choose **Brine circuit** if the unit is on the brine of a ground-source heat pump. See [Water circuit](#water-circuit-and-brine). |
-| Allow winter heating | off | In winter the integration request heats with water from the heating circuit. Off: such requests are refused. Has no effect on a brine circuit. |
+| Allow winter heating | off | Lets Home Assistant request heating in winter (the integration request heats with water from the heating circuit), and accepts that the unit heats on its own (see [The unit heats on its own](#the-unit-heats-on-its-own)). Off: Home Assistant refuses its own winter integration requests; the unit can still heat by itself. Cannot be turned on together with a brine circuit. |
 | Brine temperature guard sensor | empty | Optional HA temperature sensor on the brine supply. See [Brine temperature guard](#brine-temperature-guard). |
 | Brine guard minimum temperature | 8 °C | Lowest brine temperature at which a request may start. |
 
@@ -271,7 +279,7 @@ What it blocks, and what it does not:
 
 | Blocked while the switch is off | Always works |
 |---|---|
-| Turning the unit **on** (also climate *Auto*), **dehumidify** (climate *Dry*, `switch.dehumidify`), **active cooling / integration** (climate *Cool* / *Heat*, `switch.active_cooling`), and any **non-zero fan speed** | Turning things **off** (climate *Off*, switches off, fan 0), reading every sensor, and every configuration write (setpoints, selects, setup entities) |
+| Turning the unit **on** (also climate *Auto*), **dehumidify** (climate *Dry*, `switch.dehumidify`), **integration** (climate *Cool* / *Heat*, `switch.integration_request`), and any **non-zero fan speed** | Turning things **off** (climate *Off*, switches off, fan 0), reading every sensor, and every configuration write (setpoints, selects, setup entities) |
 
 A blocked request fails with *"Operational requests are not allowed yet. Review
 the setup entities, then turn on 'Allow operational requests'."* That message
@@ -351,7 +359,7 @@ add a recirculation fan and damper, which run with **every** request (see
 The unit knows exactly two requests:
 
 * **DEU** — dehumidify (`switch.dehumidify`, climate **Dry**)
-* **INT** — integration (`switch.active_cooling`, climate **Cool** in summer,
+* **INT** — integration (`switch.integration_request`, climate **Cool** in summer,
   **Heat** in winter)
 
 What they do depends on the season and on how cold the water is.
@@ -381,21 +389,23 @@ Sources and the remaining combinations:
 
 | Request | What the unit does |
 |---------|--------------------|
-| INT (climate **Heat**) | **Heating support**: compressor off, warm water from the heating circuit through the water register. Only with the option *Allow winter heating*; never on brine |
+| INT (climate **Heat**) | **Heating support**: compressor off, warm water from the heating circuit through the water register. Home Assistant requests it only with the option *Allow winter heating*, never on brine; the unit also raises it by itself (see [The unit heats on its own](#the-unit-heats-on-its-own)) |
 
 The unit has **no heat source of its own** and no heating register. A winter
 INT request only opens the external valve, runs the pump and the fan, and keeps
 the compressor off (handbook §2.6.2, §6.4). The air gets warmer only if the
 building's heating circuit delivers warm water (boiler, or a heat pump in
 heating mode). So the climate action shows **Heating** only when the unit can
-be doing it: the INT request may heat (winter, *Allow winter heating* on, unit
-has the integration function PG02), the valve/pump output is on, AL04 is not
+be doing it: there is a winter INT request (a latched one, from Home Assistant
+or a display, or the unit's own while the room is below SEtH + PF12), the unit
+has the integration function PG02, the valve/pump output is on, AL04 is not
 active, the compressor is off, and the water temperature is at least **PC08**
 (the unit's own minimum for winter integration; handbook 20 °C, the reference
 unit shipped with 10 °C). Otherwise it
-shows *Idle*, or *Drying* while the unit dehumidifies. An INT request that
-cannot heat (brine, option off, set at a display) does not make the mode
-*Heat* either. Not tested on a real unit.
+shows *Idle*, or *Drying* while the unit dehumidifies. The option *Allow
+winter heating* does not enter: the unit knows nothing of it, so a winter INT
+set elsewhere shows as *Heat*. On brine a winter INT only circulates cold
+brine: it never shows as *Heat* or *Heating*. Not tested on a real unit.
 | DEU (climate **Dry**) | Only if PU02 (`select.winter_dehumidify`) allows it; factory: disabled. On brine only with a passing [brine temperature guard](#brine-temperature-guard) |
 
 On a brine circuit the handbook forbids heating and active winter
@@ -409,8 +419,11 @@ in winter; see [Water circuit and brine](#water-circuit-and-brine).
 2. **Pick the mode on the climate entity:** **Dry** to dry the air at room
    temperature, **Cool** to dry and cool (summer), **Auto** to let the unit
    decide from its own room sensors (only offered with a display or room
-   probe), **Off** to stop: it clears both requests. The
-   switches `switch.dehumidify` and `switch.active_cooling` do the same per
+   probe), **Standby** to have it on and waiting (without a display or room
+   probe), **Off** to stop: it clears both requests and turns the unit off.
+   Climate *turn on* goes to Standby (Auto where the unit regulates by
+   itself), *turn off* to Off. The
+   switches `switch.dehumidify` and `switch.integration_request` do the same per
    request. Every start needs [Allow operational requests](#4-switch-on-allow-operational-requests).
 3. **Decide who regulates.** Without a display or room probe the unit runs
    while a request is on and ignores its setpoints, so let Home Assistant
@@ -440,13 +453,47 @@ heating, the integration guards it:
 * Switching the season to winter is refused while an integration request is on,
   and on brine without a passing brine guard while the unit is on and its room
   probe could make it dehumidify in winter by itself (PU02 enabled).
-* With a display or room probe the unit heats by itself below SEtH − PF12. The
-  factory PH10 cap (14 °C) only limits SEtH, so it still heats below about
-  13.5 °C ([UNIT_BEHAVIOUR §3.3](references/UNIT_BEHAVIOUR.md#33-requests-deu-and-int)).
-  Headless without a probe it cannot trigger.
+* *Allow winter heating* governs only what Home Assistant requests. The unit
+  can heat by itself below SEtH − PF12 (about 13.5 °C with the factory PH10 cap and
+  PF12), see below and
+  [UNIT_BEHAVIOUR §3.3](references/UNIT_BEHAVIOUR.md#33-requests-deu-and-int).
 * Not something software controls: in OFF/standby the internal water valve is
   open. If warm water circulates through the unit, it warms the ventilation air
   passing through - unless an external valve on V3V closes the circuit.
+
+### The unit heats on its own
+
+With a room temperature source (a display, or a probe on AI2) and the
+integration function (PG02), the unit raises its own winter integration request
+when the room falls below **SEtH − PF12** and drops it above SEtH + PF12
+(handbook §6.1.2). It does not ask Home Assistant, and *Allow winter heating*
+cannot stop it: the unit knows nothing of that option. The factory PH10 cap
+(14 °C, also PH09) only limits SEtH, so with the factory dead band (PF12 =
+0.5 K) the unit heats whenever the room is below 13.5 °C. Headless without a
+probe it never heats by itself.
+
+The integration tells you instead of pretending otherwise:
+
+* `binary_sensor.automatic_heating` (*Unit heats on its own*) is **on** while
+  the unit, switched on in winter, can heat by itself. Its attributes say on
+  what: `starts_below` / `stops_above` (SEtH ∓ PF12), `winter_setpoint`,
+  `dead_band`, `winter_setpoint_min` / `_max` (PH09/PH10), the room
+  temperature and its source, and `heating` (the unit heats right now). It is
+  not created without a room temperature source or the integration function.
+* The climate entity shows **Auto** with the action **Heating** while it does,
+  and **Off** switches the unit off, since only that stops its own logic.
+* The setup check lists `unit_heats_on_its_own` while *Allow winter heating* is
+  off, and `unit_heats_on_its_own_on_brine` on a brine circuit (there it pumps
+  cold brine through the register instead of heating).
+
+To react, either accept it (turn *Allow winter heating* on) or stop it:
+
+* **Lower the threshold**: set *PH09 Winter setpoint min* (installer device,
+  enable it in the options) to 5 °C or less, then the winter setpoint to 5 °C.
+  The unit then only heats below 4.5 °C, and the setup check stops listing it.
+* **Switch the unit off in winter** (what the handbook recommends on brine).
+* Setting PG02 = 0 or unallocating the room probe also stops it, but takes
+  summer cooling or the unit's own humidity control with it.
 
 ### Water circuit and brine
 
@@ -643,7 +690,7 @@ for full detail.
 
 | Entity | What it shows / does |
 |--------|---------------------|
-| `climate.hrds_climate` | HVAC mode (Off, Auto⁴, Dry, Cool in summer, Heat in winter if enabled), action, fan mode. The mode says what can make the unit act: **Off** also covers a unit that is on with nothing requested and no room sensor (action *Idle*), because such a unit never starts by itself. **Off** clears the dehumidify and integration requests, and switches the unit off only if its own logic could still start it. **Auto** turns the unit on with no request, so it regulates on its own setpoints. **Cool**/**Heat** are offered only on a unit with the integration function (PG02), and an INT request that cannot act (winter without *Allow winter heating*, brine) does not show as Cool/Heat. The action reports what the unit does: *Cooling* needs a summer INT the unit acts on with the compressor running and no AL03; *Heating* needs the evidence described in [Operating modes in winter](#operating-modes-in-winter). Target T¹ / RH² only when a display or room probe is configured. `current_temperature`¹ and `current_humidity`² are suppressed when the corresponding probe is absent. Target-humidity bounds follow the unit's own PH29/PH30 clamps; the target temperature is SEtC in summer and SEtH in winter. |
+| `climate.hrds_climate` | HVAC mode (Off, Standby or Auto⁴, Dry, Cool in summer, Heat in winter if enabled), action, fan mode (`R` units only). The mode says what can make the unit act. **Off** is the unit off: it clears the dehumidify and integration requests and switches the unit off. **Standby** (HA's *fan only*) is a unit that is on with nothing requested and no display or room probe, so nothing can start it by itself; action *Idle*, or *Fan* while a manual fan speed runs the fan. **Auto** turns the unit on with no request, so it regulates on its own setpoints; with a display or room probe that is what "on, nothing requested" means, so Standby is not offered then. *Turn on* clears both requests and switches the unit on (Standby, or Auto where offered); *turn off* is Off. **Cool**/**Heat** are offered only on a unit with the integration function (PG02), and an INT request that cannot act (brine in winter, no integration function) does not show as Cool/Heat; a winter INT from elsewhere shows as Heat whatever *Allow winter heating* says. The action reports what the unit does: *Cooling* needs a summer INT the unit acts on with the compressor running and no AL03; *Heating* needs the evidence described in [Operating modes in winter](#operating-modes-in-winter). Target T¹ / RH² only when a display or room probe is configured. `current_temperature`¹ and `current_humidity`² are suppressed when the corresponding probe is absent. Target-humidity bounds follow the unit's own PH29/PH30 clamps; the target temperature is SEtC in summer (15–35 °C) and SEtH in winter, limited to the unit's PH09–PH10 clamp (factory 14 °C both). |
 
 ⁴ Only offered when a display or a room probe lets the unit raise requests by
 itself (handbook §6.1), and while that reading is healthy. Not tested on a real
@@ -700,7 +747,7 @@ holding registers. They are read-only from the integration.
 | Entity | What it means |
 |--------|--------------|
 | `sensor.machine_type` | PG01 fan arrangement: *supply fan only* or *supply and exhaust fan*. **Not** a recirculation flag: an `R` unit reads *supply fan only*. |
-| `binary_sensor.active_cooling_available` | ON: the unit has the integration (INT) function (PG02 = 1). Read-only: an installer setting, not a Modbus permission |
+| `binary_sensor.integration_available` | ON: the unit has the integration (INT) function (PG02 = 1). Read-only: an installer setting, not a Modbus permission |
 
 Whether the unit has a recirculation fan (`R`) is shown by
 `sensor.recirculation_damper`: *Disabled* means no damper is wired (non-`R`),
@@ -718,6 +765,7 @@ Each sensor maps to a single bit of a packed alarm register. **ON = alarm is act
 | `binary_sensor.alarm_low_water_temperature` | AL04 | Reg 768 bit 3 | Winter: water below PC08; heating blocked |
 | `binary_sensor.alarm_water_antifreeze` | AL16 | Reg 768 bit 15 | Fan stopped (antifreeze protection) |
 | `binary_sensor.alarm_dirty_filter` | AL22 | Reg 769 bit 5 | Maintenance reminder; display only, manual reset |
+| `binary_sensor.automatic_heating` | — | not a register | Only with a room temperature source and the integration function: ON = the unit, on in winter, can heat by itself below SEtH − PF12; attributes give the band and whether it heats now. See [The unit heats on its own](#the-unit-heats-on-its-own) |
 | `binary_sensor.brine_temperature_guard` | — | not a register | Only with a [brine temperature guard](#brine-temperature-guard) configured: ON = the guard refuses to start requests (brine too cold, sensor stale or unavailable) |
 
 ### Switches
@@ -726,7 +774,7 @@ Each sensor maps to a single bit of a packed alarm register. **ON = alarm is act
 |--------|----------|-------|
 | `switch.unit_on_off` | 1105 | BMS on/off request (requires PH02 = 1) |
 | `switch.dehumidify` | 1140 | BMS dehumidify request (requires PH28 = 1). In winter on a brine circuit only with a passing brine temperature guard |
-| `switch.active_cooling` | 1139 | **Integration request** (requires PH27 = 1): dehumidify + cool in summer, **heat in winter**. Refused while not in summer unless winter heating is enabled in the options; always refused in winter on a brine circuit |
+| `switch.integration_request` | 1139 | **Integration request** (requires PH27 = 1): dehumidify + cool in summer, **heat in winter**. Refused while not in summer unless winter heating is enabled in the options; always refused in winter on a brine circuit |
 | `switch.allow_operational_requests` | — | **Setup device.** Not a register: the integration's own gate. Off by default; while off, on/dehumidify/cooling/non-zero fan requests are refused. Restored across restarts |
 | `switch.enable_time_programs` | 1779 | **Setup device.** PH03 — time programs can switch the unit off |
 | `switch.enable_onoff_by_di_request` | 1894 | **Setup device.** PC12 — a DEU/INT request on the digital inputs starts the unit even with the OFF contact open |
@@ -743,7 +791,7 @@ Each sensor maps to a single bit of a packed alarm register. **ON = alarm is act
 |--------|----------|-------|-------|
 | `number.humidity_setpoint` | 1586 | 0–100 %RH | PU01; target humidity for automatic dehumidify. **Not created without a display or humidity probe** |
 | `number.summer_setpoint` | 1584 | 15–35 °C | SEtC; target room temp for automatic summer integration, clamped by PH07/PH08. **Not created without a display or room temperature probe** |
-| `number.winter_setpoint` | 1585 | 5–35 °C | SEtH; target room temp for automatic winter heating. The factory PH10 cap of 14 °C keeps automatic heating off. **Not created without a display or room temperature probe** |
+| `number.winter_setpoint` | 1585 | 5–35 °C | SEtH; target room temp for automatic winter heating: the unit heats by itself below SEtH − PF12 (see [The unit heats on its own](#the-unit-heats-on-its-own)). Clamped by the unit to PH09–PH10 (factory 14 °C both). **Not created without a display or room temperature probe** |
 | `number.fan_min_speed_dehumidify` | 1853 | 0–100 % | PF28; lower fan bound in dehumidify mode |
 | `number.fan_max_speed_dehumidify` | 1647 | 0–100 % | PF10; upper fan bound in dehumidify mode |
 | `number.fan_min_speed_cooling` | 1852 | 0–100 % | PF27; lower fan bound in active cooling |
@@ -791,7 +839,7 @@ so you can see it without opening the display. See the
 
 | Entity | What it does |
 |--------|-------------|
-| `fan.hrds_supply_fan` | The unit's supply/recirculation fan as a percentage. Reports the **actual** output (reg 639) — what the fan is doing — while `fan.set_percentage` writes the setpoint PM20 (1614). The commanded value, RPM and fan status are state attributes. Because the unit's own fan recirculates room air *in addition* to whatever the central MVHR pushes through the duct, this is the lever for topping combined airflow up to a target. |
+| `fan.hrds_supply_fan` | `R` units only (a non-R unit has no fan of its own; its damper output reads *disabled*, and the fan entity, the climate fan modes, the fan speed numbers and the fan sensors are not created). The unit's supply/recirculation fan as a percentage. Reports the **actual** output (reg 639) — what the fan is doing — while `fan.set_percentage` writes the setpoint PM20 (1614). The commanded value, RPM and fan status are state attributes. Because the unit's own fan recirculates room air *in addition* to whatever the central MVHR pushes through the duct, this is the lever for topping combined airflow up to a target. |
 
 ### Installer device
 

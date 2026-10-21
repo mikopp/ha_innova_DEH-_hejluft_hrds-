@@ -45,6 +45,7 @@ from .const import (
     DOMAIN,
     MODEL_SPECS,
     MODELS,
+    WATER_CIRCUIT_BRINE,
     WATER_CIRCUITS,
 )
 from .identity import CannotConnect, WrongDevice, verify_device
@@ -109,6 +110,13 @@ async def _check_device(
     return None
 
 
+def _winter_heating_on_brine(user_input: dict[str, Any]) -> bool:
+    """A brine circuit cannot heat (handbook 3.8.7): the option makes no sense."""
+    return bool(user_input.get(CONF_ALLOW_WINTER_HEATING)) and (
+        user_input.get(CONF_WATER_CIRCUIT) == WATER_CIRCUIT_BRINE
+    )
+
+
 def host_valid(host: str) -> bool:
     """Return True if hostname or IP address is valid."""
     try:
@@ -138,6 +146,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors[CONF_HOST] = "already_configured"
             elif not host_valid(host):
                 errors[CONF_HOST] = "invalid_host"
+            elif _winter_heating_on_brine(user_input):
+                errors[CONF_ALLOW_WINTER_HEATING] = "winter_heating_on_brine"
             else:
                 error = await _check_device(
                     self.hass,
@@ -168,7 +178,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class OptionsFlowHandler(config_entries.OptionsFlow):
     async def async_step_init(self, user_input: dict[str, Any] | None = None):
         errors: dict[str, str] = {}
-        if user_input is not None:
+        if user_input is not None and _winter_heating_on_brine(user_input):
+            errors[CONF_ALLOW_WINTER_HEATING] = "winter_heating_on_brine"
+        elif user_input is not None:
             data = self.config_entry.data
             options = self.config_entry.options
             error = await _check_device(
@@ -194,6 +206,15 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         )
         # Same rule as the hub: once options exist they replace the setup data.
         brine_source = options if options else data
+        water_circuit = options.get(
+            CONF_WATER_CIRCUIT, data.get(CONF_WATER_CIRCUIT, DEFAULT_WATER_CIRCUIT)
+        )
+        # An older entry may hold the option together with brine, where the
+        # hub ignores it; start unticked, or saving would be refused.
+        allow_winter_heating = water_circuit != WATER_CIRCUIT_BRINE and options.get(
+            CONF_ALLOW_WINTER_HEATING,
+            data.get(CONF_ALLOW_WINTER_HEATING, DEFAULT_ALLOW_WINTER_HEATING),
+        )
         return self.async_show_form(
             step_id="init",
             errors=errors,
@@ -241,20 +262,10 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                         ),
                     ): cv.boolean,
                     vol.Required(
-                        CONF_WATER_CIRCUIT,
-                        default=options.get(
-                            CONF_WATER_CIRCUIT,
-                            data.get(CONF_WATER_CIRCUIT, DEFAULT_WATER_CIRCUIT),
-                        ),
+                        CONF_WATER_CIRCUIT, default=water_circuit
                     ): WATER_CIRCUIT_SELECTOR,
                     vol.Optional(
-                        CONF_ALLOW_WINTER_HEATING,
-                        default=options.get(
-                            CONF_ALLOW_WINTER_HEATING,
-                            data.get(
-                                CONF_ALLOW_WINTER_HEATING, DEFAULT_ALLOW_WINTER_HEATING
-                            ),
-                        ),
+                        CONF_ALLOW_WINTER_HEATING, default=allow_winter_heating
                     ): cv.boolean,
                     # suggested_value, not default: a default would refill the
                     # field and make the guard impossible to remove again.

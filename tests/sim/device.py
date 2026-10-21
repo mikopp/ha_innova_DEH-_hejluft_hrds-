@@ -12,6 +12,8 @@ that the integration depends on:
 * HB04 sets the season (4 = summer, 3 = winter), anything else raises AL25 and
   shuts everything off;
 * the humidity setpoint is clamped to PH29/PH30;
+* the unit's own room logic: DEU from the room humidity, INT from the room
+  temperature (summer above SEtC + PF12, winter below SEtH - PF12);
 * a request starts water valve, damper (R units), fan and compressor; winter
   integration heats (compressor off, pump on);
 * the fan output follows PM20 under one of three hypotheses (``fan_model``),
@@ -112,6 +114,7 @@ class HrdsDevice:
             self._factory = {a: self.holding.get(a, 0) for a in R.VOLATILE_SETTINGS}
             self._running_since: Optional[float] = None
             self._auto_dehum = False
+            self._auto_int = False
             self._mode_base = 4 if self.input.get(R.MODE_STATUS, 0) in (4, 5) else 0
             self._recompute()
 
@@ -313,8 +316,7 @@ class HrdsDevice:
 
         Needs a humidity source: a display with H (HA00) that is fitted and on,
         or a probe on AI3. On above PU01 + PU07, off below PU01; in winter only
-        if PU02 allows dehumidifying. Room temperature auto (INT) is not
-        modelled.
+        if PU02 allows dehumidifying.
         """
         h, i = self.holding, self.input
         source = h.get(R.HA03_AI3) in R.ROOM_HUMIDITY_PROBE_CODES or (
@@ -338,6 +340,43 @@ class HrdsDevice:
         elif room < setpoint:
             self._auto_dehum = False
         return self._auto_dehum
+
+    def _auto_integration(self, on: bool, summer: bool, alarms: set[str]) -> bool:
+        """The unit's own INT request from the room temperature (handbook 6.1.2).
+
+        Needs a temperature source: a display (HA00) that is fitted and on, or
+        a probe on AI2. Summer: on above SEtC + PF12, off below SEtC - PF12.
+        Winter: on below SEtH - PF12, off above SEtH + PF12. SEtH is clamped to
+        PH09..PH10 (factory 14 degC both).
+        """
+        h, i = self.holding, self.input
+        source = h.get(R.HA02_AI2) in R.ROOM_TEMP_PROBE_CODES or (
+            self.has_display
+            and self.display_on
+            and h.get(R.HA00_PROBE_SOURCE) in R.DISPLAY_TEMP_SOURCES
+        )
+        room = i.get(R.ROOM_TEMP, R.PROBE_SENTINEL)
+        if not (on and source and "AL28" not in alarms and not _sentinel(room)):
+            self._auto_int = False
+            return False
+        room = _int16(room)
+        band = h.get(R.PF12_TEMP_DEAD_BAND, 0)
+        if summer:
+            setpoint = _int16(h.get(R.SUMMER_SETPOINT, 0))
+            if room > setpoint + band:
+                self._auto_int = True
+            elif room < setpoint - band:
+                self._auto_int = False
+        else:
+            setpoint = _int16(h.get(R.WINTER_SETPOINT, 0))
+            low = _int16(h.get(R.PH09_WINTER_SETPOINT_MIN, setpoint))
+            high = _int16(h.get(R.PH10_WINTER_SETPOINT_MAX, setpoint))
+            setpoint = max(low, min(high, setpoint))
+            if room < setpoint - band:
+                self._auto_int = True
+            elif room > setpoint + band:
+                self._auto_int = False
+        return self._auto_int
 
     def _fan_band(self, deu: bool, integ: bool) -> tuple[int, int]:
         h = self.holding
@@ -376,7 +415,9 @@ class HrdsDevice:
         on = status == 5 and not shutdown
         # Request sources are ORed: Modbus and the unit's own room-probe logic.
         deu = h.get(R.DEU_REQUEST) == 1 or self._auto_dehumidify(on, summer, alarms)
-        integ = h.get(R.INT_REQUEST) == 1 and h.get(R.PG02_INTEGRATION) == 1
+        integ = (
+            h.get(R.INT_REQUEST) == 1 or self._auto_integration(on, summer, alarms)
+        ) and h.get(R.PG02_INTEGRATION) == 1
         # AL03 disables summer integration, AL04 winter integration (heating).
         if ("AL03" if summer else "AL04") in alarms:
             integ = False

@@ -17,7 +17,7 @@
         },
         "data_description": {
           "water_circuit": "Ein Solekreis (Erdwärmepumpe) kann nicht heizen und darf im Winter nicht entfeuchten.",
-          "allow_winter_heating": "Im Winter heizt die Integrationsanforderung die Luft mit Wasser aus dem Heizkreis. Standardmäßig aus; bei Solekreis ohne Wirkung.",
+          "allow_winter_heating": "Erlaubt Home Assistant, im Winter Heizen anzufordern (Modus Heizen): die Integrationsanforderung erwärmt die Luft dann mit Wasser aus dem Heizkreis. Mit einer Raumtemperaturquelle heizt das Gerät auch selbständig (siehe 'Gerät heizt selbständig'); mit dieser Option wird das akzeptiert. Am Solekreis nicht möglich.",
           "brine_temperature_entity": "Optional. Ein Temperatursensor am Sole-Vorlauf (z. B. von der Wärmepumpe). Ist er gesetzt, starten Entfeuchtungs- und Integrationsanforderungen nur, solange er mindestens die Mindesttemperatur meldet und sich in den letzten 24 h gemeldet hat – in jeder Saison. Bei Solekreis ist er Voraussetzung für Entfeuchten im Winter.",
           "brine_min_temperature": "Niedrigste Soletemperatur, bei der eine Anforderung starten darf."
         }
@@ -27,7 +27,8 @@
       "already_configured": "Dieser Host ist bereits konfiguriert",
       "invalid_host": "Ungültiger Host oder ungültige IP-Adresse",
       "cannot_connect": "Gerät nicht erreichbar. Host, Port und Modbus-Slave-ID prüfen",
-      "wrong_device": "Das Gerät unter dieser Adresse ist kein HRDS+ (EVCO-EPB9-Regler)"
+      "wrong_device": "Das Gerät unter dieser Adresse ist kein HRDS+ (EVCO-EPB9-Regler)",
+      "winter_heating_on_brine": "Ein Solekreis kann nicht heizen: 'Heizen im Winter erlauben' ausschalten oder einen anderen Wasserkreis wählen"
     }
   },
   "options": {
@@ -50,7 +51,7 @@
         },
         "data_description": {
           "water_circuit": "Ein Solekreis (Erdwärmepumpe) kann nicht heizen und darf im Winter nicht entfeuchten.",
-          "allow_winter_heating": "Im Winter heizt die Integrationsanforderung die Luft mit Wasser aus dem Heizkreis. Standardmäßig aus; bei Solekreis ohne Wirkung.",
+          "allow_winter_heating": "Erlaubt Home Assistant, im Winter Heizen anzufordern (Modus Heizen): die Integrationsanforderung erwärmt die Luft dann mit Wasser aus dem Heizkreis. Mit einer Raumtemperaturquelle heizt das Gerät auch selbständig (siehe 'Gerät heizt selbständig'); mit dieser Option wird das akzeptiert. Am Solekreis nicht möglich.",
           "brine_temperature_entity": "Optional. Ein Temperatursensor am Sole-Vorlauf (z. B. von der Wärmepumpe). Ist er gesetzt, starten Entfeuchtungs- und Integrationsanforderungen nur, solange er mindestens die Mindesttemperatur meldet und sich in den letzten 24 h gemeldet hat – in jeder Saison. Bei Solekreis ist er Voraussetzung für Entfeuchten im Winter.",
           "brine_min_temperature": "Niedrigste Soletemperatur, bei der eine Anforderung starten darf.",
           "installer_device": "Fügt das Installateur-Gerät mit den Parametern des Installateurmenüs hinzu. Sie werden nicht regelmäßig abgefragt, sondern beim Einschalten dieser Option, bei jedem Start und mit „Installateurparameter aktualisieren“ gelesen. Ausschalten entfernt das Gerät."
@@ -59,13 +60,17 @@
     },
     "error": {
       "cannot_connect": "Gerät nicht erreichbar. Host, Port und Modbus-Slave-ID prüfen",
-      "wrong_device": "Das Gerät unter dieser Adresse ist kein HRDS+ (EVCO-EPB9-Regler)"
+      "wrong_device": "Das Gerät unter dieser Adresse ist kein HRDS+ (EVCO-EPB9-Regler)",
+      "winter_heating_on_brine": "Ein Solekreis kann nicht heizen: 'Heizen im Winter erlauben' ausschalten oder einen anderen Wasserkreis wählen"
     }
   },
   "entity": {
     "climate": {
       "hrds_climate": {
-        "name": "Klima"
+        "name": "Klima",
+        "state": {
+          "fan_only": "Bereitschaft"
+        }
       }
     },
     "sensor": {
@@ -458,7 +463,7 @@
       "humidity_probe_ok": {
         "name": "Raumfeuchtesensor OK"
       },
-      "active_cooling_available": {
+      "integration_available": {
         "name": "Gerät hat Integrationsfunktion (PG02)"
       },
       "alarm_compressor_lowpressure": {
@@ -484,6 +489,9 @@
       },
       "brine_temperature_guard": {
         "name": "Sole-Temperaturwächter"
+      },
+      "automatic_heating": {
+        "name": "Gerät heizt selbständig"
       }
     },
     "switch": {
@@ -493,7 +501,7 @@
       "dehumidify": {
         "name": "Entfeuchtung (Modbus)"
       },
-      "active_cooling": {
+      "integration_request": {
         "name": "Integrationsanforderung (Sommer kühlen, Winter heizen)"
       },
       "enable_onoff_display": {
@@ -1139,7 +1147,7 @@
         "name": "PH09 Min. Sollwert Winter"
       },
       "inst_ph10": {
-        "name": "PH10 Max. Sollwert Winter (werkseitig 14 °C sperrt Auto-Heizen)"
+        "name": "PH10 Max. Sollwert Winter (begrenzt selbständiges Heizen, werkseitig 14 °C)"
       }
     },
     "button": {
