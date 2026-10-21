@@ -181,8 +181,11 @@ Classification rules (`_classify` in `const.py`):
 
 * Two requests only: **DEU** (`dehumidify`, 1140) and **INT** (`active_cooling`,
   1139). INT is dehumidify + cool in summer and **heating** in winter (compressor
-  off, warm water through the register). There is no cooling without
-  dehumidifying.
+  off, warm water through the register). INT starts the compressor only
+  because PU05 (1692, factory on) couples a dehumidify request to it. With
+  water below PU08 (factory 10 °C) the unit runs any summer request on cold
+  water alone, compressor off (handbook §6.3, the passive path; PU09/PU10 add
+  the compressor later). README "How the unit works" documents the modes.
 * `_check_request_allowed` runs on every `write_entity_value`: INT is refused
   unless the read-back season (`operating_mode`, 1583) is summer, unless the
   `allow_winter_heating` option is on; with `water_circuit = brine` winter INT
@@ -191,7 +194,9 @@ Classification rules (`_classify` in `const.py`):
   is refused while a request it would turn unsafe is active. Keep request
   writes going through `write_entity_value`.
 * **Brine temperature guard** (options `brine_temperature_entity`,
-  `brine_min_temperature`, default 10 °C): an HA sensor, judged by
+  `brine_min_temperature`, default 8 °C: above the unit's AL16 frost alarm,
+  PA43 = 3 °C, and below PU08 so the passive cold-water path can run): an HA
+  sensor, judged by
   `update_brine_guard()` on the event loop (before each poll, on its state
   events, and inside `_check_request_allowed`). When configured, any start
   (DEU/INT on, or unit on with one latched) needs value ≥ minimum and
@@ -260,6 +265,15 @@ figures in the technical data are the tested spec range, **not** a firmware floo
   schedules a **debounced** refresh. It raises `HomeAssistantError` if the write
   did not take, so a rejected write is not silently reported as success.
   `setter_function_callback` is the entity-facing wrapper.
+* **Request switches show the command until confirmed.** The unit mirrors a
+  request into its register late (a real unit read OFF back as ON for several
+  polls). For `PENDING_KEYS` (on/off, dehumidify, integration) the hub keeps
+  the commanded value in `hub.data` after the write (`_pending`), re-reads just
+  that register at `PENDING_RECHECK_SECONDS` (`_async_verify_pending`, never a
+  full cycle) and drops the entry as soon as the read-back agrees; after the last
+  re-read the unit's value stands and a warning is logged. The BMS enables are
+  deliberately not pending (the hub re-asserts them from the read-back), and
+  neither are fan and climate, which stay actual-only (see below).
 * Entity callbacks register via `hub.async_add_my_modbus_sensor(callback)`.
 
 ## Climate entity mapping

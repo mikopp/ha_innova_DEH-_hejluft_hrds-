@@ -108,6 +108,8 @@ from .const import (
     INSTALLER_LOGIC_KEYS,
     MODEL_SPECS,
     OPERATIONAL_KEYS,
+    PENDING_KEYS,
+    PENDING_RECHECK_SECONDS,
     ROOM_HUMIDITY_PROBE_CODES,
     ROOM_TEMP_PROBE_CODES,
     TEMPERATURE_TARGET_KEYS,
@@ -405,6 +407,11 @@ class HrdsModbusHub:
         self._sensors: list = []
         self._airflow_max = airflow_max
         self._pending_refresh: Optional[Any] = None
+        # A request written but not yet read back: key -> (commanded value,
+        # when it was written, what the unit last read). See PENDING_KEYS.
+        self._pending: Dict[str, Tuple[str, float, Any]] = {}
+        self._pending_lock = threading.Lock()
+        self._verify_handles: List[Any] = []
         # False until a full read cycle succeeds; entities key their
         # availability off this so a dead gateway is visible in HA.
         self.last_update_success = False
@@ -470,6 +477,7 @@ class HrdsModbusHub:
             if self._pending_refresh is not None:
                 self._pending_refresh()
                 self._pending_refresh = None
+            self._cancel_verify()
             # Hand the socket close to an executor: it acquires the same lock a
             # poll in flight may hold, which would stall the event loop.
             self._hass.async_add_executor_job(self.close)
@@ -737,6 +745,79 @@ class HrdsModbusHub:
             await self.async_refresh_modbus_data()
 
         self._pending_refresh = async_call_later(self._hass, delay, _run)
+
+    def _cancel_verify(self) -> None:
+        for cancel in self._verify_handles:
+            cancel()
+        self._verify_handles = []
+        with self._pending_lock:
+            self._pending.clear()
+
+    @callback
+    def async_schedule_verify(self) -> None:
+        """Re-read the pending request registers, and give up after the last."""
+        for cancel in self._verify_handles:
+            cancel()
+        self._verify_handles = []
+        last = len(PENDING_RECHECK_SECONDS) - 1
+        for i, delay in enumerate(PENDING_RECHECK_SECONDS):
+
+            async def _run(_now, final: bool = i == last) -> None:
+                await self._async_verify_pending(final)
+
+            self._verify_handles.append(async_call_later(self._hass, delay, _run))
+
+    async def _async_verify_pending(self, final: bool) -> None:
+        with self._pending_lock:
+            keys = frozenset(self._pending)
+        if not keys:
+            return
+        # Only the pending registers: a full cycle is ~30 reads on the gateway.
+        await self._hass.async_add_executor_job(self._do_read_keys, keys)
+        if final:
+            self._expire_pending(keys)
+        self._compute_derived()
+        for cb in self._sensors:
+            cb()
+
+    def _apply_pending(self, keys: frozenset[str]) -> None:
+        """Keep the commanded value until the unit's read-back agrees with it.
+
+        Called with the registers just decoded into ``self.data``.
+        """
+        with self._pending_lock:
+            for key in keys & self._pending.keys():
+                wanted, since, _ = self._pending[key]
+                actual = self.data.get(key)
+                if actual == wanted:
+                    del self._pending[key]
+                    _LOGGER.debug(
+                        "HRDS+ confirmed %s=%s after %.1f s",
+                        key,
+                        wanted,
+                        time.monotonic() - since,
+                    )
+                else:
+                    self._pending[key] = (wanted, since, actual)
+                    self.data[key] = wanted
+
+    def _expire_pending(self, keys: frozenset[str]) -> None:
+        """The last re-read is done: what the unit reports stands."""
+        with self._pending_lock:
+            for key in keys & self._pending.keys():
+                wanted, _since, actual = self._pending.pop(key)
+                _LOGGER.warning(
+                    "HRDS+ did not confirm %s=%s within %s s; showing the unit's "
+                    "value (%s)",
+                    key,
+                    wanted,
+                    PENDING_RECHECK_SECONDS[-1],
+                    actual,
+                )
+                if actual is None:
+                    self.data.pop(key, None)
+                else:
+                    self.data[key] = actual
 
     def _do_read_cycle(self) -> bool:
         with self._lock:
@@ -1037,6 +1118,7 @@ class HrdsModbusHub:
                 self.data[key] = None
             else:
                 self.data[key] = float(raw) * get_entity_factor(props)
+        self._apply_pending(keys)
 
     def _compute_setup_issues(self) -> list[str]:
         """Slugs of things the user should look at before operating the unit.
@@ -1200,6 +1282,20 @@ class HrdsModbusHub:
             for cb in self._sensors:
                 cb()
             return
+        if entity_key in PENDING_KEYS:
+            # Show the command now; the unit may take a while to mirror it.
+            wanted = "on" if raw else "off"
+            with self._pending_lock:
+                self._pending[entity_key] = (
+                    wanted,
+                    time.monotonic(),
+                    self.data.get(entity_key),
+                )
+            self.data[entity_key] = wanted
+            self._compute_derived()
+            for cb in self._sensors:
+                cb()
+            self.async_schedule_verify()
         # Debounced: the unit needs a moment to mirror a command into its status
         # registers, and one HVAC mode change issues several writes.
         self.async_schedule_refresh()

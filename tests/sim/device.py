@@ -102,6 +102,10 @@ class HrdsDevice:
             self.unplugged: set[int] = set()
             self.pump_fault = False
             self.ignore_writes: set[int] = set()
+            # {register: n}: a write shows in reads only after n reads of it
+            # (a unit that mirrors a request into its register late).
+            self.lag_reads: dict[int, int] = {}
+            self._staged: dict[int, list[int]] = {}
             self.forced: dict[int, int] = {}
             self.write_log: list[Write] = []
             self._factory = {a: self.holding.get(a, 0) for a in R.VOLATILE_SETTINGS}
@@ -122,6 +126,8 @@ class HrdsDevice:
         with self._lock:
             self._recompute()  # time-based sequence steps
             table = self.input if kind == "input" else self.holding
+            if kind == "holding":
+                self._release_staged(range(address, address + count))
             missing = [a for a in range(address, address + count) if a not in table]
             if missing:
                 raise IllegalAddress(f"{kind} {missing[0]}")
@@ -140,6 +146,17 @@ class HrdsDevice:
             )
             self._recompute()
             return self.holding[address]
+
+    def _release_staged(self, addresses: range) -> None:
+        """Count a read against each lagging write; apply the ones that are due."""
+        for addr in [a for a in self._staged if a in addresses]:
+            value, left = self._staged[addr]
+            if left > 0:
+                self._staged[addr][1] = left - 1
+                continue
+            del self._staged[addr]
+            self.holding[addr] = value
+            self._recompute()
 
     def _apply_write(self, address: int, value: int) -> bool:
         """Store a write the way the unit would. False = acknowledged, ignored."""
@@ -167,6 +184,9 @@ class HrdsDevice:
             return True
         if address == R.FAN_HOURS and value == 0:
             self.alarms.discard("AL22")
+        if self.lag_reads.get(address):
+            self._staged[address] = [value, self.lag_reads[address]]
+            return True
         self.holding[address] = value
         return True
 

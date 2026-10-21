@@ -68,7 +68,7 @@ DEFAULT_WATER_CIRCUIT = WATER_CIRCUIT_HEATING_COOLING
 # dehumidifying on brine is always refused.
 CONF_BRINE_TEMPERATURE_ENTITY = "brine_temperature_entity"
 CONF_BRINE_MIN_TEMPERATURE = "brine_min_temperature"
-DEFAULT_BRINE_MIN_TEMPERATURE = 10.0
+DEFAULT_BRINE_MIN_TEMPERATURE = 8.0
 BRINE_GUARD_MAX_AGE_HOURS = 24
 # The unit is driven over Modbus; a wired CNU2 display is the exception.
 DEFAULT_HAS_DISPLAY = False
@@ -1314,6 +1314,15 @@ COMPUTED_BINARY_SENSORS: Dict[str, Dict[str, Any]] = {
 # turns on "Allow operational requests"; switching things OFF and all
 # configuration writes always go through. A fan setpoint of 0 is not a request.
 OPERATIONAL_KEYS = (C_UNIT_ON_OFF, C_DEHUMIDIFY, C_ACTIVE_COOLING, C_FAN_MANUAL)
+
+# The request switches among them mean "what was commanded". The unit mirrors a
+# request into its register late (seen: OFF read back as ON for several polls),
+# so after a write the hub shows the command until the read-back agrees, and
+# re-reads just that register at these offsets (seconds after the write). The
+# last one is the cap: a request still unconfirmed then shows the unit's value.
+# The fan setpoint is not here: fan and climate report what the unit does.
+PENDING_KEYS = (C_UNIT_ON_OFF, C_DEHUMIDIFY, C_ACTIVE_COOLING)
+PENDING_RECHECK_SECONDS = (3, 6, 12, 25)
 
 
 # ------------------------------------------------------------------
