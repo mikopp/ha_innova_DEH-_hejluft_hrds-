@@ -8,15 +8,18 @@
 
 [![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=mikopp&repository=ha_innova_DEH-_hejluft_hrds-&category=integration)
 
-Home Assistant custom integration for the **Innova DEH+** air dehumidification
-module over **Modbus TCP**.
+Home Assistant custom integration (installable with **HACS**) for the **Innova
+DEH+** / **hej.luft HRDS+** ducted dehumidifiers. It controls and monitors the
+unit locally over **Modbus TCP**, without any cloud. Units sold under other
+brand names are listed under
+[Compatible Devices & OEM Rebrands](#compatible-devices--oem-rebrands).
 
 ## Compatible Devices & OEM Rebrands
 
 This Home Assistant integration communicates with ventilation and ducted dehumidification units manufactured by **[INNOVA S.r.l.](https://www.innova.it/)**. Because Innova supplies white-label hardware across different markets, your unit might be sold under various brand names, model series, or regional designations:
 
 * **Austria / DACH Region:** 
-  * **[HejLuft](https://www.hejluft.at/)** – Distributed as *HRDS+ 30* / *HRD+* series (e.g., *HejLuft HRDS+ 30 H R K DC*).
+  * **[HejLuft](https://www.hejluft.at/)** – Distributed as *HRDS+ 30* / *HRDS+ 50* / *HRD+* series, the Innova *DEH+ 30* / *DEH+ 50* (e.g., *HejLuft HRDS+ 30 H R K DC*).
   * **[INNOVA S.r.l.](https://www.innova.it/)** – Original manufacturer designation *[INNOVA DEH+ / HRD+ / HRDS+ Series](https://www.innova.it/en/products/vmc/active-integration/hrd/)* (Horizontal/Vertical ducted dehumidifiers with heat recovery and active radiant cooling integration).
 * **Italy & Europe (General HVAC Distribution):** 
   * Sold directly via professional HVAC wholesalers as **Innova DEH+**, **Innova HRD**, or integrated into radiant cooling packages by system partners (such as *RDZ* or similar surface cooling providers).
