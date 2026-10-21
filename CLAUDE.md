@@ -339,7 +339,9 @@ figures in the technical data are the tested spec range, **not** a firmware floo
 * `target_humidity` ← `humidity_setpoint`; `target_temperature` ←
   `summer_setpoint` in summer, `winter_setpoint` in winter. Both features are
   removed when the hub hides the setpoints (headless, no probe).
-* `min_humidity` / `max_humidity` follow the unit's own PH29/PH30 clamps.
+* `min_humidity` / `max_humidity` follow the unit's own PH29/PH30 clamps;
+  `min_temp` / `max_temp` are SEtC's 15..35 °C in summer and SEtH's PH09..PH10
+  clamp (within 5..35 °C) in winter.
 * `current_temperature` / `current_humidity` report `None` while the matching
   probe-fault alarm is active.
 

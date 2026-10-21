@@ -206,6 +206,15 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         )
         # Same rule as the hub: once options exist they replace the setup data.
         brine_source = options if options else data
+        water_circuit = options.get(
+            CONF_WATER_CIRCUIT, data.get(CONF_WATER_CIRCUIT, DEFAULT_WATER_CIRCUIT)
+        )
+        # An older entry may hold the option together with brine, where the
+        # hub ignores it; start unticked, or saving would be refused.
+        allow_winter_heating = water_circuit != WATER_CIRCUIT_BRINE and options.get(
+            CONF_ALLOW_WINTER_HEATING,
+            data.get(CONF_ALLOW_WINTER_HEATING, DEFAULT_ALLOW_WINTER_HEATING),
+        )
         return self.async_show_form(
             step_id="init",
             errors=errors,
@@ -253,20 +262,10 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                         ),
                     ): cv.boolean,
                     vol.Required(
-                        CONF_WATER_CIRCUIT,
-                        default=options.get(
-                            CONF_WATER_CIRCUIT,
-                            data.get(CONF_WATER_CIRCUIT, DEFAULT_WATER_CIRCUIT),
-                        ),
+                        CONF_WATER_CIRCUIT, default=water_circuit
                     ): WATER_CIRCUIT_SELECTOR,
                     vol.Optional(
-                        CONF_ALLOW_WINTER_HEATING,
-                        default=options.get(
-                            CONF_ALLOW_WINTER_HEATING,
-                            data.get(
-                                CONF_ALLOW_WINTER_HEATING, DEFAULT_ALLOW_WINTER_HEATING
-                            ),
-                        ),
+                        CONF_ALLOW_WINTER_HEATING, default=allow_winter_heating
                     ): cv.boolean,
                     # suggested_value, not default: a default would refill the
                     # field and make the guard impossible to remove again.

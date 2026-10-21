@@ -50,6 +50,7 @@ from .const import (
     C_AUTO_HEATING,
     C_BRINE_GUARD,
     C_COMPRESSOR_STATUS,
+    C_DEHUM_REQUEST,
     C_DEHUMIDIFY,
     C_DT_INT16,
     C_ENABLE_FREE_COOLING,
@@ -858,29 +859,38 @@ class HrdsModbusHub:
                 "temperature guard (the water register can freeze). Configure "
                 "one in the integration options."
             )
-        # The unit's own room-probe logic would dehumidify in winter on brine
-        # without a passing guard: refuse switching it on in winter, and
-        # switching a running unit to winter.
+        # The unit would dehumidify in winter on brine without a passing
+        # guard, by its own room-probe logic or on a request from another
+        # source (a digital input: 1121 on while neither of our requests is):
+        # refuse switching it on in winter, and switching a running unit to
+        # winter.
+        foreign_dehum = (
+            d.get(C_DEHUM_REQUEST) == "on"
+            and d.get(C_DEHUMIDIFY) != "on"
+            and d.get(C_INTEGRATION_REQUEST) != "on"
+        )
         unguarded_winter_dehum = (
-            self.is_brine and not brine_winter_ok and self._auto_sources("winter")[0]
+            self.is_brine
+            and not brine_winter_ok
+            and (self._auto_sources("winter")[0] or foreign_dehum)
         )
         if entity_key == C_UNIT_ON_OFF and raw and winter and unguarded_winter_dehum:
             raise ServiceValidationError(
-                "The room probe would let the unit dehumidify in winter on its "
-                "own; on a brine circuit that needs a brine temperature guard "
-                "(the water register can freeze). Configure one in the "
-                "integration options, or set winter dehumidification (PU02) to "
-                "disabled."
+                "The unit would dehumidify in winter on its own (room probe or "
+                "a digital-input request); on a brine circuit that needs a "
+                "brine temperature guard (the water register can freeze). "
+                "Configure one in the integration options, or set winter "
+                "dehumidification (PU02) to disabled."
             )
         if entity_key == C_SEASON and raw == 3:  # 3 = winter
             unit_on = d.get(C_UNIT_ON_OFF) == "on" or d.get(C_UNIT_STATUS) == "on"
             if unit_on and unguarded_winter_dehum:
                 raise ServiceValidationError(
-                    "The room probe would let the unit dehumidify in winter on "
-                    "its own; on a brine circuit that needs a brine temperature "
-                    "guard (the water register can freeze). Switch the unit off "
-                    "first, configure a guard, or set winter dehumidification "
-                    "(PU02) to disabled."
+                    "The unit would dehumidify in winter on its own (room probe "
+                    "or a digital-input request); on a brine circuit that needs "
+                    "a brine temperature guard (the water register can freeze). "
+                    "Switch the unit off first, configure a guard, or set winter "
+                    "dehumidification (PU02) to disabled."
                 )
             if (
                 self.data.get(C_INTEGRATION_REQUEST) == "on"

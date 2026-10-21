@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_HOST, CONF_PORT, CONF_SCAN_INTERVAL
@@ -184,3 +185,16 @@ async def test_options_flow_refuses_winter_heating_on_brine(hass, sim):
         },
     )
     assert result["errors"] == {"allow_winter_heating": "winter_heating_on_brine"}
+
+
+async def test_options_form_unticks_winter_heating_on_brine(hass, sim):
+    """An older entry with both would otherwise not save at all."""
+    s = await add_entry(hass, sim, water_circuit="brine", allow_winter_heating=True)
+    result = await hass.config_entries.options.async_init(s.entry.entry_id)
+    defaults = {
+        str(key): key.default()
+        for key in result["data_schema"].schema
+        if key.default is not vol.UNDEFINED
+    }
+    assert defaults["water_circuit"] == "brine"
+    assert defaults["allow_winter_heating"] is False

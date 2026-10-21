@@ -66,9 +66,11 @@ from .const import (
     CLIMATE_TARGET_HUMIDITY,
     CLIMATE_TARGET_TEMP,
     CLIMATE_TYPES,
+    ENTITIES_DICT,
     MyClimateEntityDescription,
 )
 from .entity_common import HubBackedEntity, setup_platform_from_types
+from .installer_params import installer_key
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -95,6 +97,12 @@ _FAN_MODE_PCT: dict[str, float] = {
 # Midpoints between preset values for read-back mapping (nearest neighbour).
 _FAN_LOW_THRESHOLD = (_FAN_MODE_PCT[_FAN_LOW] + _FAN_MODE_PCT[_FAN_MEDIUM]) / 2  # 42.5
 _FAN_MED_THRESHOLD = (_FAN_MODE_PCT[_FAN_MEDIUM] + _FAN_MODE_PCT[_FAN_HIGH]) / 2  # 70.0
+
+# Target temperature range: the setpoint registers' own limits (SEtC in summer,
+# SEtH in winter, where the unit's PH09/PH10 clamp narrows it).
+_SUMMER_MIN_TEMP = ENTITIES_DICT[CLIMATE_TARGET_TEMP]["MIN"]
+_WINTER_MIN_TEMP = ENTITIES_DICT[C_WINTER_SETPOINT]["MIN"]
+_MAX_TEMP = ENTITIES_DICT[CLIMATE_TARGET_TEMP]["MAX"]
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -126,8 +134,8 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
         self._attr_hvac_modes = self._modes_for()
         self._attr_hvac_mode = HVACMode.OFF
         self._attr_hvac_action = HVACAction.OFF
-        self._attr_min_temp = 15.0
-        self._attr_max_temp = 35.0
+        self._attr_min_temp = _SUMMER_MIN_TEMP
+        self._attr_max_temp = _MAX_TEMP
         self._attr_target_temperature_step = 0.5
         self._attr_min_humidity = 30
         self._attr_max_humidity = 90
@@ -187,7 +195,19 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
         if target_hum is not None:
             self._attr_target_humidity = int(target_hum)
 
-        # SEtC drives summer integration, SEtH winter integration.
+        # SEtC drives summer integration, SEtH winter integration. The unit
+        # clamps SEtH to PH09..PH10 (factory 14 degC both); offer that range
+        # in winter, within the winter setpoint's own 5..35 degC.
+        if self._hub.active_season == "winter":
+            low = data.get(installer_key("PH09"))
+            high = data.get(installer_key("PH10"))
+            self._attr_min_temp = max(_WINTER_MIN_TEMP, low or _WINTER_MIN_TEMP)
+            self._attr_max_temp = max(
+                self._attr_min_temp, min(_MAX_TEMP, high or _MAX_TEMP)
+            )
+        else:
+            self._attr_min_temp = _SUMMER_MIN_TEMP
+            self._attr_max_temp = _MAX_TEMP
         target_temp = data.get(
             C_WINTER_SETPOINT
             if self._hub.active_season == "winter"

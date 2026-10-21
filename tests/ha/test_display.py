@@ -81,9 +81,13 @@ async def test_setpoints_offered_and_written_per_season(setup, clock):
     await s.service("select", "select_option", "season", option="winter")
     await clock.settle()
     assert s.state("climate", CLIMATE).attributes["temperature"] == 14.0
-    await s.service("climate", "set_temperature", CLIMATE, temperature=18.0)
+    # The unit clamps SEtH to PH09..PH10 (factory 14 degC both): the climate
+    # offers only that range.
+    with pytest.raises(ServiceValidationError, match="14.0 to 14.0"):
+        await s.service("climate", "set_temperature", CLIMATE, temperature=18.0)
+    await s.service("climate", "set_temperature", CLIMATE, temperature=14.0)
     await clock.settle()
-    assert s.device.holding[R.WINTER_SETPOINT] == 180
+    assert s.device.holding[R.WINTER_SETPOINT] == 140
     assert s.device.holding[R.SUMMER_SETPOINT] == 265
 
 
@@ -243,3 +247,15 @@ async def test_lowered_winter_setpoint_ends_the_own_heating_issue(setup, clock):
         "unit_heats_on_its_own"
         not in (s.state("sensor", "setup_check").attributes["issues"])
     )
+
+
+async def test_target_temperature_range_follows_the_season(setup, clock):
+    """SEtH is clamped to PH09..PH10 (factory 14 degC both)."""
+    s = setup
+    climate = s.state("climate", CLIMATE).attributes
+    assert (climate["min_temp"], climate["max_temp"]) == (15.0, 35.0)
+    await s.service("select", "select_option", "season", option="winter")
+    await clock.settle()
+    climate = s.state("climate", CLIMATE).attributes
+    assert (climate["min_temp"], climate["max_temp"]) == (14.0, 14.0)
+    assert climate["temperature"] == 14.0

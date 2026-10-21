@@ -583,3 +583,22 @@ async def test_brine_never_heats(setup, clock):
     assert climate.attributes["hvac_action"] == "idle"
     with pytest.raises(ServiceValidationError):
         await s.service("climate", "set_hvac_mode", CLIMATE, hvac_mode="dry")
+
+
+@pytest.mark.parametrize("entry_options", [{"water_circuit": "brine"}])
+async def test_brine_season_change_refused_for_a_digital_input_dehumidify(setup, clock):
+    """A dehumidify request from a digital input would run on cold brine too."""
+    s = setup
+    await allow_operation(s)
+    await s.service("switch", "turn_on", "unit_on_off")
+    await clock.settle()
+    s.device.force_input(R.DEHUM_REQUEST, 1)  # neither of our requests is on
+    await clock.poll()
+    with pytest.raises(ServiceValidationError, match="digital-input request"):
+        await s.service("select", "select_option", "season", option="winter")
+    assert s.device.holding[R.HB04_SEASON] == R.SEASON_SUMMER
+    s.device.force_input(R.DEHUM_REQUEST, None)
+    await clock.poll()
+    await s.service("select", "select_option", "season", option="winter")
+    await clock.settle()
+    assert s.device.holding[R.HB04_SEASON] == R.SEASON_WINTER

@@ -39,6 +39,15 @@ keeps ignoring it), and the setup check lists
 `winter_heating_without_integration` when it is on for a unit without the
 integration function (PG02 = 0).
 
+**Fixed:** on brine without a passing guard, switching the season to winter
+(or the unit on in winter) is also refused while a dehumidify request from
+another source (a digital input) is on, not only when the room probe could
+start one. The climate's target temperature range follows the season: in
+winter it is the unit's own SEtH clamp PH09..PH10 (factory 14 °C both), so the
+card no longer offers a winter setpoint the unit cannot take (it offered 15-35
+°C while SEtH was 14 °C). The options form starts with *Allow winter heating*
+unticked on a brine circuit, so an older entry holding both can be saved.
+
 **Fixed:** climate *Off* switches the unit off if clearing a request fails,
 instead of leaving the request latched on a running unit (and reports the
 request's failure if that fails too). A refused climate mode (operation gate,
