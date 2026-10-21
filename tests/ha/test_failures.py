@@ -86,6 +86,18 @@ async def test_rejected_write_raises(setup, clock):
     assert s.device.holding[R.BMS_ON] == 0, "unit must not start after a failed request"
 
 
+async def test_off_switches_the_unit_off_when_a_request_cannot_be_cleared(setup, clock):
+    s = setup
+    await allow_operation(s)
+    await set_hvac_mode(s, clock, "dry")
+    s.sim.reject_writes = {R.DEU_REQUEST}
+    with pytest.raises(HomeAssistantError, match="Modbus write to dehumidify"):
+        await s.service("climate", "set_hvac_mode", CLIMATE, hvac_mode="off")
+    # The request is still latched: only switching the unit off stops it.
+    assert s.device.holding[R.DEU_REQUEST] == 1
+    assert s.device.holding[R.BMS_ON] == 0
+
+
 @pytest.mark.parametrize(
     ("alarm", "key"),
     [

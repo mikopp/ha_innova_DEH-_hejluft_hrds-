@@ -567,8 +567,11 @@ class HrdsModbusHub:
             and d.get(C_ALARM_HIGH_WATER_TEMP) != "on"
         )
 
-    def _auto_sources(self) -> Tuple[bool, bool]:
+    def _auto_sources(self, season: Optional[str] = None) -> Tuple[bool, bool]:
         """(humidity, temperature): what the unit can request on its own.
+
+        ``season`` judges another season than the one in force (e.g. before a
+        season change).
 
         The unit ORs its request sources (handbook 6.1): the room probes
         (humidity above PU01 + PU07 -> DEU; temperature past SEtC/SEtH -> INT),
@@ -577,7 +580,7 @@ class HrdsModbusHub:
         nothing.
         """
         d = self.data
-        summer = self.active_season == "summer"
+        summer = (season or self.active_season) == "summer"
         humidity = (
             self.show_humidity_target
             and d.get(C_ROOM_HUMIDITY) is not None
@@ -623,7 +626,8 @@ class HrdsModbusHub:
         if not self.brine_entity:
             hidden.add(C_BRINE_GUARD)
         if not self.installer_enabled:
-            # The two water-check limits are still read, but not shown.
+            # The logic limits (INSTALLER_LOGIC_KEYS) are still read, but not
+            # shown.
             hidden |= INSTALLER_KEYS | INSTALLER_DEVICE_EXTRA_KEYS
         self.hidden_keys = frozenset(hidden)
 
@@ -767,6 +771,20 @@ class HrdsModbusHub:
                 "disabled."
             )
         if entity_key == C_SEASON and raw == 3:  # 3 = winter
+            unit_on = d.get(C_UNIT_ON_OFF) == "on" or d.get(C_UNIT_STATUS) == "on"
+            if (
+                unit_on
+                and self.is_brine
+                and not brine_winter_ok
+                and self._auto_sources("winter")[0]
+            ):
+                raise ServiceValidationError(
+                    "The room probe would let the unit dehumidify in winter on "
+                    "its own; on a brine circuit that needs a brine temperature "
+                    "guard (the water register can freeze). Switch the unit off "
+                    "first, configure a guard, or set winter dehumidification "
+                    "(PU02) to disabled."
+                )
             if (
                 self.data.get(C_ACTIVE_COOLING) == "on"
                 and not self.allow_winter_heating
@@ -1333,6 +1351,19 @@ class HrdsModbusHub:
         )
 
     # ---- writing ----------------------------------------------------------
+    def check_write_allowed(self, entity_key: str, raw: int) -> None:
+        """Raise ServiceValidationError if writing ``raw`` would be refused.
+
+        The request guards and the operation gate, without writing; lets a
+        multi-write change refuse before its first write.
+        """
+        self._check_request_allowed(entity_key, raw)
+        if entity_key in OPERATIONAL_KEYS and raw != 0 and not self.operation_allowed:
+            raise ServiceValidationError(
+                "Operational requests are not allowed yet. Review the setup "
+                "entities, then turn on 'Allow operational requests'."
+            )
+
     async def write_entity_value(self, entity_key: str, value: Any) -> None:
         """Encode and write a single entity's value, then refresh."""
         props = get_entity_props(entity_key)
@@ -1348,12 +1379,7 @@ class HrdsModbusHub:
             faktor = get_entity_factor(props)
             raw = round(float(value) / faktor) if faktor else round(float(value))
 
-        self._check_request_allowed(entity_key, raw)
-        if entity_key in OPERATIONAL_KEYS and raw != 0 and not self.operation_allowed:
-            raise ServiceValidationError(
-                "Operational requests are not allowed yet. Review the setup "
-                "entities, then turn on 'Allow operational requests'."
-            )
+        self.check_write_allowed(entity_key, raw)
 
         words = ModbusTcpClient.convert_to_registers(value=int(raw), data_type=dt)
         ok = await self._hass.async_add_executor_job(self._write_registers, reg, words)

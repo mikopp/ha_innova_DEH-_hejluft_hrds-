@@ -462,6 +462,50 @@ async def test_brine_winter_refuses_a_unit_that_would_dehumidify_alone(setup, cl
     assert s.device.holding[R.BMS_ON] == 0
 
 
+@pytest.mark.parametrize("sim_options", [{"overlays": ("display_cnu2",)}])
+@pytest.mark.parametrize(
+    "entry_options", [{"has_display": True, "water_circuit": "brine"}]
+)
+async def test_brine_season_change_refused_for_a_unit_that_would_dehumidify_alone(
+    setup, clock
+):
+    s = setup
+    await allow_operation(s)
+    await s.service("select", "select_option", "winter_dehumidify", option="with_water")
+    await s.service("switch", "turn_on", "unit_on_off")
+    await clock.settle()
+    # The same winter dehumidifying as switching on in winter, by the season.
+    with pytest.raises(ServiceValidationError, match="brine temperature guard"):
+        await s.service("select", "select_option", "season", option="winter")
+    assert s.device.holding[R.HB04_SEASON] == R.SEASON_SUMMER
+
+
+@pytest.mark.parametrize("sim_options", [{"overlays": ("display_cnu2",)}])
+@pytest.mark.parametrize(
+    "entry_options",
+    [
+        {
+            "has_display": True,
+            "water_circuit": "brine",
+            "brine_temperature_entity": BRINE,
+        }
+    ],
+)
+async def test_refused_auto_leaves_a_running_request_alone(hass, setup, clock):
+    s = setup
+    await allow_operation(s)
+    hass.states.async_set(BRINE, "12.0", {"unit_of_measurement": "°C"})
+    await hass.async_block_till_done()
+    await set_hvac_mode(s, clock, "dry")
+    hass.states.async_set(BRINE, "6.5", {"unit_of_measurement": "°C"})
+    await hass.async_block_till_done()
+    s.device.clear_write_log()
+    with pytest.raises(ServiceValidationError, match="Brine temperature guard"):
+        await s.service("climate", "set_hvac_mode", CLIMATE, hvac_mode="auto")
+    assert s.device.write_log == []
+    assert s.device.holding[R.DEU_REQUEST] == 1
+
+
 @pytest.mark.parametrize("entry_options", [{"water_circuit": "brine"}])
 async def test_brine_never_heats(setup, clock):
     s = setup

@@ -6,6 +6,13 @@ All notable changes to this project are documented here, newest first.
 
 ## Unreleased
 
+**Fixed:** climate *Off* switches the unit off if clearing a request fails,
+instead of leaving the request latched on a running unit. A refused *Auto*
+(operation gate, brine guard) no longer clears a running *Dry*/*Cool* request
+first. On brine without a passing guard, switching the season to winter is
+refused while the unit is on and its room probe could make it dehumidify in
+winter by itself.
+
 **Changed:** the climate action now says what the unit does, not what was
 requested. The unit has no heat source of its own: a winter integration
 request only opens the water valve and runs the pump, so it warms the air only
