@@ -65,6 +65,7 @@ from .const import (
     C_MODE_STATUS,
     C_OPERATING_MODE,
     C_OUTDOOR_TEMPERATURE,
+    C_RECIRCULATION_DAMPER,
     C_REG_TYPE_HOLDING_REGISTERS,
     C_REG_TYPE_INPUT_REGISTERS,
     C_ROOM_HUMIDITY,
@@ -105,6 +106,7 @@ from .const import (
     DEFAULT_WATER_CIRCUIT,
     DOMAIN,
     ENTITIES_DICT,
+    FAN_KEYS,
     HEADLESS_SETTINGS,
     HUMIDITY_TARGET_KEYS,
     INSTALLER_DEVICE_EXTRA_KEYS,
@@ -469,6 +471,8 @@ class HrdsModbusHub:
         self.water_issues: list[str] = []
         # Setpoint entities not created because nothing makes them act.
         self.hidden_keys: frozenset[str] = frozenset()
+        # R variant (recirculation fan); decided in update_hidden_keys.
+        self.has_fan = True
         self.show_temperature_target = True
         self.show_humidity_target = True
 
@@ -722,6 +726,10 @@ class HrdsModbusHub:
             hidden |= HUMIDITY_TARGET_KEYS
         if not self.brine_entity:
             hidden.add(C_BRINE_GUARD)
+        # A non-R unit has no fan of its own: its damper output is disabled.
+        self.has_fan = d.get(C_RECIRCULATION_DAMPER) != "disabled"
+        if not self.has_fan:
+            hidden |= FAN_KEYS
         if not self.show_temperature_target or (
             d.get(C_INTEGRATION_AVAILABLE) == "off"
         ):

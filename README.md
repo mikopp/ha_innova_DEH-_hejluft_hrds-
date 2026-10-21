@@ -52,9 +52,16 @@ module (sold in Austria by https://www.hejluft.at/ as the **HRDS+**) over **Modb
 The integration talks to the unit's control board via Modbus TCP and exposes:
 
 * A **climate entity** showing room temperature & humidity, with the current
-  HVAC action (off / idle / drying / cooling / heating) and an HVAC mode you can
-  set to pick the operating mode (see [How the unit works](#how-the-unit-works)):
-  * **Off** — turns the unit off
+  HVAC action (off / idle / fan / drying / cooling / heating) and an HVAC mode
+  you can set to pick the operating mode (see [How the unit works](#how-the-unit-works)):
+  * **Off** — clears both requests and turns the unit off (Modbus on/off off).
+    Off always means the unit is off, so it never disagrees with
+    `switch.unit_on_off`
+  * **Standby** (Home Assistant's *fan only* mode, renamed) — the unit is on
+    with nothing requested and nothing on the unit that could start a request
+    (no display, no room probe): it waits. On an `R` unit a manual fan speed
+    runs the fan (action *Fan*); otherwise the action is *Idle*. Offered
+    instead of Auto; climate *turn on* goes here
   * **Dry** — dehumidification; supply air leaves at about room temperature
   * **Cool** — the "integration" request in **summer**: dehumidifies *and* cools
     (with cold enough water without the compressor, see
@@ -434,7 +441,10 @@ in winter; see [Water circuit and brine](#water-circuit-and-brine).
 2. **Pick the mode on the climate entity:** **Dry** to dry the air at room
    temperature, **Cool** to dry and cool (summer), **Auto** to let the unit
    decide from its own room sensors (only offered with a display or room
-   probe), **Off** to stop: it clears both requests. The
+   probe), **Standby** to have it on and waiting (without a display or room
+   probe), **Off** to stop: it clears both requests and turns the unit off.
+   Climate *turn on* goes to Standby (Auto where the unit regulates by
+   itself), *turn off* to Off. The
    switches `switch.dehumidify` and `switch.integration_request` do the same per
    request. Every start needs [Allow operational requests](#4-switch-on-allow-operational-requests).
 3. **Decide who regulates.** Without a display or room probe the unit runs
@@ -721,7 +731,7 @@ for full detail.
 
 | Entity | What it shows / does |
 |--------|---------------------|
-| `climate.hrds_climate` | HVAC mode (Off, Auto⁴, Dry, Cool in summer, Heat in winter if enabled), action, fan mode. The mode says what can make the unit act: **Off** also covers a unit that is on with nothing requested and no room sensor (action *Idle*), because such a unit never starts by itself. **Off** clears the dehumidify and integration requests, and switches the unit off only if its own logic could still start it. **Auto** turns the unit on with no request, so it regulates on its own setpoints. **Cool**/**Heat** are offered only on a unit with the integration function (PG02), and an INT request that cannot act (brine in winter, no integration function) does not show as Cool/Heat; a winter INT from elsewhere shows as Heat whatever *Allow winter heating* says. The action reports what the unit does: *Cooling* needs a summer INT the unit acts on with the compressor running and no AL03; *Heating* needs the evidence described in [Operating modes in winter](#operating-modes-in-winter). Target T¹ / RH² only when a display or room probe is configured. `current_temperature`¹ and `current_humidity`² are suppressed when the corresponding probe is absent. Target-humidity bounds follow the unit's own PH29/PH30 clamps; the target temperature is SEtC in summer (15–35 °C) and SEtH in winter, limited to the unit's PH09–PH10 clamp (factory 14 °C both). |
+| `climate.hrds_climate` | HVAC mode (Off, Standby or Auto⁴, Dry, Cool in summer, Heat in winter if enabled), action, fan mode (`R` units only). The mode says what can make the unit act. **Off** is the unit off: it clears the dehumidify and integration requests and switches the unit off. **Standby** (HA's *fan only*) is a unit that is on with nothing requested and no display or room probe, so nothing can start it by itself; action *Idle*, or *Fan* while a manual fan speed runs the fan. **Auto** turns the unit on with no request, so it regulates on its own setpoints; with a display or room probe that is what "on, nothing requested" means, so Standby is not offered then. *Turn on* clears both requests and switches the unit on (Standby, or Auto where offered); *turn off* is Off. **Cool**/**Heat** are offered only on a unit with the integration function (PG02), and an INT request that cannot act (brine in winter, no integration function) does not show as Cool/Heat; a winter INT from elsewhere shows as Heat whatever *Allow winter heating* says. The action reports what the unit does: *Cooling* needs a summer INT the unit acts on with the compressor running and no AL03; *Heating* needs the evidence described in [Operating modes in winter](#operating-modes-in-winter). Target T¹ / RH² only when a display or room probe is configured. `current_temperature`¹ and `current_humidity`² are suppressed when the corresponding probe is absent. Target-humidity bounds follow the unit's own PH29/PH30 clamps; the target temperature is SEtC in summer (15–35 °C) and SEtH in winter, limited to the unit's PH09–PH10 clamp (factory 14 °C both). |
 
 ⁴ Only offered when a display or a room probe lets the unit raise requests by
 itself (handbook §6.1), and while that reading is healthy. Not tested on a real
@@ -870,7 +880,7 @@ so you can see it without opening the display. See the
 
 | Entity | What it does |
 |--------|-------------|
-| `fan.hrds_supply_fan` | The unit's supply/recirculation fan as a percentage. Reports the **actual** output (reg 639) — what the fan is doing — while `fan.set_percentage` writes the setpoint PM20 (1614). The commanded value, RPM and fan status are state attributes. Because the unit's own fan recirculates room air *in addition* to whatever the central MVHR pushes through the duct, this is the lever for topping combined airflow up to a target. |
+| `fan.hrds_supply_fan` | `R` units only (a non-R unit has no fan of its own; its damper output reads *disabled*, and the fan entity, the climate fan modes, the fan speed numbers and the fan sensors are not created). The unit's supply/recirculation fan as a percentage. Reports the **actual** output (reg 639) — what the fan is doing — while `fan.set_percentage` writes the setpoint PM20 (1614). The commanded value, RPM and fan status are state attributes. Because the unit's own fan recirculates room air *in addition* to whatever the central MVHR pushes through the duct, this is the lever for topping combined airflow up to a target. |
 
 ### Installer device
 

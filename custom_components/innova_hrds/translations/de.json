@@ -67,7 +67,10 @@
   "entity": {
     "climate": {
       "hrds_climate": {
-        "name": "Klima"
+        "name": "Klima",
+        "state": {
+          "fan_only": "Bereitschaft"
+        }
       }
     },
     "sensor": {

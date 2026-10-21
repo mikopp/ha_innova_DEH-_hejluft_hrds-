@@ -175,12 +175,13 @@ async def test_gate_refuses_requests_and_starts_nothing(setup):
     # dehumidify request; nothing is switched on.
     assert all(w.value == 0 for w in s.device.write_log)
     assert s.device.holding[R.DEU_REQUEST] == 0
-    # Switching off is always allowed: it clears both requests.
+    # Switching off is always allowed: it clears both requests, unit off.
     s.device.clear_write_log()
     await s.service("climate", "set_hvac_mode", CLIMATE, hvac_mode="off")
     assert [(w.address, w.value) for w in s.device.write_log] == [
         (R.INT_REQUEST, 0),
         (R.DEU_REQUEST, 0),
+        (R.BMS_ON, 0),
     ]
 
 
@@ -206,29 +207,97 @@ async def test_dehumidify(setup, clock):
 
     s.device.clear_write_log()
     await set_hvac_mode(s, clock, "off")
-    # Off clears the requests. Without a room probe nothing else can make the
-    # unit act, so it is left on: off in effect, idle.
+    # Off clears the requests and switches the unit off.
     assert [(w.address, w.value) for w in s.device.write_log] == [
         (R.INT_REQUEST, 0),
         (R.DEU_REQUEST, 0),
+        (R.BMS_ON, 0),
     ]
     climate = s.state("climate", CLIMATE)
     assert climate.state == "off"
-    assert climate.attributes["hvac_action"] == "idle"
+    assert climate.attributes["hvac_action"] == "off"
+    assert s.state("switch", "unit_on_off").state == "off"
     assert s.state("sensor", "compressor_status").state == "off"
 
 
-async def test_unit_on_without_request_is_off_and_idle(setup, clock):
+async def test_unit_on_without_request_is_standby(setup, clock):
+    """Modbus on/off on, nothing requested: Standby, never Off or Auto."""
     s = setup
     await allow_operation(s)
     await s.service("switch", "turn_on", "unit_on_off")
     await clock.settle()
     assert s.state("sensor", "unit_status").state == "on"
     climate = s.state("climate", CLIMATE)
-    # Nothing can make a sensor-less unit act: no Dry, no Auto.
-    assert climate.state == "off"
+    # Nothing can make a sensor-less unit act: it waits.
+    assert climate.state == "fan_only"
     assert climate.attributes["hvac_action"] == "idle"
+    assert "fan_only" in climate.attributes["hvac_modes"]
     assert "auto" not in climate.attributes["hvac_modes"]
+    # A manual fan speed runs the R unit's fan: the action says so.
+    await s.service("climate", "set_fan_mode", CLIMATE, fan_mode="low")
+    await clock.settle()
+    assert s.state("climate", CLIMATE).attributes["hvac_action"] == "fan"
+    # Off stops it: the unit goes off, so the mode and the switch agree.
+    await set_hvac_mode(s, clock, "off")
+    assert s.state("switch", "unit_on_off").state == "off"
+    assert s.state("climate", CLIMATE).attributes["hvac_action"] == "off"
+
+
+async def test_turn_on_goes_to_standby_and_turn_off_switches_off(setup, clock):
+    s = setup
+    await allow_operation(s)
+    await set_hvac_mode(s, clock, "dry")
+    s.device.clear_write_log()
+    await s.service("climate", "turn_off", CLIMATE)
+    await clock.settle()
+    assert [(w.address, w.value) for w in s.device.write_log] == [
+        (R.INT_REQUEST, 0),
+        (R.DEU_REQUEST, 0),
+        (R.BMS_ON, 0),
+    ]
+    assert s.state("climate", CLIMATE).state == "off"
+    # On: the unit on with nothing requested, whatever ran before.
+    s.device.clear_write_log()
+    await s.service("climate", "turn_on", CLIMATE)
+    await clock.settle()
+    assert [(w.address, w.value) for w in s.device.write_log] == [
+        (R.INT_REQUEST, 0),
+        (R.DEU_REQUEST, 0),
+        (R.BMS_ON, 1),
+    ]
+    climate = s.state("climate", CLIMATE)
+    assert climate.state == "fan_only"
+    assert climate.attributes["hvac_action"] == "idle"
+    assert s.state("switch", "unit_on_off").state == "on"
+
+
+async def test_standby_mode_clears_requests_and_keeps_the_unit_on(setup, clock):
+    s = setup
+    await allow_operation(s)
+    await set_hvac_mode(s, clock, "dry")
+    await set_hvac_mode(s, clock, "fan_only")
+    assert s.device.holding[R.DEU_REQUEST] == 0
+    assert s.device.holding[R.BMS_ON] == 1
+    assert s.state("climate", CLIMATE).attributes["hvac_action"] == "idle"
+
+
+# A non-R unit (overlay non_r): no recirculation fan, damper output disabled.
+@pytest.mark.parametrize("sim_options", [{"overlays": ("non_r",)}])
+async def test_non_r_unit_has_no_fan_entities(setup):
+    s = setup
+    assert s.entity_id("fan", "hrds_supply_fan") is None
+    for platform, key in (
+        ("number", "fan_manual_speed"),
+        ("sensor", "supply_fan_output"),
+        ("sensor", "supply_fan_airflow"),
+        ("number", "fan_min_speed_dehumidify"),
+    ):
+        assert s.entity_id(platform, key) is None, key
+    climate = s.state("climate", CLIMATE).attributes
+    assert not climate["supported_features"] & ClimateEntityFeature.FAN_MODE
+    assert "fan_modes" not in climate
+    # The damper output that tells the variant stays visible.
+    assert s.state("sensor", "recirculation_damper").state == "disabled"
 
 
 async def test_auto_refused_without_room_probe(setup):
@@ -316,7 +385,8 @@ async def test_heating_needs_warm_water(setup, clock):
     await clock.poll()
     climate = s.state("climate", CLIMATE)
     assert climate.state == "heat"
-    assert climate.attributes["hvac_action"] == "idle"
+    # The fan runs for the request, nothing warms the air.
+    assert climate.attributes["hvac_action"] == "fan"
     # AL04 is the unit's own verdict: it drops the request (valve closes).
     s.device.set_water_temperature(18.0)
     s.device.raise_alarm("AL04")
@@ -579,8 +649,10 @@ async def test_brine_never_heats(setup, clock):
     s.device.set_holding(R.INT_REQUEST, 1)
     await clock.poll()
     climate = s.state("climate", CLIMATE)
-    assert climate.state == "off"
-    assert climate.attributes["hvac_action"] == "idle"
+    # Not Heat, not Heating: the unit is on with a request that only runs
+    # the fan and circulates cold brine.
+    assert climate.state == "fan_only"
+    assert climate.attributes["hvac_action"] == "fan"
     with pytest.raises(ServiceValidationError):
         await s.service("climate", "set_hvac_mode", CLIMATE, hvac_mode="dry")
 

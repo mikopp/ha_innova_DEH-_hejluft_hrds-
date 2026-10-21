@@ -298,17 +298,20 @@ figures in the technical data are the tested spec range, **not** a firmware floo
 ## Climate entity mapping
 
 * `current_temperature` ← `room_temperature`; `current_humidity` ← `room_humidity`.
-* `hvac_mode` ∈ {OFF, AUTO, DRY, COOL (summer), HEAT (winter; offered with
-  `allow_winter_heating` or while a winter INT is on, never on brine)};
+* `hvac_mode` ∈ {OFF, AUTO or FAN_ONLY (shown as "Standby"), DRY, COOL
+  (summer), HEAT (winter; offered with `allow_winter_heating` or while a winter
+  INT is on, never on brine)};
   COOL/HEAT only offered when PG02 is not `off`. The unit ORs its request sources (handbook 6.1: its own
   room-probe logic, the DEU/INT digital inputs, Modbus), so the mode says what
   can make it act. Derived in order: unit off → OFF; `hub.int_effect`
   (INT on and able to act: PG02, summer → cool; winter and not brine → heat,
   whatever `allow_winter_heating` says, since the unit does not know it) →
   COOL/HEAT; DEU (1140) on → DRY; `hub.auto_capable` → AUTO;
-  `dehumidify_request` (1121) on from another source → DRY; else OFF (on but
-  nothing can make it act, action IDLE). An INT request that cannot act never
-  decides the mode.
+  `dehumidify_request` (1121) on from another source → DRY; else FAN_ONLY
+  ("Standby": on, but nothing can make it act). OFF only ever means the unit
+  is off, so it never contradicts `switch.unit_on_off`. An INT request that
+  cannot act never decides the mode. FAN_ONLY is offered only while
+  `auto_capable` is false (otherwise "on, nothing requested" is AUTO).
 * Season for the climate logic and the request guards is `hub.active_season`:
   the prefix of `mode_status` (1110), falling back to `operating_mode` (1583,
   which reads `auto` under PC05). Unknown counts as not summer in the guards.
@@ -319,7 +322,8 @@ figures in the technical data are the tested spec range, **not** a firmware floo
   unit has no heat source: winter INT only opens valve and pump, so only warm
   water from a heating circuit heats (never on brine). COOLING only with
   `hub.is_cooling`: `int_effect == "cool"`, compressor on, no AL03. Else
-  DRYING (compressor on or 1121 on), else IDLE. The condenser valve (1124, K4)
+  DRYING (compressor on or 1121 on), else FAN (R unit, fan status on), else
+  IDLE. The condenser valve (1124, K4)
   is not evidence: the real unit reads it ON in standby, against the handbook.
 * INT writes are refused when PG02 reads `off` (`_check_request_allowed`).
 * `hub.auto_capable` (`_auto_sources`): a display or allocated probe
@@ -330,10 +334,11 @@ figures in the technical data are the tested spec range, **not** a firmware floo
   start for the brine guard, and on brine in winter it needs a passing guard
   (the unit would dehumidify by itself).
 * Setting a mode writes the request registers first (so the guard refuses
-  before the unit starts), then `unit_on_off`. AUTO clears both requests and
-  turns the unit on. OFF clears both requests and turns the unit off only if
-  it could still act on its own (`auto_capable`, or a 1121 request not ours):
-  over Modbus that is the only way to stop the unit's own logic.
+  before the unit starts), then `unit_on_off`. AUTO and FAN_ONLY clear both
+  requests and turn the unit on. OFF clears both requests and always turns
+  the unit off: that alone stops the unit's own logic, digital-input requests
+  and a manual fan. `turn_on` = AUTO if `auto_capable` else FAN_ONLY;
+  `turn_off` = OFF.
 * Auto mode is tested only against the derived `display_cnu2` overlay, never on
   a real display unit; the README banner says so.
 * `target_humidity` ← `humidity_setpoint`; `target_temperature` ←
@@ -346,6 +351,11 @@ figures in the technical data are the tested spec range, **not** a firmware floo
   probe-fault alarm is active.
 
 ## Fan entity
+
+Only the R variant has a fan. `hub.has_fan` (from the primed read-back: damper
+output 1134 not `disabled`) decides; on a non-R unit `FAN_KEYS` (fan entity,
+fan speed numbers, fan sensors, 1112) are hidden and the climate entity drops
+`FAN_MODE`.
 
 Read and write are deliberately separate, because on this device they are not
 the same number.

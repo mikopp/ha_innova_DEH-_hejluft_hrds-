@@ -309,6 +309,8 @@ C_ALARM_ANTIFREEZE = "alarm_water_antifreeze"
 C_ALARM_FILTER = "alarm_dirty_filter"
 # Computed (non-register-backed) airflow sensors
 C_MAX_TOTAL_AIRFLOW = "max_total_airflow"
+# Composite fan entity (the R variant's recirculation fan).
+C_FAN_ENTITY = "hrds_supply_fan"
 C_SUPPLY_FAN_MAX_AIRFLOW = "supply_fan_max_airflow"
 C_SUPPLY_FAN_AIRFLOW = "supply_fan_airflow"
 
@@ -1273,6 +1275,30 @@ DIAGNOSTIC_KEYS = frozenset(
 SETUP_DEVICE_SUFFIX = "-setup"
 INSTALLER_DEVICE_SUFFIX = "-installer"
 
+# The unit's own fan and what describes or drives it. Only the R variant has
+# one (recirculation fan + damper); a non-R unit runs on the building's MVHR
+# airflow and reads its damper output (1134) as disabled. Not created there.
+FAN_KEYS = frozenset(
+    {
+        C_FAN_ENTITY,
+        C_SUPPLY_FAN_OUTPUT,
+        C_SUPPLY_FAN_RPM,
+        C_SUPPLY_FAN_STATUS,
+        C_SUPPLY_FAN_AIRFLOW,
+        C_SUPPLY_FAN_MAX_AIRFLOW,
+        C_FAN_MANUAL,
+        C_FAN_MANUAL_REQUEST,
+        C_FAN_MIN_DEHUM,
+        C_FAN_MAX_DEHUM,
+        C_FAN_MIN_COOLING,
+        C_FAN_MAX_COOLING,
+        C_FAN_MIN_VMC,
+        C_FAN_MIN_RUNTIME,
+        C_FAN_POST_RUN_TIME,
+        C_RECIRCULATION_ACTIVE,
+    }
+)
+
 # Shown on the main device only when a room probe can make them act: without
 # one the unit ignores its setpoints, and Home Assistant must do the control.
 TEMPERATURE_TARGET_KEYS = frozenset({C_SUMMER_SETPOINT, C_WINTER_SETPOINT})
@@ -1581,8 +1607,8 @@ def init() -> None:
         translation_key="hrds_climate",
     )
     # Also composite: backed by the manual-speed register plus status readings.
-    FAN_TYPES["hrds_supply_fan"] = MyFanEntityDescription(
-        key="hrds_supply_fan",
+    FAN_TYPES[C_FAN_ENTITY] = MyFanEntityDescription(
+        key=C_FAN_ENTITY,
         name="Supply fan",
         translation_key="hrds_supply_fan",
     )

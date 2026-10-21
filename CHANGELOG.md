@@ -6,6 +6,20 @@ All notable changes to this project are documented here, newest first.
 
 ## Unreleased
 
+**Changed:** climate *Off* now always means the unit is off: it clears both
+requests and switches the unit off (Modbus on/off), so it stops the unit's own
+logic, digital-input requests and a manual fan, and never disagrees with
+`switch.unit_on_off`. A unit that is on with nothing requested and no display
+or room probe (nothing can start it) now shows the new mode **Standby** (Home
+Assistant's *fan only*, renamed) instead of *Off*; its action is *Idle*, or
+*Fan* while a manual fan speed runs an R unit's fan. Climate *turn on* clears
+both requests and switches the unit on (Standby, or Auto where the unit
+regulates by itself; it used to start Dry); *turn off* is Off.
+
+**Fixed:** a non-R unit has no fan of its own, yet got a fan entity, climate
+fan modes, fan speed numbers and fan sensors. They are no longer created when
+the damper output (1134) reads *disabled*.
+
 **Breaking:** register 1139 is the integration (INT) request, not "active
 cooling": it cools in summer and heats in winter. Its keys now say so:
 `switch.active_cooling` is `integration_request`, and

@@ -193,7 +193,8 @@ async def test_auto_withdrawn_on_humidity_probe_fault(setup, clock):
     await clock.poll()
     climate = s.state("climate", CLIMATE)
     assert "auto" not in climate.attributes["hvac_modes"]
-    assert climate.state == "off"
+    # On with nothing that can make it act: Standby.
+    assert climate.state == "fan_only"
     assert climate.attributes["hvac_action"] == "idle"
     with pytest.raises(ServiceValidationError, match="auto"):
         await s.service("climate", "set_hvac_mode", CLIMATE, hvac_mode="auto")

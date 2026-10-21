@@ -67,7 +67,10 @@
   "entity": {
     "climate": {
       "hrds_climate": {
-        "name": "Climate"
+        "name": "Climate",
+        "state": {
+          "fan_only": "Standby"
+        }
       }
     },
     "sensor": {
