@@ -341,7 +341,7 @@ modes); register numbers from the Modbus PDF and §§6–8 above.
 > contain the word *integration* but are unrelated: 1139 is the *active-cooling*
 > command (compressor), 1112 is a read-only status that the *supply fan* is
 > running its integration/blending function. The HA integration maps 1139 to the
-> `active_cooling` switch and 1112 to the `fan_integration_active` binary sensor.
+> `integration_request` switch and 1112 to the `fan_integration_active` binary sensor.
 
 ### 13.2 HA fan mode → register mapping
 

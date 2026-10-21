@@ -101,7 +101,7 @@ A short summary:
   (`Status_Integ_byBMS`, 1139): the compressor/chilled-water circuit actively
   cools the supply air in summer (parameter `PG02_EnableIntegration`, 1798). This
   is the **active-cooling** request, unrelated to the fan's blending function
-  above, and is mapped to the `active_cooling` switch.
+  above, and is mapped to the `integration_request` switch.
 
 **Dehumidify with the fan on but active cooling off** is a normal state:
 `Status_Dehum_byBMS` (1140) = 1 runs the compressor to condense moisture, which
@@ -182,7 +182,7 @@ The table below lists the best Modbus proxies, exposed as HA sensors:
 | **Airflow size (30 vs 50)** | Not readable — set manually in integration setup | — | config `model` field |
 | **Fan arrangement** | `PG01_MachineType` (1797): `0` = supply fan only, `1` = supply + exhaust fan. **Not** the `R` flag: an `R` unit reads `0`. | FC 03, R/W configured as R/O | `sensor.machine_type` |
 | **Recirculation fan present (`R` / non-`R`)** and **damper state** | `outDO_RecircDamper` (1134), the reliable `R` indicator: `off` = damper closed (room-air duct blocked, MVHR passive flow only), `on` = damper open (room air drawn in and blended), `disabled` = no damper output wired (non-`R` build, no recirculation assembly) | FC 04, R/O | `sensor.recirculation_damper` |
-| **Active cooling present (`DC` / `D`)** | `PG02_EnableIntegration` (1798): `1` = cooling enabled on this unit | FC 03, R/W configured as R/O | `binary_sensor.active_cooling_available` |
+| **Active cooling present (`DC` / `D`)** | `PG02_EnableIntegration` (1798): `1` = cooling enabled on this unit | FC 03, R/W configured as R/O | `binary_sensor.integration_available` |
 
 **What the damper is:** a motorised flap in the room-air return duct. When
 recirculation is active the control board opens the damper so the fan can draw
@@ -194,7 +194,7 @@ output to the damper motor.
 
 **Caveats:** `PG01` and `PG02` are configuration parameters written by the
 installer, not hard-wired hardware IDs. A unit with cooling hardware but
-`PG02 = 0` (disabled by installer) reads as `active_cooling_available = OFF`.
+`PG02 = 0` (disabled by installer) reads as `integration_available = OFF`.
 The damper sensor (`outDO_RecircDamper`) is the most reliable hardware signal:
 `disabled` means the control board sees no damper output wired up, i.e. the
 unit physically lacks the recirculation assembly.

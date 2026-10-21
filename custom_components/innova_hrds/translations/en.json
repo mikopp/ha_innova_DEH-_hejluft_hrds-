@@ -460,7 +460,7 @@
       "humidity_probe_ok": {
         "name": "Room humidity probe OK"
       },
-      "active_cooling_available": {
+      "integration_available": {
         "name": "Unit has integration function (PG02)"
       },
       "alarm_compressor_lowpressure": {
@@ -498,7 +498,7 @@
       "dehumidify": {
         "name": "Dehumidify (Modbus)"
       },
-      "active_cooling": {
+      "integration_request": {
         "name": "Integration request (cool in summer, heat in winter)"
       },
       "enable_onoff_display": {

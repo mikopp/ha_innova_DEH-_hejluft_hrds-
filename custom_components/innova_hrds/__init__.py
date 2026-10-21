@@ -42,8 +42,6 @@ from .const import (
     AUTO_HEATING_NEGLIGIBLE_BELOW,
     BMS_ENABLE_KEYS,
     BRINE_GUARD_MAX_AGE_HOURS,
-    C_ACTIVE_COOLING,
-    C_ACTIVE_COOLING_AVAILABLE,
     C_AI2_ALLOCATION,
     C_AI3_ALLOCATION,
     C_ALARM_ANTIFREEZE,
@@ -58,6 +56,8 @@ from .const import (
     C_ENABLE_INT_BMS,
     C_HUMIDITY_PROBE_OK,
     C_INSTALLER_LAST_READ,
+    C_INTEGRATION_AVAILABLE,
+    C_INTEGRATION_REQUEST,
     C_MAX_BLOCK,
     C_MAX_GAP,
     C_MAX_TOTAL_AIRFLOW,
@@ -287,6 +287,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         registry.async_remove_device(installer_device.id)
 
     _migrate_setup_entities(hass, entry)
+    _migrate_renamed_keys(hass, entry)
 
     # HA02/HA03 were numbers up to 0.9.1 and are selects now, with the same
     # unique id: drop the orphaned number entities.
@@ -306,7 +307,7 @@ def _migrate_setup_entities(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
     PH27 was `enable_cooling_bms` but is the INT request's enable, so the key
     follows the register. The entity id stays as the user has it. PG02 is a
-    hardware capability, shown by `active_cooling_available`; its switch
+    hardware capability, shown by `integration_available`; its switch
     duplicated that register and is gone.
     """
     registry = er.async_get(hass)
@@ -318,6 +319,45 @@ def _migrate_setup_entities(hass: HomeAssistant, entry: ConfigEntry) -> None:
         "switch", DOMAIN, prefix + "enable_integration"
     ):
         registry.async_remove(entity_id)
+
+
+# Keys renamed after a release: (platform, old key, new key). Register 1139 is
+# the integration (INT) request, which cools in summer and heats in winter, and
+# PG02 says whether the unit has INT; both used to be keyed "active cooling".
+RENAMED_KEYS = (
+    (Platform.SWITCH, "active_cooling", C_INTEGRATION_REQUEST),
+    (Platform.BINARY_SENSOR, "active_cooling_available", C_INTEGRATION_AVAILABLE),
+)
+
+
+def _migrate_renamed_keys(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Move entities of a renamed key to the new unique id, history included.
+
+    An entity id that still carries the old key (e.g.
+    `switch.hrds_active_cooling_modbus`) follows the new one, unless that id is
+    taken; any other entity id stays as it is.
+    """
+    registry = er.async_get(hass)
+    prefix = entry.entry_id + "-"
+    for platform, old, new in RENAMED_KEYS:
+        entity_id = registry.async_get_entity_id(platform, DOMAIN, prefix + old)
+        if entity_id is None or registry.async_get_entity_id(
+            platform, DOMAIN, prefix + new
+        ):
+            continue
+        changes: dict[str, Any] = {"new_unique_id": prefix + new}
+        object_id = entity_id.split(".", 1)[1]
+        new_entity_id = f"{platform}.{object_id.replace(old, new)}"
+        if old in object_id and not registry.async_is_registered(new_entity_id):
+            changes["new_entity_id"] = new_entity_id
+        registry.async_update_entity(entity_id, **changes)
+        _LOGGER.info(
+            "Renamed %s to %s (key %s is now %s)",
+            entity_id,
+            changes.get("new_entity_id", entity_id),
+            old,
+            new,
+        )
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
@@ -529,8 +569,8 @@ class HrdsModbusHub:
         """
         d = self.data
         if (
-            d.get(C_ACTIVE_COOLING) != "on"
-            or d.get(C_ACTIVE_COOLING_AVAILABLE) == "off"
+            d.get(C_INTEGRATION_REQUEST) != "on"
+            or d.get(C_INTEGRATION_AVAILABLE) == "off"
         ):
             return None
         season = self.active_season
@@ -649,7 +689,7 @@ class HrdsModbusHub:
             and d.get(C_TEMP_PROBE_OK) != "off"
             # In winter the unit heats by itself (SEtH), whatever the
             # integration's allow_winter_heating says.
-            and d.get(C_ACTIVE_COOLING_AVAILABLE) == "on"
+            and d.get(C_INTEGRATION_AVAILABLE) == "on"
         )
         return bool(humidity), bool(temperature)
 
@@ -682,7 +722,7 @@ class HrdsModbusHub:
         if not self.brine_entity:
             hidden.add(C_BRINE_GUARD)
         if not self.show_temperature_target or (
-            d.get(C_ACTIVE_COOLING_AVAILABLE) == "off"
+            d.get(C_INTEGRATION_AVAILABLE) == "off"
         ):
             # No room temperature to regulate on, or no INT: it never heats.
             hidden.add(C_AUTO_HEATING)
@@ -767,11 +807,13 @@ class HrdsModbusHub:
         """
         winter = self.active_season != "summer"
         d = self.data
-        requests_on = d.get(C_DEHUMIDIFY) == "on" or d.get(C_ACTIVE_COOLING) == "on"
+        requests_on = (
+            d.get(C_DEHUMIDIFY) == "on" or d.get(C_INTEGRATION_REQUEST) == "on"
+        )
         # Switching the unit on starts it when a request is latched or when its
         # own room-probe logic can raise one.
         starts = bool(raw) and (
-            entity_key in (C_DEHUMIDIFY, C_ACTIVE_COOLING)
+            entity_key in (C_DEHUMIDIFY, C_INTEGRATION_REQUEST)
             or (entity_key == C_UNIT_ON_OFF and (requests_on or self.auto_capable))
         )
         if self.brine_entity:
@@ -784,15 +826,15 @@ class HrdsModbusHub:
         # dehumidifies with brine flowing, and cold brine freezes the register.
         brine_winter_ok = self.brine_guard_ok is True
         if (
-            entity_key == C_ACTIVE_COOLING
+            entity_key == C_INTEGRATION_REQUEST
             and raw
-            and d.get(C_ACTIVE_COOLING_AVAILABLE) == "off"
+            and d.get(C_INTEGRATION_AVAILABLE) == "off"
         ):
             raise ServiceValidationError(
                 "The unit has no integration function (PG02 = 0); it ignores an "
                 "integration request."
             )
-        if entity_key == C_ACTIVE_COOLING and raw and winter:
+        if entity_key == C_INTEGRATION_REQUEST and raw and winter:
             if self.is_brine:
                 raise ServiceValidationError(
                     "The unit is not in summer season, where an integration "
@@ -841,7 +883,7 @@ class HrdsModbusHub:
                     "(PU02) to disabled."
                 )
             if (
-                self.data.get(C_ACTIVE_COOLING) == "on"
+                self.data.get(C_INTEGRATION_REQUEST) == "on"
                 and not self.allow_winter_heating
             ):
                 raise ServiceValidationError(
@@ -1354,7 +1396,7 @@ class HrdsModbusHub:
                 issues.append("unit_heats_on_its_own_on_brine")
             elif not self.allow_winter_heating:
                 issues.append("unit_heats_on_its_own")
-        if self.allow_winter_heating and d.get(C_ACTIVE_COOLING_AVAILABLE) == "off":
+        if self.allow_winter_heating and d.get(C_INTEGRATION_AVAILABLE) == "off":
             issues.append("winter_heating_without_integration")
         return issues
 

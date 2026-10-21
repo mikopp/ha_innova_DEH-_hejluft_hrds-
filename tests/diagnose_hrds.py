@@ -696,7 +696,7 @@ def step_settings(
         say(
             INFO,
             "PG02=0: active cooling is not enabled/available (non-DC); "
-            "keep active_cooling off.",
+            "keep the integration request off.",
         )
     if pg03 == 1:
         say(

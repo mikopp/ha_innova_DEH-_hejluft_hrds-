@@ -460,7 +460,7 @@
       "humidity_probe_ok": {
         "name": "Raumfeuchtesensor OK"
       },
-      "active_cooling_available": {
+      "integration_available": {
         "name": "Gerät hat Integrationsfunktion (PG02)"
       },
       "alarm_compressor_lowpressure": {
@@ -498,7 +498,7 @@
       "dehumidify": {
         "name": "Entfeuchtung (Modbus)"
       },
-      "active_cooling": {
+      "integration_request": {
         "name": "Integrationsanforderung (Sommer kühlen, Winter heizen)"
       },
       "enable_onoff_display": {

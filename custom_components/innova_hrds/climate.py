@@ -46,13 +46,13 @@ from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
 from .const import (
-    C_ACTIVE_COOLING,
-    C_ACTIVE_COOLING_AVAILABLE,
     C_COMPRESSOR_STATUS,
     C_DEHUM_REQUEST,
     C_DEHUMIDIFY,
     C_FAN_MANUAL,
     C_HUMIDITY_PROBE_OK,
+    C_INTEGRATION_AVAILABLE,
+    C_INTEGRATION_REQUEST,
     C_SUPPLY_FAN_OUTPUT,
     C_SUPPLY_FAN_STATUS,
     C_TEMP_PROBE_OK,
@@ -142,7 +142,7 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
             modes.append(HVACMode.AUTO)
         modes.append(HVACMode.DRY)
         # INT needs the integration function (PG02); unknown counts as present.
-        if hub.data.get(C_ACTIVE_COOLING_AVAILABLE) != "off":
+        if hub.data.get(C_INTEGRATION_AVAILABLE) != "off":
             if season == "summer":
                 modes.append(HVACMode.COOL)
             # Heat is offered when allowed; a winter INT set elsewhere still
@@ -259,10 +259,10 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
             foreign_request = (
                 data.get(C_DEHUM_REQUEST) == "on"
                 and data.get(C_DEHUMIDIFY) != "on"
-                and data.get(C_ACTIVE_COOLING) != "on"
+                and data.get(C_INTEGRATION_REQUEST) != "on"
             )
             try:
-                await hub.write_entity_value(C_ACTIVE_COOLING, 0)
+                await hub.write_entity_value(C_INTEGRATION_REQUEST, 0)
                 await hub.write_entity_value(C_DEHUMIDIFY, 0)
             except HomeAssistantError:
                 # A request may still be latched: switching the unit off is
@@ -285,14 +285,14 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
                     "on; without one the unit never requests by itself. Use Dry"
                     + (" or Cool." if HVACMode.COOL in self.hvac_modes else ".")
                 )
-            writes = [(C_ACTIVE_COOLING, 0), (C_DEHUMIDIFY, 0)]
+            writes = [(C_INTEGRATION_REQUEST, 0), (C_DEHUMIDIFY, 0)]
         elif hvac_mode in (HVACMode.COOL, HVACMode.HEAT):
             writes = [
-                (C_ACTIVE_COOLING, 1),
+                (C_INTEGRATION_REQUEST, 1),
                 (C_DEHUMIDIFY, 1 if hvac_mode == HVACMode.COOL else 0),
             ]
         elif hvac_mode == HVACMode.DRY:
-            writes = [(C_ACTIVE_COOLING, 0), (C_DEHUMIDIFY, 1)]
+            writes = [(C_INTEGRATION_REQUEST, 0), (C_DEHUMIDIFY, 1)]
         else:
             writes = []
         # Requests first, so the unit is never switched on with a refused

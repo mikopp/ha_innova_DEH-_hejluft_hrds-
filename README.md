@@ -271,7 +271,7 @@ What it blocks, and what it does not:
 
 | Blocked while the switch is off | Always works |
 |---|---|
-| Turning the unit **on** (also climate *Auto*), **dehumidify** (climate *Dry*, `switch.dehumidify`), **active cooling / integration** (climate *Cool* / *Heat*, `switch.active_cooling`), and any **non-zero fan speed** | Turning things **off** (climate *Off*, switches off, fan 0), reading every sensor, and every configuration write (setpoints, selects, setup entities) |
+| Turning the unit **on** (also climate *Auto*), **dehumidify** (climate *Dry*, `switch.dehumidify`), **integration** (climate *Cool* / *Heat*, `switch.integration_request`), and any **non-zero fan speed** | Turning things **off** (climate *Off*, switches off, fan 0), reading every sensor, and every configuration write (setpoints, selects, setup entities) |
 
 A blocked request fails with *"Operational requests are not allowed yet. Review
 the setup entities, then turn on 'Allow operational requests'."* That message
@@ -365,7 +365,7 @@ ground-source heat pump, or a separate ground loop.
 The unit knows exactly two requests:
 
 * **DEU** — dehumidify (`switch.dehumidify`, climate **Dry**)
-* **INT** — integration (`switch.active_cooling`, climate **Cool** in summer,
+* **INT** — integration (`switch.integration_request`, climate **Cool** in summer,
   **Heat** in winter)
 
 What they do depends on the season and on how cold the water is.
@@ -435,7 +435,7 @@ in winter; see [Water circuit and brine](#water-circuit-and-brine).
    temperature, **Cool** to dry and cool (summer), **Auto** to let the unit
    decide from its own room sensors (only offered with a display or room
    probe), **Off** to stop: it clears both requests. The
-   switches `switch.dehumidify` and `switch.active_cooling` do the same per
+   switches `switch.dehumidify` and `switch.integration_request` do the same per
    request. Every start needs [Allow operational requests](#4-switch-on-allow-operational-requests).
 3. **Decide who regulates.** Without a display or room probe the unit runs
    while a request is on and ignores its setpoints, so let Home Assistant
@@ -778,7 +778,7 @@ holding registers. They are read-only from the integration.
 | Entity | What it means |
 |--------|--------------|
 | `sensor.machine_type` | PG01 fan arrangement: *supply fan only* or *supply and exhaust fan*. **Not** a recirculation flag: an `R` unit reads *supply fan only*. |
-| `binary_sensor.active_cooling_available` | ON: the unit has the integration (INT) function (PG02 = 1). Read-only: an installer setting, not a Modbus permission |
+| `binary_sensor.integration_available` | ON: the unit has the integration (INT) function (PG02 = 1). Read-only: an installer setting, not a Modbus permission |
 
 Whether the unit has a recirculation fan (`R`) is shown by
 `sensor.recirculation_damper`: *Disabled* means no damper is wired (non-`R`),
@@ -805,7 +805,7 @@ Each sensor maps to a single bit of a packed alarm register. **ON = alarm is act
 |--------|----------|-------|
 | `switch.unit_on_off` | 1105 | BMS on/off request (requires PH02 = 1) |
 | `switch.dehumidify` | 1140 | BMS dehumidify request (requires PH28 = 1). In winter on a brine circuit only with a passing brine temperature guard |
-| `switch.active_cooling` | 1139 | **Integration request** (requires PH27 = 1): dehumidify + cool in summer, **heat in winter**. Refused while not in summer unless winter heating is enabled in the options; always refused in winter on a brine circuit |
+| `switch.integration_request` | 1139 | **Integration request** (requires PH27 = 1): dehumidify + cool in summer, **heat in winter**. Refused while not in summer unless winter heating is enabled in the options; always refused in winter on a brine circuit |
 | `switch.allow_operational_requests` | — | **Setup device.** Not a register: the integration's own gate. Off by default; while off, on/dehumidify/cooling/non-zero fan requests are refused. Restored across restarts |
 | `switch.enable_time_programs` | 1779 | **Setup device.** PH03 — time programs can switch the unit off |
 | `switch.enable_onoff_by_di_request` | 1894 | **Setup device.** PC12 — a DEU/INT request on the digital inputs starts the unit even with the OFF contact open |

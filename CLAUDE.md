@@ -45,7 +45,7 @@ not backed by a single register, and are declared directly in `init()`
   are set: PH02 gates on/off, PH28 gates the DEU request, PH27 gates the INT
   request (key `enable_integration_bms`; it is not a cooling mode). PG02 (1798) is
   a different thing, an installer setting saying the unit has INT at all, and is
-  only shown read-only (`active_cooling_available`). `_sync_required_settings_locked` re-asserts them **every poll**, driven
+  only shown read-only (`integration_available`). `_sync_required_settings_locked` re-asserts them **every poll**, driven
   by the polled read-back rather than a one-shot flag, so a device power-cycle
   that clears them self-heals. They are also exposed as switches — and because
   the hub re-asserts them, turning one off by hand is undone on the next poll.
@@ -154,6 +154,10 @@ Classification rules (`_classify` in `const.py`):
   `unique_id` always uses the config entry id, so moving a key between devices
   keeps its entity. All devices are registered in `async_setup_entry`.
   `wiring_check.py` guards the sets.
+* **Renaming a key** changes its unique id: add it to `RENAMED_KEYS` in
+  `__init__.py`, whose `_migrate_renamed_keys` moves the registry entry (and an
+  entity id still carrying the old key) at setup, so history is kept. 1139 /
+  PG02 were `active_cooling` / `active_cooling_available` up to 0.9.1.
 * **Installer device:** opt-in (`installer_device` option, default off, only in
   the options flow, not at first install). Its registers are **never part of
   the regular poll** (`_poll_keys` excludes `INSTALLER_KEYS`, and a block never
@@ -180,7 +184,7 @@ Classification rules (`_classify` in `const.py`):
 
 ## Operating modes, season, water circuit
 
-* Two requests only: **DEU** (`dehumidify`, 1140) and **INT** (`active_cooling`,
+* Two requests only: **DEU** (`dehumidify`, 1140) and **INT** (`integration_request`,
   1139). INT is dehumidify + cool in summer and **heating** in winter (compressor
   off, warm water through the register). INT starts the compressor only
   because PU05 (1692, factory on) couples a dehumidify request to it. With

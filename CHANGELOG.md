@@ -6,6 +6,15 @@ All notable changes to this project are documented here, newest first.
 
 ## Unreleased
 
+**Breaking:** register 1139 is the integration (INT) request, not "active
+cooling": it cools in summer and heats in winter. Its keys now say so:
+`switch.active_cooling` is `integration_request`, and
+`binary_sensor.active_cooling_available` (PG02) is `integration_available`.
+The entities are migrated at startup with their history; an entity id that
+still carries the old key follows (e.g. `switch.hrds_active_cooling_modbus`
+becomes `switch.hrds_integration_request_modbus`), other entity ids stay.
+Update automations, scripts and dashboards that use the old entity ids.
+
 **Changed:** the unit's own winter heating is reported instead of ignored. With
 a room temperature source (display or AI2 probe) and the integration function
 (PG02), the unit raises a winter integration request by itself when the room

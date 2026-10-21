@@ -1,7 +1,6 @@
 # serializer version: 1
 # name: test_entity_states_snapshot[display]
   dict({
-    'binary_sensor.active_cooling_available': 'on',
     'binary_sensor.alarm_active': 'off',
     'binary_sensor.alarm_compressor_highpressure': 'off',
     'binary_sensor.alarm_compressor_lowpressure': 'off',
@@ -12,6 +11,7 @@
     'binary_sensor.automatic_heating': 'off',
     'binary_sensor.dehumidify_request': 'off',
     'binary_sensor.humidity_probe_ok': 'on',
+    'binary_sensor.integration_available': 'on',
     'binary_sensor.recirculation_active': 'off',
     'binary_sensor.remote_contact_closed': 'on',
     'binary_sensor.temp_probe_ok': 'on',
@@ -71,7 +71,6 @@
     'sensor.water_condenser_valve': 'on',
     'sensor.water_temperature': '18.7',
     'sensor.water_valve_pump': 'off',
-    'switch.active_cooling': 'off',
     'switch.dehumidify': 'off',
     'switch.enable_dehumidify_bms': 'on',
     'switch.enable_free_cooling': 'on',
@@ -81,13 +80,13 @@
     'switch.enable_onoff_display': 'on',
     'switch.enable_time_programs': 'off',
     'switch.force_dehumidify_in_cooling': 'on',
+    'switch.integration_request': 'off',
     'switch.operation_allowed': 'off',
     'switch.unit_on_off': 'off',
   })
 # ---
 # name: test_entity_states_snapshot[headless]
   dict({
-    'binary_sensor.active_cooling_available': 'on',
     'binary_sensor.alarm_active': 'off',
     'binary_sensor.alarm_compressor_highpressure': 'off',
     'binary_sensor.alarm_compressor_lowpressure': 'off',
@@ -97,6 +96,7 @@
     'binary_sensor.alarm_water_antifreeze': 'off',
     'binary_sensor.dehumidify_request': 'off',
     'binary_sensor.humidity_probe_ok': 'on',
+    'binary_sensor.integration_available': 'on',
     'binary_sensor.recirculation_active': 'off',
     'binary_sensor.remote_contact_closed': 'on',
     'binary_sensor.temp_probe_ok': 'on',
@@ -152,7 +152,6 @@
     'sensor.water_condenser_valve': 'on',
     'sensor.water_temperature': '18.7',
     'sensor.water_valve_pump': 'off',
-    'switch.active_cooling': 'off',
     'switch.dehumidify': 'off',
     'switch.enable_dehumidify_bms': 'on',
     'switch.enable_free_cooling': 'on',
@@ -162,6 +161,7 @@
     'switch.enable_onoff_display': 'off',
     'switch.enable_time_programs': 'off',
     'switch.force_dehumidify_in_cooling': 'on',
+    'switch.integration_request': 'off',
     'switch.operation_allowed': 'off',
     'switch.unit_on_off': 'off',
   })

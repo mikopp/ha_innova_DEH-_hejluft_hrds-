@@ -255,8 +255,8 @@ async def test_dehumidify_request_from_another_source_shows_dry(setup, clock):
     assert (R.BMS_ON, 0) in [(w.address, w.value) for w in s.device.write_log]
 
 
-# ---- active cooling (integration) --------------------------------------------
-async def test_active_cooling_in_summer(setup, clock):
+# ---- integration (cool in summer) ------------------------------------------------
+async def test_integration_cools_in_summer(setup, clock):
     s = setup
     await allow_operation(s)
     await set_hvac_mode(s, clock, "cool")
@@ -281,7 +281,7 @@ async def test_cooling_refused_in_winter(setup, clock):
         await s.hass.services.async_call(
             "switch",
             "turn_on",
-            {"entity_id": s.entity_id("switch", "active_cooling")},
+            {"entity_id": s.entity_id("switch", "integration_request")},
             blocking=True,
         )
     assert s.device.holding[R.INT_REQUEST] == 0
@@ -339,7 +339,7 @@ async def test_winter_int_from_elsewhere_heats(setup, clock):
     await clock.settle()
     s.device.set_holding(R.INT_REQUEST, 1)  # e.g. from a display
     await clock.poll()
-    assert s.state("switch", "active_cooling").state == "on"
+    assert s.state("switch", "integration_request").state == "on"
     climate = s.state("climate", CLIMATE)
     assert "heat" in climate.attributes["hvac_modes"]
     assert climate.state == "heat"

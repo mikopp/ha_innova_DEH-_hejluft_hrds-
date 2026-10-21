@@ -241,7 +241,7 @@ C_RECIRCULATION_ACTIVE = "recirculation_active"
 C_ALARM_ACTIVE = "alarm_active"
 # Read-only sensors derived from holding registers (RW=0)
 C_MACHINE_TYPE = "machine_type"
-C_ACTIVE_COOLING_AVAILABLE = "active_cooling_available"
+C_INTEGRATION_AVAILABLE = "integration_available"
 # Read-only enum sensor from digital output register
 C_RECIRCULATION_DAMPER = "recirculation_damper"
 # Read-write numbers
@@ -264,7 +264,7 @@ C_HUMIDITY_SETPOINT_MAX = "humidity_setpoint_max"
 # Read-write switches
 C_UNIT_ON_OFF = "unit_on_off"
 C_DEHUMIDIFY = "dehumidify"
-C_ACTIVE_COOLING = "active_cooling"
+C_INTEGRATION_REQUEST = "integration_request"
 C_TIME_PROGRAMS = "enable_time_programs"
 C_AI2_ALLOCATION = "ai2_allocation"
 C_AI3_ALLOCATION = "ai3_allocation"
@@ -603,7 +603,7 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "SWITCH": {"off": 0, "on": 1},
         "NAME": "Dehumidify (BMS)",
     },
-    C_ACTIVE_COOLING: {
+    C_INTEGRATION_REQUEST: {
         "RT": C_REG_TYPE_HOLDING_REGISTERS,
         "REG": 1139,
         "DT": C_DT_UINT16,
@@ -656,7 +656,7 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "RW": 0,
         "NAME": "Machine type (PG01)",
     },
-    C_ACTIVE_COOLING_AVAILABLE: {
+    C_INTEGRATION_AVAILABLE: {
         "RT": C_REG_TYPE_HOLDING_REGISTERS,
         "REG": 1798,
         "DT": C_DT_UINT16,
@@ -1230,7 +1230,7 @@ SETUP_KEYS = frozenset(
         C_SEASON_OWNER,
         C_TEMPERATURE_UNIT,
         C_MACHINE_TYPE,
-        C_ACTIVE_COOLING_AVAILABLE,
+        C_INTEGRATION_AVAILABLE,
         C_FAN_OUTPUT_ALLOCATION,
         C_DAMPER_RELAY_ALLOCATION,
         C_DAMPER_PRESTART,
@@ -1336,7 +1336,7 @@ COMPUTED_BINARY_SENSORS: Dict[str, Dict[str, Any]] = {
 # Requests that make the unit do something. They are refused until the user
 # turns on "Allow operational requests"; switching things OFF and all
 # configuration writes always go through. A fan setpoint of 0 is not a request.
-OPERATIONAL_KEYS = (C_UNIT_ON_OFF, C_DEHUMIDIFY, C_ACTIVE_COOLING, C_FAN_MANUAL)
+OPERATIONAL_KEYS = (C_UNIT_ON_OFF, C_DEHUMIDIFY, C_INTEGRATION_REQUEST, C_FAN_MANUAL)
 
 # The request switches among them mean "what was commanded". The unit mirrors a
 # request into its register late (seen: OFF read back as ON for several polls),
@@ -1344,7 +1344,7 @@ OPERATIONAL_KEYS = (C_UNIT_ON_OFF, C_DEHUMIDIFY, C_ACTIVE_COOLING, C_FAN_MANUAL)
 # re-reads just that register at these offsets (seconds after the write). The
 # last one is the cap: a request still unconfirmed then shows the unit's value.
 # The fan setpoint is not here: fan and climate report what the unit does.
-PENDING_KEYS = (C_UNIT_ON_OFF, C_DEHUMIDIFY, C_ACTIVE_COOLING)
+PENDING_KEYS = (C_UNIT_ON_OFF, C_DEHUMIDIFY, C_INTEGRATION_REQUEST)
 PENDING_RECHECK_SECONDS = (3, 6, 12, 25)
 
 
