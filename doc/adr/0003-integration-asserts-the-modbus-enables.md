@@ -2,6 +2,7 @@
 status: superseded by ADR-0022
 date: 2026-09-10
 decision-makers: mikopp
+topics: [modbus-writes, requests]
 ---
 
 # ADR-0003: The integration asserts the Modbus enables on every poll

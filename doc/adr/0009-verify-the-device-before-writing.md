@@ -2,6 +2,7 @@
 status: accepted
 date: 2026-10-19
 decision-makers: mikopp
+topics: [config, modbus-writes]
 paths:
   - "custom_components/innova_hrds/identity.py"
   - "custom_components/innova_hrds/config_flow.py"

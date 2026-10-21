@@ -2,6 +2,7 @@
 status: accepted
 date: 2026-10-21
 decision-makers: mikopp
+topics: [requests, season]
 paths:
   - "custom_components/innova_hrds/__init__.py"
   - "custom_components/innova_hrds/{climate,select,binary_sensor,config_flow}.py"

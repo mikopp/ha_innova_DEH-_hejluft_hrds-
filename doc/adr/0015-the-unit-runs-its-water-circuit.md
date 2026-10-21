@@ -2,6 +2,7 @@
 status: accepted
 date: 2026-10-19
 decision-makers: mikopp
+topics: [water]
 paths:
   - "custom_components/innova_hrds/__init__.py"
   - "custom_components/innova_hrds/installer_params.py"

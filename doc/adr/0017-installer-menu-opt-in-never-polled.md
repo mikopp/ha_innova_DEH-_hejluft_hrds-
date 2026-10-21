@@ -2,6 +2,7 @@
 status: accepted
 date: 2026-10-20
 decision-makers: mikopp
+topics: [entities, config, modbus-reads]
 paths:
   - "custom_components/innova_hrds/installer_params.py"
   - "custom_components/innova_hrds/button.py"

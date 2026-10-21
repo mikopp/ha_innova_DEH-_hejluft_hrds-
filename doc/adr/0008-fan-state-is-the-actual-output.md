@@ -2,6 +2,7 @@
 status: accepted
 date: 2026-10-21
 decision-makers: mikopp
+topics: [fan, state, config]
 supersedes: [ADR-0007]
 paths:
   - "custom_components/innova_hrds/fan.py"

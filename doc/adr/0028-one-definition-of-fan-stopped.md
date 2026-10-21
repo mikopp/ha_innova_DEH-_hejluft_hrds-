@@ -2,6 +2,7 @@
 status: proposed
 date: 2026-10-21
 decision-makers: mikopp
+topics: [fan, state]
 paths:
   - "custom_components/innova_hrds/{fan,climate,__init__,const}.py"
 ---

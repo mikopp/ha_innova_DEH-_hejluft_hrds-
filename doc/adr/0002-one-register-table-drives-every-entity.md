@@ -2,6 +2,7 @@
 status: accepted
 date: 2026-09-10
 decision-makers: mikopp
+topics: [entities]
 paths:
   - "custom_components/innova_hrds/const.py"
   - "custom_components/innova_hrds/entity_common.py"

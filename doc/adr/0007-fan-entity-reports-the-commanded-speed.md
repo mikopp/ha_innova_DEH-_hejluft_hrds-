@@ -2,6 +2,7 @@
 status: superseded by ADR-0008
 date: 2026-09-10
 decision-makers: mikopp
+topics: [fan, state]
 ---
 
 # ADR-0007: The fan entity reports the commanded speed

@@ -2,6 +2,7 @@
 status: accepted
 date: 2026-10-21
 decision-makers: mikopp
+topics: [requests, modbus-writes]
 supersedes: [ADR-0003]
 paths:
   - "custom_components/innova_hrds/__init__.py"

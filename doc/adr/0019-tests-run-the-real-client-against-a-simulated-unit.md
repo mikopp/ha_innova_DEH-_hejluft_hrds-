@@ -2,6 +2,7 @@
 status: accepted
 date: 2026-10-20
 decision-makers: mikopp
+topics: [tests]
 paths:
   - "tests/**"
   - ".github/workflows/{tests,e2e}.yaml"

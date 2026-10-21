@@ -2,6 +2,7 @@
 status: accepted
 date: 2026-10-20
 decision-makers: mikopp
+topics: [modbus-reads]
 paths:
   - "custom_components/innova_hrds/__init__.py"
   - "tests/diagnose_hrds.py"

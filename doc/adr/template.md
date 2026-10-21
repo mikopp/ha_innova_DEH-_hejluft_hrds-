@@ -2,6 +2,7 @@
 status: proposed
 date: YYYY-MM-DD
 decision-makers: mikopp
+topics: [modbus-writes]
 paths:
   - "custom_components/innova_hrds/__init__.py"
 ---

@@ -2,6 +2,7 @@
 status: accepted
 date: 2026-10-21
 decision-makers: mikopp
+topics: [docs]
 paths:
   - "doc/adr/**"
   - ".claude/**"
@@ -16,7 +17,8 @@ paths:
   must keep honouring) as one file `doc/adr/NNNN-kebab-title.md`, from
   `doc/adr/template.md`: MADR 4.0 frontmatter (`status`, `date`,
   `decision-makers`, optional `supersedes`) plus `paths`, the globs of the
-  files the decision governs.
+  files the decision governs, and `topics`, what the decision is about from
+  the fixed set `TOPICS` in `tests/adr_check.py`.
 - MUST put the rules first: `## Decision` is a list of RFC 2119 rules
   (MUST / MUST NOT / SHOULD / MAY) naming the code symbols, so an agent can
   act without reading further. Context, options and consequences follow,
@@ -26,6 +28,10 @@ paths:
 - MUST keep `.claude/rules/adr/` a set of symlinks to exactly the accepted
   ADRs (`python3 tests/adr_check.py --fix`). Claude Code then loads an ADR
   only when it reads a file matching its `paths`.
+- MUST keep `.claude/rules/adr-topics.md` generated (`--fix`): topic → ADR
+  ids, loaded with any code, test or CI file, so a decision also reaches
+  logic in a file no `paths` glob covers yet. Code in such a file MUST
+  follow the ADRs of its topics.
 - MUST NOT restate an ADR in CLAUDE.md. CLAUDE.md MAY list one-line
   invariants citing the ADR id; `tests/adr_check.py` fails if a cited ADR is
   not accepted.
@@ -54,6 +60,8 @@ CLAUDE.md, and some had been reversed without a trace in the docs.
 - ADRs directly in `.claude/rules/`: loads well, but hidden from people
   browsing `doc/`.
 - Generated copies of the rules in CLAUDE.md: always loaded, drifts.
+- Broad `paths` (`custom_components/**`) for cross-cutting ADRs: reaches new
+  files, but loads ~9k tokens with every code read; the topic map costs ~450.
 
 ## Consequences
 
@@ -61,8 +69,7 @@ CLAUDE.md, and some had been reversed without a trace in the docs.
   file; superseded ideas are recorded but never loaded.
 - Good: `tests/adr_check.py` (lint workflow) keeps scopes, links, index,
   citations and confirmations honest.
-- Bad: on Windows without symlink support the links check out as plain
-  files and nothing auto-loads; the CLAUDE.md pointer to the index remains.
+- Bad: without symlink support (Windows) nothing auto-loads but the topic map.
 
 ## Confirmation
 

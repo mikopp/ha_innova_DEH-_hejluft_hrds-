@@ -9,9 +9,11 @@ dehumidification module over **Modbus TCP**. Domain `innova_hrds`, code in
 
 Every design decision is an ADR in [`doc/adr/`](doc/adr/README.md) (index
 there). The accepted ADRs that govern a file load into your context
-automatically when you read that file (`.claude/rules/adr/`, path-scoped), so
-you do not need to search for them. They are binding: follow them, or stop
-and propose a superseding ADR. Use the `/adr` skill to record a new decision
+automatically when you read that file (`.claude/rules/adr/`, path-scoped).
+For logic in a file no ADR path covers (a new module), the topic map
+`.claude/rules/adr-topics.md` (loads with any code) names the ADRs per topic:
+read those before the first edit. ADRs are binding: follow them, or stop and
+propose a superseding ADR. Use the `/adr` skill to record a new decision
 (`new`), change one (`supersede`), or check a diff before a PR (`check`).
 Do not restate ADR content in this file.
 

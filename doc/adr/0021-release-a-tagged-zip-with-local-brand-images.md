@@ -2,6 +2,7 @@
 status: accepted
 date: 2026-10-20
 decision-makers: mikopp
+topics: [ci]
 paths:
   - ".github/workflows/release.yaml"
   - ".github/scripts/**"

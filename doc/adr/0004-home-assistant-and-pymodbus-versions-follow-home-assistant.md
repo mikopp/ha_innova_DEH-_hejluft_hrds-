@@ -2,6 +2,7 @@
 status: accepted
 date: 2026-10-20
 decision-makers: mikopp
+topics: [dependencies]
 paths:
   - "custom_components/innova_hrds/manifest.json"
   - "hacs.json"

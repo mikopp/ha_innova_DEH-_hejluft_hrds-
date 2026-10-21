@@ -9,10 +9,15 @@ describes the format and how agents use it; in short:
 * `paths` lists the files a decision governs. Accepted ADRs are linked into
   `.claude/rules/adr/`, so Claude Code loads one when it reads a matching
   file, and not otherwise.
+* `topics` says what a decision is about. The generated
+  `.claude/rules/adr-topics.md` lists the ADRs per topic and loads with any
+  code, test or CI file, so a decision also reaches a new file that no
+  `paths` glob covers yet.
 * A decision that changes gets a new ADR that supersedes the old one; the old
   one stays here for the record and is no longer loaded.
 * `python3 tests/adr_check.py` checks all of this (lint workflow);
-  `--fix` rewrites the table below and the links.
+  `--fix` rewrites the table below, the topic map and the links;
+  `--for FILE...` and `--topic TOPIC...` list the ADRs that apply.
 * New or changed decision: copy [`template.md`](template.md), or ask an agent
   to use the `/adr` skill.
 
