@@ -6,6 +6,13 @@ All notable changes to this project are documented here, newest first.
 
 ## Unreleased
 
+**Fixed:** switching *Unit on/off (Modbus)* (and the dehumidify and integration
+requests) off could flick back to on for several seconds. The unit mirrors a
+request into its register late, so the next poll read the old value. The switch
+now shows what you commanded until the unit agrees, re-reading just that
+register after 3, 6, 12 and 25 s. If the unit has not confirmed after 25 s the
+switch shows the unit's value and the log says so. The fan and the climate
+entity still show what the unit actually does.
 **Changed:** the *Brine guard minimum temperature* now defaults to 8 °C
 (was 10 °C). That is still well above the unit's own frost alarm (AL16, PA43
 factory 3 °C) and lets early-summer brine below PU08 (10 °C) run the passive
