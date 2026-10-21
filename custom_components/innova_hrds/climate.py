@@ -262,8 +262,12 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
                 await hub.write_entity_value(C_DEHUMIDIFY, 0)
             except HomeAssistantError:
                 # A request may still be latched: switching the unit off is
-                # then the only sure way to stop it.
-                await hub.write_entity_value(C_UNIT_ON_OFF, 0)
+                # then the only sure way to stop it. Report the original
+                # failure, not the fallback's (a dead link fails both).
+                try:
+                    await hub.write_entity_value(C_UNIT_ON_OFF, 0)
+                except HomeAssistantError as err:
+                    _LOGGER.warning("Could not switch the unit off either: %s", err)
                 raise
             # The unit's own logic only stops when the unit is off.
             if hub.auto_capable or foreign_request:
@@ -277,25 +281,24 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
                     "on; without one the unit never requests by itself. Use Dry"
                     + (" or Cool." if HVACMode.COOL in self.hvac_modes else ".")
                 )
-            # Refuse (gate, brine guard) before the requests are cleared, so a
-            # refused Auto leaves a running Dry/Cool alone.
-            hub.check_write_allowed(C_UNIT_ON_OFF, 1)
-            await hub.write_entity_value(C_ACTIVE_COOLING, 0)
-            await hub.write_entity_value(C_DEHUMIDIFY, 0)
-            await hub.write_entity_value(C_UNIT_ON_OFF, 1)
-            return
-
-        # Requests first: the hub refuses heating (or brine winter dehumidify)
-        # before the unit is switched on.
-        if hvac_mode in (HVACMode.COOL, HVACMode.HEAT):
-            await hub.write_entity_value(C_ACTIVE_COOLING, 1)
-            await hub.write_entity_value(
-                C_DEHUMIDIFY, 1 if hvac_mode == HVACMode.COOL else 0
-            )
+            writes = [(C_ACTIVE_COOLING, 0), (C_DEHUMIDIFY, 0)]
+        elif hvac_mode in (HVACMode.COOL, HVACMode.HEAT):
+            writes = [
+                (C_ACTIVE_COOLING, 1),
+                (C_DEHUMIDIFY, 1 if hvac_mode == HVACMode.COOL else 0),
+            ]
         elif hvac_mode == HVACMode.DRY:
-            await hub.write_entity_value(C_ACTIVE_COOLING, 0)
-            await hub.write_entity_value(C_DEHUMIDIFY, 1)
-        await hub.write_entity_value(C_UNIT_ON_OFF, 1)
+            writes = [(C_ACTIVE_COOLING, 0), (C_DEHUMIDIFY, 1)]
+        else:
+            writes = []
+        # Requests first, so the unit is never switched on with a refused
+        # request. Every write is checked (gate, brine guard, season) before
+        # the first one, so a refused mode leaves a running request alone.
+        writes.append((C_UNIT_ON_OFF, 1))
+        for key, raw in writes:
+            hub.check_write_allowed(key, raw)
+        for key, raw in writes:
+            await hub.write_entity_value(key, raw)
 
     async def async_turn_on(self) -> None:
         await self.async_set_hvac_mode(

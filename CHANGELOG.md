@@ -7,9 +7,11 @@ All notable changes to this project are documented here, newest first.
 ## Unreleased
 
 **Fixed:** climate *Off* switches the unit off if clearing a request fails,
-instead of leaving the request latched on a running unit. A refused *Auto*
-(operation gate, brine guard) no longer clears a running *Dry*/*Cool* request
-first. On brine without a passing guard, switching the season to winter is
+instead of leaving the request latched on a running unit (and reports the
+request's failure if that fails too). A refused climate mode (operation gate,
+brine guard) no longer clears a running request first: every write of a mode
+change is checked before the first one, so a refused *Auto* or *Dry* leaves a
+running *Dry*/*Cool* alone. On brine without a passing guard, switching the season to winter is
 refused while the unit is on and its room probe could make it dehumidify in
 winter by itself.
 

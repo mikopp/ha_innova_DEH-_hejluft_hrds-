@@ -506,6 +506,25 @@ async def test_refused_auto_leaves_a_running_request_alone(hass, setup, clock):
     assert s.device.holding[R.DEU_REQUEST] == 1
 
 
+@pytest.mark.parametrize(
+    "entry_options",
+    [{"water_circuit": "brine", "brine_temperature_entity": BRINE}],
+)
+async def test_refused_dry_leaves_a_running_cool_alone(hass, setup, clock):
+    s = setup
+    await allow_operation(s)
+    hass.states.async_set(BRINE, "12.0", {"unit_of_measurement": "°C"})
+    await hass.async_block_till_done()
+    await set_hvac_mode(s, clock, "cool")
+    hass.states.async_set(BRINE, "6.5", {"unit_of_measurement": "°C"})
+    await hass.async_block_till_done()
+    s.device.clear_write_log()
+    with pytest.raises(ServiceValidationError, match="Brine temperature guard"):
+        await s.service("climate", "set_hvac_mode", CLIMATE, hvac_mode="dry")
+    assert s.device.write_log == []
+    assert s.device.holding[R.INT_REQUEST] == 1
+
+
 @pytest.mark.parametrize("entry_options", [{"water_circuit": "brine"}])
 async def test_brine_never_heats(setup, clock):
     s = setup

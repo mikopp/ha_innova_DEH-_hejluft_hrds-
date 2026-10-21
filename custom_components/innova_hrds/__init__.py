@@ -755,14 +755,13 @@ class HrdsModbusHub:
                 "temperature guard (the water register can freeze). Configure "
                 "one in the integration options."
             )
-        if (
-            entity_key == C_UNIT_ON_OFF
-            and raw
-            and winter
-            and self.is_brine
-            and not brine_winter_ok
-            and self._auto_sources()[0]
-        ):
+        # The unit's own room-probe logic would dehumidify in winter on brine
+        # without a passing guard: refuse switching it on in winter, and
+        # switching a running unit to winter.
+        unguarded_winter_dehum = (
+            self.is_brine and not brine_winter_ok and self._auto_sources("winter")[0]
+        )
+        if entity_key == C_UNIT_ON_OFF and raw and winter and unguarded_winter_dehum:
             raise ServiceValidationError(
                 "The room probe would let the unit dehumidify in winter on its "
                 "own; on a brine circuit that needs a brine temperature guard "
@@ -772,12 +771,7 @@ class HrdsModbusHub:
             )
         if entity_key == C_SEASON and raw == 3:  # 3 = winter
             unit_on = d.get(C_UNIT_ON_OFF) == "on" or d.get(C_UNIT_STATUS) == "on"
-            if (
-                unit_on
-                and self.is_brine
-                and not brine_winter_ok
-                and self._auto_sources("winter")[0]
-            ):
+            if unit_on and unguarded_winter_dehum:
                 raise ServiceValidationError(
                     "The room probe would let the unit dehumidify in winter on "
                     "its own; on a brine circuit that needs a brine temperature "
