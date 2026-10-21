@@ -1,0 +1,6 @@
+{
+  "description": "Best-effort derivation of the real headless dump into a unit with a CNU2 display (switched on) and its built-in room T/H sensors: PH01 = 1 and HA00 = 6 (the handbook pair for 'with CNU2'), no external probes (HA02 = HA03 = 0), and room readings in place of the unwired sentinel. Not a real dump; replace with one in tests/devices/ when available.",
+  "meta": {"display": true},
+  "input": {"499": 225, "505": 55},
+  "holding": {"1777": 1, "1803": 6, "1805": 0, "1806": 0}
+}

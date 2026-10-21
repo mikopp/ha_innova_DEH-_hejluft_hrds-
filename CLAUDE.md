@@ -279,12 +279,41 @@ figures in the technical data are the tested spec range, **not** a firmware floo
 ## Climate entity mapping
 
 * `current_temperature` ← `room_temperature`; `current_humidity` ← `room_humidity`.
-* `hvac_mode` ∈ {OFF, DRY, COOL (summer), HEAT (winter, only with
-  `allow_winter_heating`, never on brine)}; setting it writes the request
-  registers first (so the guard refuses before the unit starts), then
-  `unit_on_off`.
-* `hvac_action` derived from `unit_status` / `compressor_status` /
-  `dehumidify_request`.
+* `hvac_mode` ∈ {OFF, AUTO, DRY, COOL (summer), HEAT (winter, only with
+  `allow_winter_heating`, never on brine)}; COOL/HEAT only offered when PG02
+  is not `off`. The unit ORs its request sources (handbook 6.1: its own
+  room-probe logic, the DEU/INT digital inputs, Modbus), so the mode says what
+  can make it act. Derived in order: unit off → OFF; `hub.int_effect`
+  (INT on and able to act: PG02, summer → cool; winter + `allow_winter_heating`
+  → heat) → COOL/HEAT; DEU (1140) on → DRY; `hub.auto_capable` → AUTO;
+  `dehumidify_request` (1121) on from another source → DRY; else OFF (on but
+  nothing can make it act, action IDLE). An INT request that cannot act never
+  decides the mode.
+* Season for the climate logic and the request guards is `hub.active_season`:
+  the prefix of `mode_status` (1110), falling back to `operating_mode` (1583,
+  which reads `auto` under PC05). Unknown counts as not summer in the guards.
+* `hvac_action` is what the unit does, not what was asked. HEATING only with
+  `hub.is_heating`: `int_effect == "heat"`, valve/pump (1126) on, no AL04,
+  compressor off, water ≥ PC08 (in `INSTALLER_LOGIC_KEYS`, read at setup). The
+  unit has no heat source: winter INT only opens valve and pump, so only warm
+  water from a heating circuit heats (never on brine). COOLING only with
+  `hub.is_cooling`: `int_effect == "cool"`, compressor on, no AL03. Else
+  DRYING (compressor on or 1121 on), else IDLE. The condenser valve (1124, K4)
+  is not evidence: the real unit reads it ON in standby, against the handbook.
+* INT writes are refused when PG02 reads `off` (`_check_request_allowed`).
+* `hub.auto_capable` (`_auto_sources`): a display or allocated probe
+  (`show_*_target`) with a healthy reading. Humidity also needs summer or PU02 on;
+  temperature also needs PG02 and summer (or `allow_winter_heating`). AUTO is
+  only offered while it holds. Switching the unit on while it holds counts as a
+  start for the brine guard, and on brine in winter it needs a passing guard
+  (the unit would dehumidify by itself).
+* Setting a mode writes the request registers first (so the guard refuses
+  before the unit starts), then `unit_on_off`. AUTO clears both requests and
+  turns the unit on. OFF clears both requests and turns the unit off only if
+  it could still act on its own (`auto_capable`, or a 1121 request not ours):
+  over Modbus that is the only way to stop the unit's own logic.
+* Auto mode is tested only against the derived `display_cnu2` overlay, never on
+  a real display unit; the README banner says so.
 * `target_humidity` ← `humidity_setpoint`; `target_temperature` ←
   `summer_setpoint` in summer, `winter_setpoint` in winter. Both features are
   removed when the hub hides the setpoints (headless, no probe).

@@ -26,4 +26,14 @@ registers. Remove anything you do not want in the repository (the `host`
 field holds the gateway address).
 
 For setups without a dump yet, add an overlay in `tests/sim/overlays/`
-instead (see `display_with_probes.json`).
+instead. Two scenarios run today:
+
+* **headless (real)**: the dump above, as is.
+* **display (derived)**: `display_cnu2.json` patches that dump best-effort
+  into a unit with a CNU2 display and its built-in room sensors (PH01 = 1,
+  HA00 = 6, room readings instead of the sentinel). `tests/ha/test_display.py`
+  and the climate *Auto* mode tests run on it. It is not a real dump: replace
+  it with one when a display unit is available.
+
+`display_with_probes.json` (display plus external probes on AI2/AI3) covers the
+external-probe path.

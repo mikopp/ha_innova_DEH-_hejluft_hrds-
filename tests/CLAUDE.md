@@ -89,6 +89,13 @@ from the image's modbus manifest and installs that. A bare `pytest` skips
   (`diagnose_hrds.py --json` output). Every file there is smoke-tested
   automatically (`ha/test_seeds.py`). **Overlays** (`sim/overlays/`) patch a seed
   for a setup without a dump yet (display with probes, non-R, no DC).
+  `display_cnu2` is the display scenario: the real headless dump turned
+  best-effort into a CNU2 unit with built-in room sensors. `ha/test_display.py`
+  and the climate *Auto* tests run on it; nothing about a real display unit is
+  verified.
+* The model ORs the unit's automatic DEU request (room humidity vs PU01/PU07,
+  from a display with H or an AI3 probe) with the Modbus request. Temperature
+  auto (INT) is not modelled.
 * The PM20 → fan output mapping is unconfirmed on hardware, so the model offers
   `fan_model` = `rescale` (default) / `clamp` / `direct`; the fan tests cover
   all three. Remove two once the hardware answer is known (`plans/todo.md`).

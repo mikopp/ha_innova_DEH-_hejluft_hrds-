@@ -146,6 +146,31 @@ def test_probe_alarm_when_allocated_probe_missing():
     assert dev.input[reg] & (1 << bit)
 
 
+def test_display_humidity_raises_auto_dehumidify():
+    dev = HrdsDevice(overlays=("display_cnu2",))
+    dev.write(R.PH02_ONOFF_BMS, 1)
+    dev.write(R.BMS_ON, 1)
+    assert dev.input[R.UNIT_STATUS] == 5
+    assert dev.input[R.DEHUM_REQUEST] == 0  # 55 %RH, PU01 60 + PU07 3
+    dev.set_room_humidity(70)
+    assert dev.input[R.DEHUM_REQUEST] == 1
+    assert dev.input[R.COMPRESSOR_STATUS] == 4
+    dev.set_room_humidity(61)  # inside the hysteresis: keeps running
+    assert dev.input[R.DEHUM_REQUEST] == 1
+    dev.set_room_humidity(58)
+    assert dev.input[R.DEHUM_REQUEST] == 0
+    dev.set_room_humidity(70)
+    dev.write(R.BMS_ON, 0)  # only switching the unit off stops it
+    assert dev.input[R.DEHUM_REQUEST] == 0
+
+
+def test_headless_unit_never_requests_by_itself():
+    dev = HrdsDevice()
+    _enable_and_wake(dev)
+    dev.set_room_humidity(90)  # not a source: no display, nothing on AI3
+    assert dev.input[R.DEHUM_REQUEST] == 0
+
+
 def test_power_cycle_restores_factory_settings():
     dev = HrdsDevice()
     _enable_and_wake(dev)

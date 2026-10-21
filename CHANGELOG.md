@@ -6,6 +6,37 @@ All notable changes to this project are documented here, newest first.
 
 ## Unreleased
 
+**Changed:** the climate action now says what the unit does, not what was
+requested. The unit has no heat source of its own: a winter integration
+request only opens the water valve and runs the pump, so it warms the air only
+with warm water from a heating circuit. *Heating* is shown only when the
+request may heat (winter, *Allow winter heating*, never on brine), the
+valve/pump output is on, AL04 is not active, the compressor is off and the
+water is at least PC08 (now read once at setup). *Cooling* needs a summer
+integration request the unit acts on, the compressor running and no AL03;
+otherwise the action is *Drying* or *Idle*. An integration request that cannot
+act (winter without the option, brine, no integration function) no longer
+shows the mode as *Heat*/*Cool*. *Cool*/*Heat* are not offered, and an
+integration request is refused, on a unit without the integration function
+(PG02 = 0). With the season on *auto*, the mode status decides which season is
+in force.
+
+**Changed:** the climate entity no longer shows *Dry* for a unit that is just
+switched on. The unit acts only on a request (its own room-probe logic, a
+digital input or Modbus), so a unit that is on with nothing requested and no
+display or room probe now shows **Off** with the action *Idle*. Setting the
+climate to **Off** now clears the dehumidify and integration requests. It
+switches the unit off only when a display or room probe (or a request from
+another source) could start it again by itself; otherwise `switch.unit_on_off`
+stays as it is.
+
+**Added:** an **Auto** climate mode, offered only when a display or room probe
+lets the unit raise requests itself and its reading is healthy. Auto turns the
+unit on with no Modbus request, so it regulates on its own setpoints. With a
+brine temperature guard configured, turning the unit on in that state needs a
+passing guard. Auto mode is **not tested on a real device**: CI covers it with
+a simulated display unit derived from the headless dump.
+
 **Fixed:** switching *Unit on/off (Modbus)* (and the dehumidify and integration
 requests) off could flick back to on for several seconds. The unit mirrors a
 request into its register late, so the next poll read the old value. The switch
@@ -13,6 +44,7 @@ now shows what you commanded until the unit agrees, re-reading just that
 register after 3, 6, 12 and 25 s. If the unit has not confirmed after 25 s the
 switch shows the unit's value and the log says so. The fan and the climate
 entity still show what the unit actually does.
+
 **Changed:** the *Brine guard minimum temperature* now defaults to 8 °C
 (was 10 °C). That is still well above the unit's own frost alarm (AL16, PA43
 factory 3 °C) and lets early-summer brine below PU08 (10 °C) run the passive

@@ -110,6 +110,7 @@ class HrdsDevice:
             self.write_log: list[Write] = []
             self._factory = {a: self.holding.get(a, 0) for a in R.VOLATILE_SETTINGS}
             self._running_since: Optional[float] = None
+            self._auto_dehum = False
             self._mode_base = 4 if self.input.get(R.MODE_STATUS, 0) in (4, 5) else 0
             self._recompute()
 
@@ -241,6 +242,9 @@ class HrdsDevice:
     def set_water_temperature(self, celsius: float) -> None:
         self.set_input(R.WATER_TEMP, round(celsius * 10))
 
+    def set_room_humidity(self, percent: int) -> None:
+        self.set_input(R.ROOM_HUMIDITY, int(percent))
+
     def set_pump_fault(self, fault: bool = True) -> None:
         with self._lock:
             self.pump_fault = fault
@@ -303,6 +307,37 @@ class HrdsDevice:
             found.add("AL34")
         return found
 
+    def _auto_dehumidify(self, on: bool, summer: bool, alarms: set[str]) -> bool:
+        """The unit's own DEU request from the room humidity (handbook 6.1.1).
+
+        Needs a humidity source: a display with H (HA00) that is fitted and on,
+        or a probe on AI3. On above PU01 + PU07, off below PU01; in winter only
+        if PU02 allows dehumidifying. Room temperature auto (INT) is not
+        modelled.
+        """
+        h, i = self.holding, self.input
+        source = h.get(R.HA03_AI3) in R.ROOM_HUMIDITY_PROBE_CODES or (
+            self.has_display
+            and self.display_on
+            and h.get(R.HA00_PROBE_SOURCE) in R.DISPLAY_HUMIDITY_SOURCES
+        )
+        room = i.get(R.ROOM_HUMIDITY, R.PROBE_SENTINEL)
+        if not (
+            on
+            and source
+            and "AL34" not in alarms
+            and not _sentinel(room)
+            and (summer or h.get(R.PU02_WINTER_DEHUM, 0))
+        ):
+            self._auto_dehum = False
+            return False
+        setpoint = h.get(R.HUMIDITY_SETPOINT, 0)
+        if room > setpoint + h.get(R.PU07_DEHUM_DIFF, 0):
+            self._auto_dehum = True
+        elif room < setpoint:
+            self._auto_dehum = False
+        return self._auto_dehum
+
     def _fan_band(self, deu: bool, integ: bool) -> tuple[int, int]:
         h = self.holding
         if integ:
@@ -337,12 +372,16 @@ class HrdsDevice:
         shutdown = bool(alarms & set(SHUTDOWN_ALARMS))
         i[R.UNIT_STATUS] = status
 
-        deu = h.get(R.DEU_REQUEST) == 1
+        on = status == 5 and not shutdown
+        # Request sources are ORed: Modbus and the unit's own room-probe logic.
+        deu = h.get(R.DEU_REQUEST) == 1 or self._auto_dehumidify(on, summer, alarms)
         integ = h.get(R.INT_REQUEST) == 1 and h.get(R.PG02_INTEGRATION) == 1
+        # AL03 disables summer integration, AL04 winter integration (heating).
+        if ("AL03" if summer else "AL04") in alarms:
+            integ = False
         # PU13: no dehumidifying while the room is colder than this.
         room = i.get(R.ROOM_TEMP, R.PROBE_SENTINEL)
         too_cold = not _sentinel(room) and _int16(room) < h.get(R.PU13_MIN_ROOM_TEMP, 0)
-        on = status == 5 and not shutdown
         request = on and (deu or integ) and not (too_cold and not integ)
         if request and self._running_since is None:
             self._running_since = time.monotonic()

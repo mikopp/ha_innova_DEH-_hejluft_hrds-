@@ -175,10 +175,13 @@ async def test_gate_refuses_requests_and_starts_nothing(setup):
     # dehumidify request; nothing is switched on.
     assert all(w.value == 0 for w in s.device.write_log)
     assert s.device.holding[R.DEU_REQUEST] == 0
-    # Switching off is always allowed.
+    # Switching off is always allowed: it clears both requests.
     s.device.clear_write_log()
     await s.service("climate", "set_hvac_mode", CLIMATE, hvac_mode="off")
-    assert [(w.address, w.value) for w in s.device.write_log] == [(R.BMS_ON, 0)]
+    assert [(w.address, w.value) for w in s.device.write_log] == [
+        (R.INT_REQUEST, 0),
+        (R.DEU_REQUEST, 0),
+    ]
 
 
 # ---- dehumidify --------------------------------------------------------------
@@ -201,11 +204,55 @@ async def test_dehumidify(setup, clock):
     assert s.state("binary_sensor", "dehumidify_request").state == "on"
     assert s.state("sensor", "water_check").state == "ok"
 
+    s.device.clear_write_log()
     await set_hvac_mode(s, clock, "off")
+    # Off clears the requests. Without a room probe nothing else can make the
+    # unit act, so it is left on: off in effect, idle.
+    assert [(w.address, w.value) for w in s.device.write_log] == [
+        (R.INT_REQUEST, 0),
+        (R.DEU_REQUEST, 0),
+    ]
     climate = s.state("climate", CLIMATE)
     assert climate.state == "off"
-    assert climate.attributes["hvac_action"] == "off"
+    assert climate.attributes["hvac_action"] == "idle"
     assert s.state("sensor", "compressor_status").state == "off"
+
+
+async def test_unit_on_without_request_is_off_and_idle(setup, clock):
+    s = setup
+    await allow_operation(s)
+    await s.service("switch", "turn_on", "unit_on_off")
+    await clock.settle()
+    assert s.state("sensor", "unit_status").state == "on"
+    climate = s.state("climate", CLIMATE)
+    # Nothing can make a sensor-less unit act: no Dry, no Auto.
+    assert climate.state == "off"
+    assert climate.attributes["hvac_action"] == "idle"
+    assert "auto" not in climate.attributes["hvac_modes"]
+
+
+async def test_auto_refused_without_room_probe(setup):
+    s = setup
+    await allow_operation(s)
+    s.device.clear_write_log()
+    with pytest.raises(ServiceValidationError, match="auto"):
+        await s.service("climate", "set_hvac_mode", CLIMATE, hvac_mode="auto")
+    assert s.device.write_log == []
+
+
+async def test_dehumidify_request_from_another_source_shows_dry(setup, clock):
+    s = setup
+    await allow_operation(s)
+    await s.service("switch", "turn_on", "unit_on_off")
+    await clock.settle()
+    # E.g. the DEU digital input: the unit dries though we requested nothing.
+    s.device.force_input(R.DEHUM_REQUEST, 1)
+    await clock.poll()
+    assert s.state("climate", CLIMATE).state == "dry"
+    # Off cannot clear that request, so it switches the unit off.
+    s.device.clear_write_log()
+    await set_hvac_mode(s, clock, "off")
+    assert (R.BMS_ON, 0) in [(w.address, w.value) for w in s.device.write_log]
 
 
 # ---- active cooling (integration) --------------------------------------------
@@ -255,6 +302,76 @@ async def test_winter_heating_when_allowed(setup, clock):
     assert s.state("sensor", "water_valve_pump").state == "on"
 
 
+@pytest.mark.parametrize("entry_options", [{"allow_winter_heating": True}])
+async def test_heating_needs_warm_water(setup, clock):
+    """Winter INT only opens valve and pump; cold water heats nothing."""
+    s = setup
+    await allow_operation(s)
+    await s.service("select", "select_option", "season", option="winter")
+    await clock.settle()
+    await set_hvac_mode(s, clock, "heat")
+    assert s.state("climate", CLIMATE).attributes["hvac_action"] == "heating"
+    # Below PC08 (factory 10 degC): the request stands, but nothing heats.
+    s.device.set_water_temperature(8.0)
+    await clock.poll()
+    climate = s.state("climate", CLIMATE)
+    assert climate.state == "heat"
+    assert climate.attributes["hvac_action"] == "idle"
+    # AL04 is the unit's own verdict: it drops the request (valve closes).
+    s.device.set_water_temperature(18.0)
+    s.device.raise_alarm("AL04")
+    await clock.poll()
+    assert s.state("sensor", "water_valve_pump").state == "off"
+    assert s.state("climate", CLIMATE).attributes["hvac_action"] == "idle"
+
+
+async def test_winter_int_from_elsewhere_is_not_heating(setup, clock):
+    """INT set at the unit in winter, heating not allowed: no Heat anywhere."""
+    s = setup
+    await allow_operation(s)
+    await s.service("select", "select_option", "season", option="winter")
+    await clock.settle()
+    await s.service("switch", "turn_on", "unit_on_off")
+    await clock.settle()
+    s.device.set_holding(R.INT_REQUEST, 1)  # e.g. from a display
+    await clock.poll()
+    assert s.state("switch", "active_cooling").state == "on"
+    climate = s.state("climate", CLIMATE)
+    assert "heat" not in climate.attributes["hvac_modes"]
+    assert climate.state == "off"
+    assert climate.attributes["hvac_action"] == "idle"
+
+
+async def test_summer_int_blocked_by_al03_is_drying(setup, clock):
+    s = setup
+    await allow_operation(s)
+    await set_hvac_mode(s, clock, "cool")
+    assert s.state("climate", CLIMATE).attributes["hvac_action"] == "cooling"
+    # AL03 (water above PC07) disables active cooling; the DEU request that
+    # Cool also sets keeps the compressor dehumidifying.
+    s.device.raise_alarm("AL03")
+    await clock.poll()
+    assert s.state("sensor", "compressor_status").state == "on"
+    assert s.state("climate", CLIMATE).attributes["hvac_action"] == "drying"
+
+
+@pytest.mark.parametrize("entry_options", [{"allow_winter_heating": True}])
+async def test_auto_season_follows_mode_status(setup, clock):
+    """1583 reads auto while the unit switches season; 1110 says which."""
+    s = setup
+    s.device.force_input(R.SEASON_READBACK, 2)
+    s.device.force_input(R.MODE_STATUS, 3)  # winter_auto
+    await clock.poll()
+    modes = s.state("climate", CLIMATE).attributes["hvac_modes"]
+    assert "heat" in modes
+    assert "cool" not in modes
+    s.device.force_input(R.MODE_STATUS, 2)  # summer_auto
+    await clock.poll()
+    modes = s.state("climate", CLIMATE).attributes["hvac_modes"]
+    assert "cool" in modes
+    assert "heat" not in modes
+
+
 async def test_season_change_refused_while_integration_runs(setup, clock):
     s = setup
     await allow_operation(s)
@@ -299,6 +416,52 @@ async def test_brine_guard_gates_starts_only(hass, setup, clock):
     )
 
 
+# A display unit (overlay display_cnu2): its own room logic can start it.
+@pytest.mark.parametrize("sim_options", [{"overlays": ("display_cnu2",)}])
+@pytest.mark.parametrize(
+    "entry_options",
+    [
+        {
+            "has_display": True,
+            "water_circuit": "brine",
+            "brine_temperature_entity": BRINE,
+        }
+    ],
+)
+async def test_auto_is_a_start_for_the_brine_guard(hass, setup):
+    s = setup
+    await allow_operation(s)
+    hass.states.async_set(BRINE, "6.5", {"unit_of_measurement": "°C"})
+    await hass.async_block_till_done()
+    with pytest.raises(ServiceValidationError, match="Brine temperature guard"):
+        await s.service("climate", "set_hvac_mode", CLIMATE, hvac_mode="auto")
+    # Switching the unit on is the same start: its own logic would run.
+    with pytest.raises(ServiceValidationError, match="Brine temperature guard"):
+        await s.service("switch", "turn_on", "unit_on_off")
+    assert s.device.holding[R.BMS_ON] == 0
+
+
+@pytest.mark.parametrize("sim_options", [{"overlays": ("display_cnu2",)}])
+@pytest.mark.parametrize(
+    "entry_options", [{"has_display": True, "water_circuit": "brine"}]
+)
+async def test_brine_winter_refuses_a_unit_that_would_dehumidify_alone(setup, clock):
+    s = setup
+    await allow_operation(s)
+    await s.service("select", "select_option", "season", option="winter")
+    await clock.settle()
+    # PU02 off (factory): no winter dehumidifying, so switching on is harmless.
+    await s.service("switch", "turn_on", "unit_on_off")
+    await clock.settle()
+    await s.service("switch", "turn_off", "unit_on_off")
+    await clock.settle()
+    await s.service("select", "select_option", "winter_dehumidify", option="with_water")
+    await clock.settle()
+    with pytest.raises(ServiceValidationError, match="brine temperature guard"):
+        await s.service("switch", "turn_on", "unit_on_off")
+    assert s.device.holding[R.BMS_ON] == 0
+
+
 @pytest.mark.parametrize("entry_options", [{"water_circuit": "brine"}])
 async def test_brine_never_heats(setup, clock):
     s = setup
@@ -306,5 +469,13 @@ async def test_brine_never_heats(setup, clock):
     await s.service("select", "select_option", "season", option="winter")
     await clock.settle()
     assert "heat" not in s.state("climate", CLIMATE).attributes["hvac_modes"]
+    # INT set at the unit: on brine it never heats, and the card never says so.
+    await s.service("switch", "turn_on", "unit_on_off")
+    await clock.settle()
+    s.device.set_holding(R.INT_REQUEST, 1)
+    await clock.poll()
+    climate = s.state("climate", CLIMATE)
+    assert climate.state == "off"
+    assert climate.attributes["hvac_action"] == "idle"
     with pytest.raises(ServiceValidationError):
         await s.service("climate", "set_hvac_mode", CLIMATE, hvac_mode="dry")

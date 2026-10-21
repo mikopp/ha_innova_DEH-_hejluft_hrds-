@@ -173,7 +173,7 @@ which would shadow them.
 | `0x045F` | 1119 | `SupplyFan_Status`   | `0=Disable`, `1=OFF`, `2=Wait ON`, `3=ON`, `4=Wait OFF`, `5=Alarm` |
 | `0x0461` | 1121 | `DehumRequest`       | `0=No`, `1=Yes` — dehumidification currently requested |
 | `0x0462` | 1122 | `CmpStatus`          | `0=Disable`, `1=Alarm`, `2=Manual`, `3=Wait ON`, `4=ON`, `5=Wait OFF`, `6=OFF` — compressor (active cooling/dehum) |
-| `0x0464` | 1124 | `outDO_WaterCond` | Internal water condenser valve (relay K4): `0=OFF`, `1=ON`, `2=Disable`. ON = closed, all compressor heat to the water (summer integration). |
+| `0x0464` | 1124 | `outDO_WaterCond` | Internal water condenser valve (relay K4): `0=OFF`, `1=ON`, `2=Disable`. The manual: ON = closed, all compressor heat to the water (summer integration). **But** a real HRDS+ 30 read `1` in standby (`tests/devices/hrds_30+_headless_factory_state.json`), where the handbook (§6.4) says the valve stays deactivated with the compressor off, so the mapping is unverified. The integration does not use it to decide anything. |
 | `0x0466` | 1126 | `outDO_WaterFlow` | External water valve V3V (relay K5) — the PM pump output is switched together with it: `0=OFF`, `1=ON`, `2=Disable` (not configured: the unit cannot start the pump). |
 | `0x046E` | 1134 | `outDO_RecircDamper` | `0=OFF` (damper closed — room-air duct sealed, MVHR passive flow only), `1=ON` (damper open — room air blended with MVHR inflow), `2=Disable` (no damper wired, non-`R` variant) |
 | `0x027F` | 639  | `outAO_SupplyFan`    | Supply-fan output % (×0.01) |
@@ -590,7 +590,9 @@ display or any room sensors. In this mode:
 3. Automatic setpoint-based control (trigger dehumidify when room humidity >
    PU01) does **not** function — there is no room sensor to compare against.
    Issue dehumidify / cooling requests **explicitly via Modbus** (the climate
-   entity or individual switches).
+   entity or individual switches). A unit that is merely switched on does
+   nothing: the climate entity shows it as *Off* with action *Idle*, and offers
+   no *Auto*.
 4. `current_temperature` and `current_humidity` on the climate entity read
    `None`. An unwired input does not read 0: it reads a sentinel word
    (§14.7), which the integration decodes to "no value" (entity state
@@ -599,6 +601,18 @@ display or any room sensors. In this mode:
    OFF by display, so do not rely on them alone. This is expected, not an error.
 5. The evaporator and water-circuit probes remain active (factory-wired) and
    continue to protect the unit against AL03/AL04/AL11/AL12.
+
+**Request sources (handbook §6.1, §6.3).** The unit ORs them; any one starts
+the request:
+
+| Request | Automatic (room probe or display) | Digital input | Modbus |
+|---|---|---|---|
+| DEU | room humidity > PU01 + PU07, off below PU01; held off below PU13 (re-enabled above PU13 + PU14); in winter only if PU02 allows it | DEU input | 1140 with PH28 = 1 |
+| INT | summer: room temp > SEtC + PF12, off below SEtC − PF12; winter: room temp < SEtH − PF12 (SEtH capped by PH10, factory 14 °C) | INT input | 1139 with PH27 = 1 |
+
+An INT request in summer also requests DEU when PU05 is on. The effective DEU
+request is readable (`DehumRequest`, 1121); the INT one is not. Over Modbus the
+automatic requests can only be stopped by switching the unit off.
 
 ### 14.7 Unwired analog inputs read a sentinel, not a temperature
 
@@ -690,7 +704,7 @@ are read at setup and on the device's refresh button.
 | `0x065F` | 1631 | PC05 | Season change (0 manual, 1 manual+auto, 2 auto) | x1 | 0…2  | R/W |
 | `0x0660` | 1632 | PC06 | Auto season probe (0 water, 1 room) | x1 | 0…1  | R/W |
 | `0x0661` | 1633 | PC07 | Max water temperature for dehumidify / summer integration | x0.1 | 0…70 °C | R/W |
-| `0x0662` | 1634 | PC08 | Min water temperature for winter integration | x0.1 | 0…70 °C | R/W |
+| `0x0662` | 1634 | PC08 | Min water temperature for winter integration (below it AL04 blocks heating; the climate action needs water ≥ PC08 to show Heating; read once at setup) | x0.1 | 0…70 °C | R/W |
 | `0x0663` | 1635 | PC09 | Auto summer above room temperature | x0.1 | 0…70 °C | R/W |
 | `0x0664` | 1636 | PC10 | Auto winter below room temperature | x0.1 | 0…70 °C | R/W |
 | `0x0665` | 1637 | PF26 | Supply fan post-run speed | x0.01 | 0…100 % | R/W |
