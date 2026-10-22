@@ -12,7 +12,7 @@ this page; it can go stale.
   `hacs-integration`, `hacs`, `hejluft`, `home-assistant`, `homeassistant`,
   `homeassistant-custom-component`, `custom-component`, `hrds`, `hvac`, `innova`,
   `innova-deh`, `modbus`, `modbus-tcp`, `taupunktentfeuchtung`, `entfeuchter`,
-  `radiant-cooling`, `vmc`, `hej-luft`.
+  `radiant-cooling`, `vmc`.
 * Optional: a social preview image (Settings -> General).
 
 ## Ruleset on the default branch (Settings -> Rules -> Rulesets)
