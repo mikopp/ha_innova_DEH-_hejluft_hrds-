@@ -9,10 +9,19 @@
 [![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=mikopp&repository=homeassistant-innova-hrds&category=integration)
 
 Home Assistant custom integration (installable with **HACS**) for the **Innova
-DEH+** / **hej.luft HRDS+** ducted dehumidifiers. It controls and monitors the
-unit locally over **Modbus TCP**, without any cloud. Units sold under other
-brand names are listed under
+DEH+** / **hej.luft HRDS+** ducted dehumidifiers (models *HRDS+ 30* and
+*HRDS+ 50*, also written HRDS 30 / HRDS 50, or *DEH+ 30* / *DEH+ 50*, also
+written DEH 30 / DEH 50). It controls and monitors the unit locally over
+**Modbus TCP**, without any cloud. Units sold under other brand names are
+listed under
 [Compatible Devices & OEM Rebrands](#compatible-devices--oem-rebrands).
+
+**Deutsch:** Home-Assistant-Integration (per **HACS** installierbar) für die
+Entfeuchter **hej.luft HRDS+ 30 / 50** und **Innova DEH+ 30 / 50**
+(Taupunktentfeuchtung mit Lüftung und Flächenkühlung). Sie steuert und
+überwacht das Gerät lokal über **Modbus TCP**, ohne Cloud. Installation und
+Einrichtung stehen unter [Install and set up](#install-and-set-up) (derzeit nur
+auf Englisch).
 
 ## Compatible Devices & OEM Rebrands
 
