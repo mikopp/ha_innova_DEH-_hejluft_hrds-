@@ -12,7 +12,7 @@ PDF wins — please fix this file.
 What the unit *does* with these registers (states, sequences, seasons,
 variants, what was tested on hardware) is in
 [`UNIT_BEHAVIOUR.md`](UNIT_BEHAVIOUR.md). How the Home Assistant integration
-uses them is in [`../../CLAUDE.md`](../../CLAUDE.md) and [`../../README.md`](../../README.md),
+uses them is in [`../adr/`](../adr/README.md) and [`../../README.md`](../../README.md),
 not here.
 
 ---

@@ -1038,6 +1038,12 @@ interlock without a probe, mode combinations) and the integration has run on at
 least one other kind of unit (a display, external probes, a different
 size/variant). Until then the 0.x releases keep the beta label above.
 
+## Design decisions
+
+Why the integration behaves as it does (what it never writes, which requests
+it refuses, what the climate modes mean) is recorded one decision per file in
+[`doc/adr/`](doc/adr/README.md).
+
 ## Credits
 
 Architecture closely follows the

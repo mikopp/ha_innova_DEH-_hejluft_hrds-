@@ -1276,12 +1276,13 @@ class HrdsModbusHub:
     def _sync_required_settings_locked(self) -> bool:
         """Keep PH01/HA00 at 0 on a unit without a display.
 
-        Driven by the polled read-back rather than a one-shot flag: if the unit
-        power-cycles and loses a setting, every subsequent write would silently
-        no-op until Home Assistant restarted. Checking each cycle self-heals
-        that, but writes only when the read-back differs (the parameters are in
-        EEPROM): a register that was not read is left alone, and a setting the
-        unit does not keep is given up after REQUIRED_SETTING_MAX_WRITES polls.
+        Driven by the polled read-back rather than a one-shot flag, so a setting
+        changed elsewhere (at a display, by a factory reset) is repaired. The
+        unit keeps both across a power cycle (UNIT_BEHAVIOUR.md 3.6), so in
+        steady state nothing is written: only when the read-back differs (the
+        parameters are in EEPROM, ADR-0023). A register that was not read is
+        left alone, and a setting the unit does not keep is given up after
+        REQUIRED_SETTING_MAX_WRITES polls.
         Returns True if anything was written.
 
         Note this deliberately overrides the matching switch/select: without a
