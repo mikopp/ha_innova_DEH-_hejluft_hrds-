@@ -8,27 +8,45 @@
 
 [![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=mikopp&repository=homeassistant-innova-hrds&category=integration)
 
+**English** · [Deutsch](README.de.md)
+
 Home Assistant custom integration (installable with **HACS**) for the **Innova
-DEH+** / **hej.luft HRDS+** ducted dehumidifiers. It controls and monitors the
-unit locally over **Modbus TCP**, without any cloud. Units sold under other
-brand names are listed under
-[Compatible Devices & OEM Rebrands](#compatible-devices--oem-rebrands).
+DEH+** / **hej.luft HRDS+** ducted dehumidifiers (models *HRDS+ 30* and
+*HRDS+ 50*, also written HRDS 30 / HRDS 50, or *DEH+ 30* / *DEH+ 50*, also
+written DEH 30 / DEH 50). It controls and monitors the unit locally over
+**Modbus TCP**, without any cloud. The units it is meant for are listed under
+[Compatible devices](#compatible-devices).
 
-## Compatible Devices & OEM Rebrands
+**Deutsch:** Home-Assistant-Integration (per **HACS** installierbar) für die
+Entfeuchter **hej.luft HRDS+ 30 / 50** und **Innova DEH+ 30 / 50**
+(Taupunktentfeuchtung mit Lüftung und Flächenkühlung). Sie steuert und
+überwacht das Gerät lokal über **Modbus TCP**, ohne Cloud. Installation und
+Einrichtung stehen unter [Install and set up](#install-and-set-up) (derzeit nur
+auf Englisch). Eine Kurzfassung mit Inhaltsverzeichnis: [README.de.md](README.de.md).
 
-This Home Assistant integration communicates with ventilation and ducted dehumidification units manufactured by **[INNOVA S.r.l.](https://www.innova.it/)**. Because Innova supplies white-label hardware across different markets, your unit might be sold under various brand names, model series, or regional designations:
+## Compatible devices
 
-* **Austria / DACH Region:** 
-  * **[HejLuft](https://www.hejluft.at/)** – Distributed as *HRDS+ 30* / *HRDS+ 50* / *HRD+* series, the Innova *DEH+ 30* / *DEH+ 50* (e.g., *HejLuft HRDS+ 30 H R K DC*).
-  * **[INNOVA S.r.l.](https://www.innova.it/)** – Original manufacturer designation *[INNOVA DEH+ / HRD+ / HRDS+ Series](https://www.innova.it/en/products/vmc/active-integration/hrd/)* (Horizontal/Vertical ducted dehumidifiers with heat recovery and active radiant cooling integration).
-* **Italy & Europe (General HVAC Distribution):** 
-  * Sold directly via professional HVAC wholesalers as **Innova DEH+**, **Innova HRD**, or integrated into radiant cooling packages by system partners (such as *RDZ* or similar surface cooling providers).
-* **United Kingdom (UK):** 
-  * Marketed through specialist ventilation and radiant heating distributors under **Innova DEH+ Horizontal Ductable Dehumidifier** or customized as *Radiant System Air Treatment Units*.
-* **USA & North America:** 
-  * Distributed and integrated via specialized hydronic/radiant cooling system suppliers (such as **[Messana Radiant Cooling](https://messana.com/)** air treatment modules or equivalent ducted hydronic dehumidification lines utilizing Innova OEM cores).
+The unit is made by **[INNOVA S.r.l.](https://www.innova.it/)** (Storo, Italy).
+hej.luft sells it in Austria under its own name as an OEM product. The
+[CE declaration on the hej.luft site](https://www.hejluft.at/_files/ugd/714411_e735ab85400c485fa7c042fac92d3230.pdf)
+names Innova as the manufacturer of the HRDS and HRDS+ dehumidification units.
 
-> *If your device uses the Innova electronic board / serial protocol and is sold under a different local brand name not listed here, feel free to open an issue or pull request to add it!*
+* **[hej.luft HRDS+ 30 / HRDS+ 50](https://www.hejluft.at/hrds)** (also written
+  HRDS 30 / 50), with the type-plate codes of the
+  [technical handbook](https://www.hejluft.at/_files/ugd/714411_f1ffc5d222f4476da2e37f29c64a7f93.pdf),
+  for example *HRDS+ 30 H R K DC*.
+* **[Innova DEH+ 30 H / 50 H](https://www.innova.it/en/products/vmc/dehumidifiers/deh-ad-incasso-orizzontale/)**:
+  Innova's own name for the same unit, with the same sizes and nominal airflow
+  (300 / 500 m³/h). hej.luft does not build or change it: the maintainer's
+  HRDS+ 30 was shipped directly from Italy and is physically the same device as
+  the DEH+ 30 H, and the integration was developed against it. The 50 sizes are
+  untested (see the beta notice). The DEH+ installation manual kept in
+  `doc/references/` describes the older microswitch controller, not the EVCO "K"
+  board of the HRDS+; the registers and behaviour here come from the HRDS+
+  handbooks.
+
+> *If your unit uses the Innova board and is sold under another name, open an
+> issue and link its product page.*
 
 > ## Release 0.9 — beta, not 1.0 yet
 >
@@ -98,7 +116,7 @@ The integration talks to the unit's control board via Modbus TCP and exposes:
     doing. **"off" does not make Dry/Cool run on passive airflow**: on an `R`
     unit every dehumidify or cooling request opens the recirculation damper and
     starts the fan (see [Fan mode and recirculation](#fan-mode-and-recirculation)).
-* **Sensors** — see entity table below, including four computed airflow
+* **Sensors** — see the [entity reference](doc/entity-reference.md), including three computed airflow
   sensors derived from your model's calibration data.
 * **Binary sensors** — dehumidify requested, recirculation active, probe
   health, overall alarm active, four individual alarm sensors (compressor
@@ -146,7 +164,7 @@ Or by hand:
 
 1. In HACS, add this repository as a custom repository (category: *Integration*):
    `https://github.com/mikopp/homeassistant-innova-hrds`
-2. Install **Innova HRDS+ / hej.luft Dehumidifier** and restart Home Assistant.
+2. Install **Innova DEH+ / hej.luft HRDS+ Dehumidifier** and restart Home Assistant.
 
 HACS installs the `innova_hrds.zip` asset attached to each
 [GitHub release](https://github.com/mikopp/homeassistant-innova-hrds/releases);
@@ -209,11 +227,11 @@ split by purpose:
 | **`HRDS+`** device, *Configuration* section | Post-setup tuning: setpoints (only with a probe), per-mode fan min/max, dehumidify differential, minimum room temperature (PU13/PU14), fan run times, humidity clamps | Occasionally |
 | **`HRDS+`** device, main section | Climate, fan, season, the request switches (on/off, dehumidify, integration), live readings, status and alarms | Day to day |
 | **`HRDS+`** device, *Diagnostic* section | Water valve/pump, condenser valve, water circuit check, airflow calibration, fan request echo | When troubleshooting |
-| **`HRDS+ installer`** device (linked to the main device) | The rest of the installer menu (see [Installer device](#installer-device)) | Rarely, by an installer |
+| **`HRDS+ installer`** device (linked to the main device) | The rest of the installer menu (see [Installer device](doc/entity-reference.md#installer-device-hrds-installer)) | Rarely, by an installer |
 
 Entity ids follow the device name, so setup entities are prefixed with the setup
-device name (for example `sensor.hrds_setup_setup_check`); the tables below omit
-the prefix.
+device name (for example `sensor.hrds_setup_setup_check`); the
+[entity reference](doc/entity-reference.md) omits the prefix.
 
 **What is left to fix:** while *Setup check* reads *Needs attention (see
 attributes)*, open it (click the row, then *Attributes*). `to_fix` lists each
@@ -689,16 +707,13 @@ temperature. **Cool** adds the integration request on top (summer only).
 
 ### Airflow sensors
 
-The integration provides four computed sensors that estimate the unit's
+The integration provides three computed sensors that estimate the unit's
 recirculation airflow **automatically** from the live fan output reading and your
 calibration settings (see [Airflow calibration](#airflow-calibration-options)
-above):
-
-| Sensor | What it shows |
-|--------|--------------|
-| `sensor.supply_fan_airflow` | Live estimate in m³/h; updates every poll cycle |
-| `sensor.supply_fan_max_airflow` | Configured maximum airflow in m³/h (from Options) |
-| `sensor.max_total_airflow` | Same as max airflow (provided for convenience) |
+above): the live estimate in m³/h, which updates every poll cycle
+(`sensor.supply_fan_airflow`), the configured maximum from the options, and a
+copy of it kept for convenience. They are listed in the
+[entity reference](doc/entity-reference.md).
 
 The formula is proportional: `Q = (output% / 100) × Q_max`, using the live
 `supply_fan_output` register. The fan counts as stopped (0 m³/h) when the
@@ -746,199 +761,17 @@ and [`plans/todo.md`](plans/todo.md).
 
 ## Entity reference
 
-Entities marked **¹** are only meaningful when a room temperature probe is
-present (CNU2 display or external NTC). Entities marked **²** require a room
-humidity probe. Entities marked **³** are built into the unit's control board
-and are always available. See [probe requirements](#probe-requirements) below
-and [UNIT_BEHAVIOUR §8](doc/references/UNIT_BEHAVIOUR.md#8-display-and-probe-configurations)
-for full detail.
+Every entity, with its register and what it shows, is in the
+**[entity reference](doc/entity-reference.md)** (English). It is organised like
+the devices the integration creates:
 
-### Climate
-
-| Entity | What it shows / does |
-|--------|---------------------|
-| `climate.hrds_climate` | HVAC mode (Off, Standby or Auto⁴, Dry, Cool in summer, Heat in winter if enabled), action, fan mode (`R` units only). The mode says what can make the unit act. **Off** is the unit off: it clears the dehumidify and integration requests and switches the unit off. **Standby** (HA's *fan only*) is a unit that is on with nothing requested and no display or room probe, so nothing can start it by itself; action *Idle*, or *Fan* while a manual fan speed runs the fan. **Auto** turns the unit on with no request, so it regulates on its own setpoints; with a display or room probe that is what "on, nothing requested" means, so Standby is not offered then. *Turn on* clears both requests and switches the unit on (Standby, or Auto where offered); *turn off* is Off. **Cool**/**Heat** are offered only on a unit with the integration function (PG02), and an INT request that cannot act (brine in winter, no integration function) does not show as Cool/Heat; a winter INT from elsewhere shows as Heat whatever *Allow winter heating* says. The action reports what the unit does: *Cooling* needs a summer INT the unit acts on with the compressor running and no AL03; *Heating* needs the evidence described in [Operating modes in winter](#operating-modes-in-winter). Target T¹ / RH² only when a display or room probe is configured. `current_temperature`¹ and `current_humidity`² are suppressed when the corresponding probe is absent. Target-humidity bounds follow the unit's own PH29/PH30 clamps; the target temperature is SEtC in summer (15–35 °C) and SEtH in winter, limited to the unit's PH09–PH10 clamp (factory 14 °C both). |
-
-⁴ Only offered when a display or a room probe lets the unit raise requests by
-itself (handbook §6.1), and while that reading is healthy. Not tested on a real
-device (see the banner at the top).
-
-### Sensors
-
-| Entity | Unit | Probe needed | Notes |
-|--------|------|-------------|-------|
-| `sensor.room_temperature` | °C | ¹ Display or external NTC | Read from reg 499; used for automatic cooling trigger |
-| `sensor.room_humidity` | %RH | ² Display or external humidity sensor | Read from reg 505; used for automatic dehumidify trigger |
-| `sensor.outdoor_temperature` | °C | External NTC (IP65) | Reg 500; only drives Free-Cooling/Heating (PG03). Display-only otherwise. |
-| `sensor.water_temperature` | °C | ³ Built-in | Reg 501; over-temperature protection |
-| `sensor.supply_temperature` | °C | External NTC | Reg 503; monitoring only |
-| `sensor.air_quality` | ppm | External IAQ sensor | Reg 506; monitoring only |
-| `sensor.actual_setpoint` | °C | — | Reg 1111; active room setpoint in use |
-| `sensor.supply_fan_output` | % | ³ Built-in | Reg 639 (×0.01 %); actual fan analog output |
-| `sensor.compressor_output` | % | ³ Built-in | Reg 641 (×0.01 %); compressor modulation level |
-| `sensor.supply_fan_rpm` | rpm | ³ Built-in | Reg 1117 |
-| `sensor.exhaust_temperature` | °C | External NTC | Reg 502; monitoring only |
-| `sensor.evaporator_temperature` | °C | ³ Built-in | Reg 511; drives compressor modulation, works on a headless unit |
-| `sensor.fan_manual_request` | % | ³ Built-in | Reg 1114; the **display's** manual request, not ours — diagnostic |
-| `sensor.recirculation_damper` | enum | ³ Built-in | Reg 1134; Open confirms room air is being recirculated across the coil |
-| `sensor.unit_status` | enum | ³ Built-in | OFF by display/DI/BMS/scheduler/clock, or ON |
-| `sensor.mode_status` | enum | ³ Built-in | Summer/Winter × manual/auto/DI |
-| `sensor.supply_fan_status` | enum | ³ Built-in | Off/Starting/On/Stopping/Alarm |
-| `sensor.compressor_status` | enum | ³ Built-in | Off/Wait/On/Alarm/Manual |
-| `sensor.operating_mode` | enum | ³ Built-in | Summer/Winter/Auto season |
-| `sensor.recirculation_damper` | enum | ³ Built-in | Reg 1134; Off/On/Disabled — state of the motorised recirculation damper (R-variant only) |
-| `sensor.supply_fan_airflow` | m³/h | ³ Built-in | Computed from live fan output %; see [Airflow sensors](#airflow-sensors) |
-| `sensor.water_valve_pump` | enum | ³ Built-in | Diagnostic. Reg 1126; relay K5 — external water valve (V3V) and the pump output (PM) switched with it: Off / On / Not configured |
-| `sensor.water_condenser_valve` | enum | ³ Built-in | Diagnostic. Reg 1124; relay K4, the internal valve. A real unit reads On in standby, against the handbook's description, so its meaning is unverified ([UNIT_BEHAVIOUR §11.1](doc/references/UNIT_BEHAVIOUR.md#111-internal-valve-relay-k4)); the climate action does not use it |
-| `sensor.water_check` | enum | — | Diagnostic. `ok` / `attention`; attribute `issues`, see [Water circuit](#water-circuit-and-brine) |
-| `sensor.supply_fan_max_airflow` | m³/h | — | Computed constant; maximum fan airflow (from config) |
-| `sensor.max_total_airflow` | m³/h | — | Computed constant; same as supply_fan_max_airflow (from config) |
-
-### Binary sensors
-
-#### Status
-
-| Entity | Probe needed | What ON means |
-|--------|-------------|--------------|
-| `binary_sensor.dehumidify_request` | ³ | Dehumidification currently requested |
-| `binary_sensor.recirculation_active` | ³ | Unit's supply fan is running (reg 1112) |
-| `binary_sensor.alarm_active` | ³ | At least one alarm is active |
-| `binary_sensor.temp_probe_ok` | ³ | Room temperature probe healthy (AL28 not active) |
-| `binary_sensor.humidity_probe_ok` | ³ | Room humidity probe healthy (AL34 not active) |
-
-#### Variant detection
-
-These reflect configuration written by the installer (or the factory) to
-holding registers. They are read-only from the integration.
-
-| Entity | What it means |
-|--------|--------------|
-| `sensor.machine_type` | PG01 fan arrangement: *supply fan only* or *supply and exhaust fan*. **Not** a recirculation flag: an `R` unit reads *supply fan only*. |
-| `binary_sensor.integration_available` | ON: the unit has the integration (INT) function (PG02 = 1). Read-only: an installer setting, not a Modbus permission |
-
-Whether the unit has a recirculation fan (`R`) is shown by
-`sensor.recirculation_damper`: *Disabled* means no damper is wired (non-`R`),
-*Off*/*On* means it is an `R` unit.
-
-#### Individual alarms
-
-Each sensor maps to a single bit of a packed alarm register. **ON = alarm is active.**
-
-| Entity | Alarm | Register bit | Effect |
-|--------|-------|-------------|--------|
-| `binary_sensor.alarm_compressor_lowpressure` | AL11 | Reg 768 bit 10 | Compressor stopped (low pressure / frost thermostat) |
-| `binary_sensor.alarm_compressor_highpressure` | AL12 | Reg 768 bit 11 | Compressor stopped (high pressure switch) |
-| `binary_sensor.alarm_high_water_temperature` | AL03 | Reg 768 bit 2 | Summer: water above PC07; cooling (and dehumidify unless PU03) blocked |
-| `binary_sensor.alarm_low_water_temperature` | AL04 | Reg 768 bit 3 | Winter: water below PC08; heating blocked |
-| `binary_sensor.alarm_water_antifreeze` | AL16 | Reg 768 bit 15 | Fan stopped (antifreeze protection) |
-| `binary_sensor.alarm_dirty_filter` | AL22 | Reg 769 bit 5 | Maintenance reminder; display only, manual reset |
-| `binary_sensor.automatic_heating` | — | not a register | Only with a room temperature source and the integration function: ON = the unit, on in winter, can heat by itself below SEtH − PF12; attributes give the band and whether it heats now. See [The unit heats on its own](#the-unit-heats-on-its-own) |
-| `binary_sensor.brine_temperature_guard` | — | not a register | Only with a [brine temperature guard](#brine-temperature-guard) configured: ON = the guard refuses to start requests (brine too cold, sensor stale or unavailable) |
-
-### Switches
-
-| Entity | Register | Notes |
-|--------|----------|-------|
-| `switch.unit_on_off` | 1105 | BMS on/off request (requires PH02 = 1) |
-| `switch.dehumidify` | 1140 | BMS dehumidify request (requires PH28 = 1). In winter on a brine circuit only with a passing brine temperature guard |
-| `switch.integration_request` | 1139 | **Integration request** (requires PH27 = 1): dehumidify + cool in summer, **heat in winter**. Refused while not in summer unless winter heating is enabled in the options; always refused in winter on a brine circuit |
-| `switch.allow_operational_requests` | — | **Setup device.** Not a register: the integration's own gate. Off by default; while off, on/dehumidify/cooling/non-zero fan requests are refused. Restored across restarts |
-| `switch.enable_time_programs` | 1779 | **Setup device.** PH03 — time programs can switch the unit off |
-| `switch.enable_onoff_by_di_request` | 1894 | **Setup device.** PC12 — a DEU/INT request on the digital inputs starts the unit even with the OFF contact open |
-| `switch.enable_onoff_display` | 1777 | PH01 — on/off by wired display. Forced **off** while `has_display` is off (the default); turning it on by hand is undone on the next poll |
-| `switch.enable_onoff_bms` | 1778 | PH02 — lets Home Assistant switch the unit on and off. Yours to set; the integration never writes it ([step 4](#4-choose-what-home-assistant-may-control)) |
-| `switch.enable_dehumidify_bms` | 1870 | PH28 — lets Home Assistant request dehumidifying (DEU). Yours to set |
-| `switch.enable_integration_bms` | 1869 | PH27 — lets Home Assistant request integration (INT: cool in summer, heat in winter). Yours to set |
-| `switch.force_dehumidify_in_cooling` | 1692 | PU05 (factory on); an INT request also starts the compressor. Off: INT cools only with the water, see [Operating modes in summer](#operating-modes-in-summer) |
-| `switch.enable_free_cooling` | 1799 | PG03; while off, outdoor temperature drives nothing |
-
-### Numbers
-
-| Entity | Register | Range | Notes |
-|--------|----------|-------|-------|
-| `number.humidity_setpoint` | 1586 | 0–100 %RH | PU01; target humidity for automatic dehumidify. **Not created without a display or humidity probe** |
-| `number.summer_setpoint` | 1584 | 15–35 °C | SEtC; target room temp for automatic summer integration, clamped by PH07/PH08. **Not created without a display or room temperature probe** |
-| `number.winter_setpoint` | 1585 | 5–35 °C | SEtH; target room temp for automatic winter heating: the unit heats by itself below SEtH − PF12 (see [The unit heats on its own](#the-unit-heats-on-its-own)). Clamped by the unit to PH09–PH10 (factory 14 °C both). **Not created without a display or room temperature probe** |
-| `number.fan_min_speed_dehumidify` | 1853 | 0–100 % | PF28; lower fan bound in dehumidify mode |
-| `number.fan_max_speed_dehumidify` | 1647 | 0–100 % | PF10; upper fan bound in dehumidify mode |
-| `number.fan_min_speed_cooling` | 1852 | 0–100 % | PF27; lower fan bound in active cooling |
-| `number.fan_min_speed_vmc` | 1644 | 0–100 % | PF07; lower fan bound in VMC (ventilation-only) mode |
-| `number.fan_max_speed_cooling` | 1646 | 0–100 % | PF09; upper fan bound in active cooling |
-| `number.fan_manual_speed` | 1614 | 0–100 % | PM20; the fan **setpoint** — what was asked for. The fan entity and climate fan mode write here too. See the note below on the min/max band. |
-| `number.dehumidify_differential` | 1694 | 0–100 %RH | PU07; the unit's own dehumidify hysteresis. Not created without a display or humidity probe |
-| `number.min_room_temp_dehumidify` | 1889 | 0–30 °C | PU13; **below this the unit refuses to dehumidify, including over Modbus** |
-| `number.min_room_temp_diff_dehumidify` | 1890 | 0.1–20 °C | PU14; re-enable differential above PU13 |
-| `number.fan_min_runtime` | 1638 | 0–999 s | PF01; device-side minimum fan runtime |
-| `number.fan_post_run_time` | 1640 | 0–999 s | PF03; post-ventilation run-on |
-| `number.humidity_setpoint_min` | 1892 | 0–100 %RH | PH29; lower clamp on target humidity |
-| `number.humidity_setpoint_max` | 1893 | 0–100 %RH | PH30; upper clamp on target humidity |
-
-### Select
-
-| Entity | Register | Options | Notes |
-|--------|----------|---------|-------|
-| `select.season` | 1825 | Summer, Winter | HB04 — the season switch without a display (the Modbus manual's method: it flips how the open DI4 contact is read). Read-back is `sensor.operating_mode`. Switching to winter is refused while an integration request is on (it would turn into heating) and, on brine, while dehumidify is on. **If a contact is wired to DI4, closing it inverts the meaning.** |
-| `select.probe_source` | 1803 | None/external, CNU2 T, CNU2 T+H, CNU T, CNU T+H, EPJ T, EPJ T+H | HA00 — which sensor feeds room T/H readings. **Set to "None / external probes" when running without a display.** |
-| `select.ai2_allocation` | 1805 | Unused, Room temperature probe (NTC 10 kΩ) | HA02, *T/H probe temperature input*: what is wired to analog input AI2 (terminal M2). Without a display, this is the only room temperature the unit can regulate on. **Leave on "Unused" unless a probe is wired**, or the unit raises AL28. |
-| `select.ai3_allocation` | 1806 | Unused, Room humidity probe (4–20 mA), Room humidity probe (0–10 V) | HA03, *T/H probe humidity input*: the same for AI3 (terminal M3) and a humidity probe; with nothing wired it raises AL34. A code other than these shows as unknown and the setup check reports `probe_input_unrecognised`. |
-| `select.winter_dehumidify` | 1689 | Disabled, With water, Without water | PU02; dehumidification during the heating season |
-
-### Setup entities (read-only facts about the installation)
-
-These live on the **HRDS+ setup** device and show how the unit is configured,
-so you can see it without opening the display. See the
-[first-use checklist](#first-use-checklist).
-
-| Entity | Register | Shows |
-|--------|----------|-------|
-| `sensor.setup_check` | — | `ok` / `attention`; attribute `issues` lists the open items |
-| `sensor.machine_type` | 1797 | PG01 — supply fan only, or supply and exhaust fan (not "has recirculation") |
-| `sensor.remote_onoff_input` | 1824 | HB03 — unused / normally closed / normally open |
-| `binary_sensor.remote_contact_closed` | 257 bit 0 | State of the remote on/off contact (meaning inferred, unverified) |
-| `sensor.season_owner` | 1878 | PC11 — who owns the season change when a display is connected |
-| `switch.enable_onoff_by_di_request` | 1894 | PC12 — DI requests start the unit despite an open OFF contact |
-| `sensor.temperature_unit` | 1781 | PH05 — Celsius or Fahrenheit |
-| `sensor.fan_output_allocation` | 1832 | HC04 — raw allocation of the supply fan output |
-| `sensor.damper_relay_allocation` | 1838 | HD01 — raw allocation of relay DO1 (10 = recirculation damper NO, 9 = NC) |
-| `sensor.damper_prestart_time` | 1698 | PS01 — damper pre-start time, seconds |
-
-### Fan
-
-| Entity | What it does |
-|--------|-------------|
-| `fan.hrds_supply_fan` | `R` units only (a non-R unit has no fan of its own; its damper output reads *disabled*, and the fan entity, the climate fan modes, the fan speed numbers and the fan sensors are not created). The unit's supply/recirculation fan as a percentage. Reports the **actual** output (reg 639) — what the fan is doing — while `fan.set_percentage` writes the setpoint PM20 (1614). The commanded value, RPM and fan status are state attributes. Because the unit's own fan recirculates room air *in addition* to whatever the central MVHR pushes through the duct, this is the lever for topping combined airflow up to a target. |
-
-### Installer device
-
-Everything else from the handbook's installer menu (§5.3) that has a Modbus
-address sits on a separate **`HRDS+ installer`** device, so it does not crowd
-the main page. It is not needed for setup or normal use, so it is **off by
-default**: turn on *Installer device* in the integration options (Settings →
-Devices & services → HRDS+ → Configure). Turning it off again removes the
-device and its entities. Entity ids carry the parameter code, for example
-`number.hrds_installer_pc07_max_water_temperature...`.
-
-The installer parameters are **not part of the regular poll**, which keeps the
-Modbus link light. They are read when the option is turned on, at each start of
-the integration, and when you press **Refresh installer parameters** on the
-installer device; *Installer parameters last read* on the same device shows when
-that last happened. After you change a parameter, just that one register is read
-back. (PC07 and PU08, which the water check uses, are read once at start even
-without the installer device.)
-
-* Writable parameters are under *Configuration*: fans (PF), compressor (PE),
-  water valves (Pb), dehumidification (PU), alarms (PA), season change (PC),
-  setpoint limits (PH07–PH10), probe offsets (PM8x) and hour counters (PM00–PM04).
-* Read-only, under *Diagnostic*: the Modbus/CAN link (PH11–PH17; changing them
-  would cut the connection), the I/O allocation (HA, HB, HC, HD; manufacturer
-  level), refrigerant and pressure-probe ranges, the compressor safety-time
-  bypass (PE05), forced compressor (PM21) and test mode (PT).
-* Parameters the HRDS+ does not use (return fan, air quality, heat-recovery
-  defrost, external damper, rotary exchanger, expansion I/O) exist but are
-  **disabled by default**; enable them in the entity settings if needed.
-* Never exposed: passwords, PH15 *restore factory defaults*, PH18 *clear alarm
-  history*. The full list with addresses and scaling is in
-  [`doc/references/MODBUS_REGISTERS.md` §16](doc/references/MODBUS_REGISTERS.md).
+* **[HRDS+](doc/entity-reference.md#main-device-hrds)**: the operating surface
+  (climate, fan, request switches, readings and alarms), with its
+  *Configuration* and *Diagnostic* sections.
+* **[HRDS+ setup](doc/entity-reference.md#setup-device-hrds-setup)**: the
+  one-time checklist (setup check, Modbus enables, probe and wiring facts).
+* **[HRDS+ installer](doc/entity-reference.md#installer-device-hrds-installer)**:
+  the opt-in installer menu, about 240 parameters.
 
 ## Probe requirements
 

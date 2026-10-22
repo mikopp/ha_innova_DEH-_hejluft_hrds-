@@ -57,6 +57,7 @@ describes the format and how agents use it. In short:
 | [0026](../../.claude/rules/adr/0026-renamed-keys-are-migrated.md) | A renamed or re-typed key is migrated in the entity registry | `__init__.py`, `translations/*.json` |
 | [0027](../../.claude/rules/adr/0027-one-home-per-topic-and-evidence-for-unit-facts.md) | One home per topic; every unit fact carries its evidence | `doc/references/*.md`, `plans/*.md`, `README.md` |
 | [0029](../../.claude/rules/adr/0029-retired-adrs-are-history-revival-needs-new-evidence.md) | Proposed and retired ADRs are history; reviving one needs new evidence | `doc/adr/proposed/**`, `doc/adr/superseded/**`, `.claude/skills/adr/**`, `.claude/settings.json` |
+| [0030](../../.claude/rules/adr/0030-entity-reference-is-the-source-of-truth-and-mirrors-the-devices.md) | The entity reference is the one source of truth and mirrors the devices | `const.py`, `entity_common.py`, `installer_params.py`, `translations/*.json`, `doc/entity-reference.md` |
 
 Not in force and not loaded; read only when recording an ADR (ADR-0029): [proposed (1)](proposed/README.md), [superseded (2)](superseded/README.md).
 <!-- adr-index:end -->

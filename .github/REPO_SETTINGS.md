@@ -6,13 +6,13 @@ this page; it can go stale.
 
 ## About panel (discoverability)
 
-* Description: `Home Assistant custom integration (HACS) for Innova DEH+ /
-  hej.luft HRDS+ ducted dehumidifiers, also sold via Messana, over Modbus TCP`
+* Description: `Home Assistant (HACS) integration for the hej.luft HRDS+ and Innova
+  DEH+ dehumidifiers: local control and monitoring over Modbus TCP, no cloud`
 * Topics (20 is the GitHub maximum): `dehumidifier`, `dehumidifiers`,
   `hacs-integration`, `hacs`, `hejluft`, `home-assistant`, `homeassistant`,
   `homeassistant-custom-component`, `custom-component`, `hrds`, `hvac`, `innova`,
   `innova-deh`, `modbus`, `modbus-tcp`, `taupunktentfeuchtung`, `entfeuchter`,
-  `radiant-cooling`, `messana`, `vmc`.
+  `radiant-cooling`, `vmc`.
 * Optional: a social preview image (Settings -> General).
 
 ## Ruleset on the default branch (Settings -> Rules -> Rulesets)

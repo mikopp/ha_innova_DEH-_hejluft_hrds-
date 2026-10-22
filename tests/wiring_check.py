@@ -252,6 +252,94 @@ def check(condition: bool, message: str) -> None:
         FAILURES.append(message)
 
 
+REFERENCE_PLATFORMS = {
+    **TYPED_DICT_PLATFORM,
+    "CLIMATE_TYPES": "climate",
+    "FAN_TYPES": "fan",
+    "OPERATION_TYPES": "switch",
+}
+# `| `platform.key` | ...` : the first cell of a row in an entity table.
+ENTITY_ROW = re.compile(r"\|\s*`([a-z_]+\.[a-z0-9_]+)`\s*\|")
+
+
+def reference_sections(text: str) -> dict[str, list[str]]:
+    """Map each entity in the reference to the device group(s) it is listed under."""
+    found: dict[str, list[str]] = {}
+    device = group = None
+    for line in text.splitlines():
+        heading = re.match(r"(#{2,3}) (.+)", line)
+        if heading:
+            title = heading.group(2)
+            if len(heading.group(1)) == 2:
+                device = next(
+                    (
+                        d
+                        for prefix, d in (
+                            ("Main device", "main"),
+                            ("Setup device", "setup"),
+                            ("Installer device", "installer"),
+                        )
+                        if title.startswith(prefix)
+                    ),
+                    None,
+                )
+                group = device
+            elif device == "main":
+                group = {
+                    "Operational": "main",
+                    "Configuration": "config",
+                    "Diagnostic": "diag",
+                }.get(title)
+            continue
+        row = ENTITY_ROW.match(line)
+        if row:
+            found.setdefault(row.group(1), []).append(group or "outside a device")
+    return found
+
+
+def check_entity_reference(const) -> None:
+    """doc/entity-reference.md lists every entity once, on its own device."""
+    expected: dict[str, str] = {}
+    for dict_name, platform in REFERENCE_PLATFORMS.items():
+        for key in getattr(const, dict_name):
+            if key in const.INSTALLER_KEYS:
+                continue  # parameters are generated; MODBUS_REGISTERS.md section 16
+            if key in const.INSTALLER_DEVICE_EXTRA_KEYS:
+                group = "installer"
+            elif key in const.SETUP_KEYS:
+                group = "setup"
+            elif key in const.CONFIG_KEYS:
+                group = "config"
+            elif key in const.DIAGNOSTIC_KEYS:
+                group = "diag"
+            else:
+                group = "main"
+            expected[f"{platform}.{key}"] = group
+    path = ROOT / "doc/entity-reference.md"
+    check(path.exists(), "doc/entity-reference.md exists")
+    if not path.exists():
+        return
+    found = reference_sections(path.read_text(encoding="utf-8"))
+    missing = sorted(set(expected) - set(found))
+    check(not missing, f"every entity is in the entity reference (missing: {missing})")
+    unknown = sorted(set(found) - set(expected))
+    check(not unknown, f"the entity reference lists no unknown entity ({unknown})")
+    twice = sorted(e for e, where in found.items() if len(where) > 1)
+    check(not twice, f"each entity is listed once (listed twice: {twice})")
+    misplaced = sorted(
+        f"{e} is under '{found[e][0]}', not '{want}'"
+        for e, want in expected.items()
+        if e in found and found[e][0] != want
+    )
+    check(not misplaced, f"each entity sits on its own device and group ({misplaced})")
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    restated = sorted({m for m in ENTITY_ROW.findall(readme)})
+    check(
+        not restated,
+        f"the README links the entity reference, not copies it ({restated})",
+    )
+
+
 def png_size(path: pathlib.Path) -> tuple[int, int]:
     """Return (width, height) read from a PNG's IHDR chunk."""
     data = path.read_bytes()
@@ -511,6 +599,9 @@ def main() -> int:
             set(states) == {"ok", "attention"},
             f"{lang}.json translates both setup_check states",
         )
+
+    print("== entity reference matches the code ==")
+    check_entity_reference(const)
 
     print("== installer device, season and heating guard ==")
     inst = const.INSTALLER_KEYS

@@ -32,6 +32,10 @@ Do not restate ADR content in this file.
 * Verify the device before anything can write (ADR-0009).
 * Entities show the unit's read-back, and unknown or unavailable rather than
   stale (ADR-0005, ADR-0006). No option may shadow a register (ADR-0008).
+* The entity reference `doc/entity-reference.md` is the only list of entities
+  and mirrors the devices (main / setup / installer). Change it in the same
+  commit as any entity, group or device change; `wiring_check.py` fails on a
+  difference (ADR-0030).
 * Never merge a PR or publish a release (ADR-0020).
 
 ## Code map
@@ -76,8 +80,9 @@ Each topic has one home; link to it instead of repeating it (ADR-0027).
 | How the unit behaves, and what was tested on real hardware (evidence log `T1…`) | [`doc/references/UNIT_BEHAVIOUR.md`](doc/references/UNIT_BEHAVIOUR.md) |
 | Which registers exist: addresses, encodings, values, installer table (§16) | [`doc/references/MODBUS_REGISTERS.md`](doc/references/MODBUS_REGISTERS.md) |
 | Source PDFs and how to search them, technical data, airflow estimate | [`doc/references/README.md`](doc/references/README.md) |
+| Every entity, by device, and why each device exists | [`doc/entity-reference.md`](doc/entity-reference.md) (ADR-0030) |
 | Adding or changing an entity | `.claude/rules/entities.md` (loads with `const.py`) |
-| User-facing description | [`README.md`](README.md) |
+| User-facing description | [`README.md`](README.md); German summary [`README.de.md`](README.de.md) (intro, devices, quick start, what it does, and a table of contents of the English sections: change it together with the English text) |
 | Open hardware questions and test plans | [`plans/todo.md`](plans/todo.md) |
 | Tests: layers, simulator, how to run | [`tests/CLAUDE.md`](tests/CLAUDE.md) |
 | Repository settings that are not files | [`.github/REPO_SETTINGS.md`](.github/REPO_SETTINGS.md) |
