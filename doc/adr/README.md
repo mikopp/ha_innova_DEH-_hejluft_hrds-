@@ -49,7 +49,6 @@ describes the format and how agents use it. In short:
 | [0018](../../.claude/rules/adr/0018-read-in-small-blocks-and-fail-fast.md) | Read in small blocks; fail the poll on a missing reply | `__init__.py`, `tests/diagnose_hrds.py`, `tests/sim/server.py` |
 | [0019](../../.claude/rules/adr/0019-tests-run-the-real-client-against-a-simulated-unit.md) | Tests run the real client against a simulated unit; e2e only for what needs a real Home Assistant | `tests/**`, `.github/workflows/{tests,e2e}.yaml` |
 | [0020](../../.claude/rules/adr/0020-ci-runs-once-with-least-privilege-and-only-the-owner-merges.md) | CI runs once per change with least privilege; only the owner merges or releases | `.github/**` |
-| [0021](../../.claude/rules/adr/0021-release-a-tagged-zip-with-local-brand-images.md) | Release a tagged zip; brand images ship with the integration | `.github/workflows/release.yaml`, `.github/scripts/**`, `hacs.json`, `manifest.json`, `brand/**`, `CHANGELOG.md` |
 | [0022](../../.claude/rules/adr/0022-modbus-enables-are-the-users.md) | The Modbus enables are the user's | `__init__.py`, `{climate,switch}.py` |
 | [0023](../../.claude/rules/adr/0023-write-only-what-changes.md) | Write only what changes (EEPROM) | `__init__.py`, `{climate,fan,switch,number,select}.py` |
 | [0024](../../.claude/rules/adr/0024-request-switches-show-the-command-until-confirmed.md) | Request switches show the command until the unit confirms it | `__init__.py`, `switch.py` |
@@ -58,6 +57,8 @@ describes the format and how agents use it. In short:
 | [0027](../../.claude/rules/adr/0027-one-home-per-topic-and-evidence-for-unit-facts.md) | One home per topic; every unit fact carries its evidence | `doc/references/*.md`, `plans/*.md`, `README.md` |
 | [0029](../../.claude/rules/adr/0029-retired-adrs-are-history-revival-needs-new-evidence.md) | Proposed and retired ADRs are history; reviving one needs new evidence | `doc/adr/proposed/**`, `doc/adr/superseded/**`, `.claude/skills/adr/**`, `.claude/settings.json` |
 | [0030](../../.claude/rules/adr/0030-entity-reference-is-the-source-of-truth-and-mirrors-the-devices.md) | The entity reference is the one source of truth and mirrors the devices | `const.py`, `entity_common.py`, `installer_params.py`, `translations/*.json`, `doc/entity-reference.md` |
+| [0031](../../.claude/rules/adr/0031-release-from-a-prepared-commit.md) | Release from a prepared commit: one script prepares, CI verifies, the owner publishes a draft | `scripts/release.py`, `.github/workflows/release.yaml`, `.github/workflows/release-draft.yaml`, `.claude/skills/release-prep/**`, `hacs.json`, `manifest.json`, `brand/**` |
+| [0032](../../.claude/rules/adr/0032-prs-record-changes-under-unreleased-and-never-set-a-version.md) | PRs record changes under Unreleased in release-notes shape and never set a version | `CHANGELOG.md`, `.claude/rules/changelog.md` |
 
-Not in force and not loaded; read only when recording an ADR (ADR-0029): [proposed (1)](proposed/README.md), [superseded (2)](superseded/README.md).
+Not in force and not loaded; read only when recording an ADR (ADR-0029): [proposed (1)](proposed/README.md), [superseded (3)](superseded/README.md).
 <!-- adr-index:end -->

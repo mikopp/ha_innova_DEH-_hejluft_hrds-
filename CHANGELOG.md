@@ -2,40 +2,52 @@
 
 All notable changes to this project are documented here, newest first.
 
+Pull requests add their entries under `## Unreleased` and never set a version;
+`scripts/release.py` turns it into the release heading, and the release notes
+are cut from it (ADR-0032, style in `.claude/rules/changelog.md`). Subsections,
+in this order, empty ones left out: `### ⚠️ Breaking changes`,
+`### ✨ Highlights`, `### 🛠️ Fixes and other changes`, `### 📚 Documentation`,
+`### 🧪 Tests and CI`. Sections before 0.9.4 use the older free-form style.
+
 ---
 
-## 0.9.4 (2026-10-22): new repository name, German README, entity reference by device
+## Unreleased
 
-**Changed:** the repository is now `mikopp/homeassistant-innova-hrds` (it was
-`ha_innova_DEH-_hejluft_hrds-`). GitHub redirects the old address and HACS
-follows it, so installed copies keep updating. If updates stop appearing in
-HACS, remove the custom repository and add
-`https://github.com/mikopp/homeassistant-innova-hrds` again. The integration
-domain (`innova_hrds`) and all entity IDs are unchanged. The README intro and
-model names were reworded to be easier to find.
+### ✨ Highlights
 
-**Docs:** a short German README ([`README.de.md`](README.de.md)) with a table of
-contents of the English sections. The entity reference moved from the README
-to [`doc/entity-reference.md`](doc/entity-reference.md), regrouped by device
-(main, setup, installer) with the reason each device exists; it is now the only
-list of entities, and `tests/wiring_check.py` fails when it differs from the
-code (ADR-0030). The compatible-devices list now names only units with a link
-to the actual product (hej.luft HRDS+ with Innova's CE declaration, Innova
-DEH+, the same unit); the claims about UK and US sellers, Messana, RDZ, "HRD+" and the Innova
-HRD ventilation unit were removed because no product page for them was found.
-The integration is now called *Innova DEH+ / hej.luft HRDS+ Dehumidifier* in HACS
-and Home Assistant (domain and entity IDs unchanged).
+- **New repository name: `mikopp/homeassistant-innova-hrds`.** GitHub redirects
+  the old address and HACS follows it, so installed copies keep updating.
+  Domain (`innova_hrds`) and entity IDs are unchanged.
+  - If updates stop appearing in HACS, remove the custom repository and add
+    `https://github.com/mikopp/homeassistant-innova-hrds` again.
+- **New name in HACS and Home Assistant:** *Innova DEH+ / hej.luft HRDS+
+  Dehumidifier*.
 
-**Docs:** the architecture decisions are recorded as ADRs in
-[`doc/adr/`](doc/adr/README.md). The README's beta section is reworded: it
-says what was developed against and tested on and what is not tested. New page
-[`doc/tested-setups.md`](doc/tested-setups.md): which units and installation
-scenarios (control path, water circuit, operating modes) are known to work,
-partly seen or untested, with the evidence; the first entry is the maintainer's
-unit in the brine circuit of a ground-source heat pump, with its own brine pump
-on the `PM` output (handbook variant 6). `UNIT_BEHAVIOUR.md` stays free of
-installation details; its evidence log gained the observation that a pump on
-`PM` runs with a request (T10).
+### 📚 Documentation
+
+- **German README** ([`README.de.md`](README.de.md)): intro, devices, quick
+  start and a table of contents of the English sections.
+- **Entity reference by device:** moved to
+  [`doc/entity-reference.md`](doc/entity-reference.md), grouped as main, setup
+  and installer, with why each device exists. CI fails when it differs from the
+  code (ADR-0030).
+- **Compatible devices** now lists only units with a linked product page
+  (hej.luft HRDS+, Innova DEH+); unconfirmed sellers and model names were
+  removed.
+- **Architecture decisions** are recorded as ADRs in
+  [`doc/adr/`](doc/adr/README.md).
+- **New [tested setups](doc/tested-setups.md) page:** which units and
+  installations are known to work, with the evidence. The first entry is the
+  maintainer's unit on the brine circuit of a ground-source heat pump.
+- The beta section says what was tested and what was not;
+  `UNIT_BEHAVIOUR.md` gained evidence T10 (a pump on `PM` runs with a request).
+
+### 🧪 Tests and CI
+
+- **Releases are prepared by `scripts/release.py`**, locally or by an agent:
+  it sets the version, turns `Unreleased` into the release heading, and the
+  merge drafts the GitHub release with notes cut from this file. Publishing
+  checks that tag, manifest, changelog and README agree (ADR-0031, ADR-0032).
 
 ---
 

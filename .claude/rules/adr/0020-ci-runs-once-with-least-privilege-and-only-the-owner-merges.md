@@ -1,6 +1,6 @@
 ---
 status: accepted
-date: 2026-10-20
+date: 2026-10-22
 decision-makers: mikopp
 topics: [ci]
 paths:
@@ -16,7 +16,8 @@ paths:
   `beta` image allowed to fail). MUST NOT use a plain `push:` trigger.
   tests and e2e MUST cancel a superseded PR run (`concurrency`).
 - Every workflow MUST set `permissions: contents: read` at the top; only
-  `release.yaml`'s `package` job MAY raise it to `contents: write`.
+  `release.yaml`'s `package` job and `release-draft.yaml`'s `draft` job MAY
+  raise it to `contents: write`.
 - Actions MUST be pinned to commit SHAs with a version comment (Dependabot
   bumps them). hassfest has no release tags: it is pinned to a `master`
   commit and re-pinned by hand.
@@ -24,14 +25,17 @@ paths:
   `.github/REPO_SETTINGS.md`. MUST NOT add "Restrict updates" on the default
   branch, nor an app to any bypass list.
 - Agents MUST NOT merge pull requests or publish releases; they open PRs
-  and leave merging and releasing to the owner.
+  and leave merging and releasing to the owner. A workflow MAY create a
+  draft release (ADR-0031); only the owner publishes it, and publishing
+  creates the tag, which the tag ruleset limits to the admin.
 
 ## Context
 
 A plain `push:` ran every workflow twice for a branch with an open PR.
 Mutable action tags let a compromised upstream run code in CI. "Restrict
 updates" forced a bypass on every merge (PR #29). A ruleset cannot stop an
-installed app from merging a green PR, so the rule is the agent's.
+installed app from merging a green PR, so the rule is the agent's. A draft
+release creates no tag, so the draft job's token cannot release anything.
 
 ## Consequences
 
@@ -44,9 +48,10 @@ installed app from merging a green PR, so the rule is the agent's.
 for f in .github/workflows/*.yaml; do grep -q '^permissions:' "$f"; done
 ! grep -hE '^\s*-?\s*uses: [^.]' .github/workflows/*.yaml | grep -vE '@[0-9a-f]{40}( |$)'
 ! grep -nE -A1 '^  push:' .github/workflows/*.yaml | grep -E -- '-[0-9]+-' | grep -v 'branches: \[main\]'
+test "$(grep -l 'contents: write' .github/workflows/*.yaml | tr '\n' ' ')" = ".github/workflows/release-draft.yaml .github/workflows/release.yaml "
 ```
 
 ## More information
 
 `b8bafa8` (SHA pins), PR #16 (triggers), PR #27 (permissions, pins),
-PR #29 (repository settings).
+PR #29 (repository settings), the release-draft job (ADR-0031).

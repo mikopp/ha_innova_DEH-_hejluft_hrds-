@@ -1,15 +1,8 @@
 ---
-status: accepted
+status: superseded by ADR-0031
 date: 2026-10-20
 decision-makers: mikopp
 topics: [ci]
-paths:
-  - ".github/workflows/release.yaml"
-  - ".github/scripts/**"
-  - "hacs.json"
-  - "custom_components/innova_hrds/manifest.json"
-  - "custom_components/innova_hrds/brand/**"
-  - "CHANGELOG.md"
 ---
 
 # ADR-0021: Release a tagged zip; brand images ship with the integration
@@ -57,3 +50,13 @@ grep -q 'innova_hrds.zip' .github/workflows/release.yaml
 
 PR #17 (packaging, brand images), PR #25 (beta release). Steps: the
 `release-prep` skill.
+
+## Why it was superseded
+
+Stamping the tag into the zip only left the tagged commit and main without
+a reliable version, so PRs guessed it (0.9.4 on main before any release),
+and nothing checked the tag against the manifest or the CHANGELOG. Writing
+back after publishing needs a bypass of the main ruleset (ADR-0020).
+ADR-0031 commits the version before the tag with `scripts/release.py`,
+verifies it on publish and drafts the release; ADR-0032 moves the
+CHANGELOG rules for PRs into their own decision.

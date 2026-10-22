@@ -47,7 +47,7 @@ jobs:
         run: pip install -r requirements_test.txt
       - name: Run tests
         run: >-
-          pytest tests/sim tests/ha tests/test_wiring.py
+          pytest tests/sim tests/ha tests/test_wiring.py tests/test_release_script.py
           --timeout=120
           --cov=custom_components.innova_hrds
           --cov-report=term-missing

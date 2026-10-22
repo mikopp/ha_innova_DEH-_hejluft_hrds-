@@ -1,0 +1,57 @@
+# Draft the GitHub release once a release PR is merged (ADR-0031).
+#
+# On main: when the top CHANGELOG heading is the manifest version (what
+# scripts/release.py leaves after `## Unreleased`) and there is no release or
+# tag for it yet, create a DRAFT release:
+#   * tag vX.Y.Z on this commit (a draft creates no tag; the owner's Publish
+#     does, which the tag ruleset limits to the admin, ADR-0020)
+#   * title "vX.Y.Z: <CHANGELOG title>"
+#   * body from `scripts/release.py notes`
+# Any other push to main (Unreleased on top) does nothing. Publishing the
+# draft starts release.yaml.
+name: Release draft
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-draft
+  cancel-in-progress: false
+
+jobs:
+  draft:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Is this commit a prepared release?
+        id: info
+        run: |
+          python3 scripts/release.py check
+          python3 scripts/release.py info >> "$GITHUB_OUTPUT"
+      - name: Create the draft release
+        if: steps.info.outputs.releasable == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.info.outputs.tag }}
+          TITLE: ${{ steps.info.outputs.title }}
+          VERSION: ${{ steps.info.outputs.version }}
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "A release or draft $TAG exists already; nothing to do."
+            exit 0
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null; then
+            echo "Tag $TAG exists already; nothing to do."
+            exit 0
+          fi
+          python3 scripts/release.py notes "$VERSION" > notes.md
+          gh release create "$TAG" --draft --target "$GITHUB_SHA" \
+            --title "$TITLE" --notes-file notes.md --repo "$GITHUB_REPOSITORY"
+          echo "Drafted $TAG: review it under Releases and publish it." >> "$GITHUB_STEP_SUMMARY"
