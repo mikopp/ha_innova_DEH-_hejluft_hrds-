@@ -55,9 +55,11 @@ The integration is released and usable, but it is a **beta**.
 * **Developed against and tested on:** one hej.luft **HRDS+ 30 with
   recirculation** (`R` variant), run **headless**: no CNU2 display, no external
   room/outdoor probes, behind a Modbus RTU→TCP gateway. It sits in the brine
-  circuit of a ground-source heat pump, in parallel, with its own small brine
-  pump on the `PM` output (the handbook's brine variants 4/5, §3.8.7). The unit
-  starts that pump and the *Water valve / pump output* sensor follows it.
+  circuit of a ground-source heat pump, in a branch parallel to the heat pump,
+  with its own small brine pump on the `PM` output (the handbook's brine
+  variant 6, §3.8.7). It runs independently of the heat pump and also at the
+  same time. The unit starts that pump and the *Water valve / pump output*
+  sensor follows it.
 * **Not tested on real hardware:** Other versions like the HRDS+ 50, units
   without recirculation (non-`R`), units with a display or external probes
   (automatic setpoint control), winter heating, free cooling.
@@ -603,10 +605,10 @@ freeze. The integration refuses winter integration requests regardless of the
 heating option. Winter dehumidify requests are refused too, unless a brine
 temperature guard is configured and passing. Without a guard, the setup check
 flags PU02 if it allows winter dehumidifying.
-In the handbook's parallel brine variants (4 and 5, §3.8.7) the HRDS+'s PM
-output switches an additional brine pump through a relay; that wiring is what
-`sensor.water_valve_pump` reflects. The maintainer's unit is wired this way and
-the pump starts on a request.
+In the handbook's brine variants (4 to 6, §3.8.7) the HRDS+'s PM output
+switches an additional brine pump through a relay; that wiring is what
+`sensor.water_valve_pump` reflects. The maintainer's unit is wired as variant 6
+(a branch parallel to the heat pump) and the pump starts on a request.
 
 #### Brine temperature guard
 

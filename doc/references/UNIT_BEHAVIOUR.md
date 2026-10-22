@@ -150,7 +150,7 @@ Hydraulic installations [HB 3.8.6–3.8.8]:
 | Variant | Water | Notes |
 |---------|-------|-------|
 | 1–3: heating/cooling circuit of a heat pump | 16–20 °C in cooling mode [INFERRED typical] | The heat pump must be in cooling mode for summer DEU/INT; the `VMC` contact can request it [HB 3.8.6]. With domestic hot water priority, open the `OFF` input during DHW [HB 3.8.6]. |
-| 4–6: brine circuit of a ground-source heat pump | brine | Independent of the heat pump's mode. **No winter heating possible; active winter dehumidification forbidden (coil freezing); anti-stagnation pulses can blow cold air → switch the unit OFF in winter or drive the brine pump separately** [HB 3.8.7]. |
+| 4–6: brine circuit of a ground-source heat pump (4: in series on the brine inlet side, 5: in series on the outlet side, 6: in a branch parallel to the heat pump) | brine | Independent of the heat pump's mode. **No winter heating possible; active winter dehumidification forbidden (coil freezing); anti-stagnation pulses can blow cold air → switch the unit OFF in winter or drive the brine pump separately** [HB 3.8.7]. |
 | separate ground loop | brine | Fully independent; same three winter notes [HB 3.8.8]. |
 
 ### 2.3 Terminals (inputs and outputs)
@@ -613,8 +613,8 @@ refrigerant circuit works on MVHR flow alone follows from the design
   [HB 2.7].
 * Run-on `Pb01` after the request ends [HB 6.4].
 * On the reference unit `PM` switches an additional brine pump (HB 3.8.7
-  variants 4/5); the pump starts with a request and the 1126 read-back
-  follows [T11].
+  variant 6); the pump starts with a request and the 1126 read-back follows
+  [T11].
 * Closed immediately on a blocking alarm [HB 6.4].
 * Not configured (output disabled) means the unit cannot drive a pump
   [MB p.15 "Disable"; INFERRED consequence]. As delivered `HD05 = 12` (water
@@ -691,7 +691,7 @@ probes), RS-485→TCP gateway, behind a Zehnder ComfoAir Q350. "Dump" means
 | T8 | 2026-10-21 | OFF written to `Status_OnOff_byBMS`: register read ON for several polls; register and `sm_UnitStatus` changed together at one later poll | PR #32 |
 | T9 | 2026-10-20 | Through the RS-485→TCP gateway a 120-register read got no reply at all; 10-register reads covered the whole map | PR #28 |
 | T10 | 2026-10 | Installation context: HRDS+ 30 behind a Zehnder ComfoAir Q350 | PR #14 |
-| T11 | 2026-10-22 | Water circuit: the unit sits in the **brine circuit** of the owner's ground-source heat pump, in parallel, with a small additional brine pump on the `PM` output (the arrangement of HB 3.8.7, variant 4 or 5; which one is not recorded). The unit starts that pump on a request and the pump runs; the water valve/pump read-back (1126) follows. Run-on `Pb01` and the OFF edge not logged | owner, README 0.9.4 |
+| T11 | 2026-10-22 | Water circuit: the unit sits in the **brine circuit** of the owner's ground-source heat pump, in a branch parallel to the heat pump (HB 3.8.7 **variant 6**), with a small additional brine pump on the `PM` output that takes brine from the circuit, passes it through the unit and returns it past the heat pump. The unit starts that pump on a request and the pump runs, independently of the heat pump's own brine pump and also at the same time as it; the water valve/pump read-back (1126) follows. Run-on `Pb01` and the OFF edge not logged | owner, README 0.9.4 |
 
 Not yet observed on hardware (everything else in this file): a running DEU or
 INT cycle with recorded fan/damper/compressor/valve read-backs, the passive
