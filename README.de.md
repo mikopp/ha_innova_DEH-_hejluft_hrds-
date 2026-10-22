@@ -50,7 +50,10 @@ Die Integration ist veröffentlicht und nutzbar, aber eine **Beta**.
 
 * **Entwickelt und getestet** wurde sie nur mit **einem HRDS+ 30 mit Umluft
   (`R`-Variante)**, ohne Display und ohne externe Fühler, hinter einem
-  Modbus-RTU-zu-TCP-Gateway. Dessen Wasserkreis ist ein Solekreis.
+  Modbus-RTU-zu-TCP-Gateway. Es hängt parallel im Solekreis einer Erdwärmepumpe,
+  mit einer eigenen kleinen Solepumpe am `PM`-Ausgang (Sole-Varianten 4/5 des
+  Handbuchs, §3.8.7). Das Gerät startet diese Pumpe, und der Sensor *Water
+  valve / pump output* folgt ihr.
 * **Auf echter Hardware nicht getestet:** das HRDS+ 50, Geräte ohne Umluft,
   Geräte mit Display oder Fühlern (automatische Sollwertregelung), Winterbetrieb
   und Freikühlung. Auch wie die manuelle Lüfterstufe zur tatsächlichen
