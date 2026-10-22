@@ -34,13 +34,16 @@ names Innova as the manufacturer of the HRDS and HRDS+ dehumidification units.
 * **[hej.luft HRDS+ 30 / HRDS+ 50](https://www.hejluft.at/hrds)** (also written
   HRDS 30 / 50), with the type-plate codes of the
   [technical handbook](https://www.hejluft.at/_files/ugd/714411_f1ffc5d222f4476da2e37f29c64a7f93.pdf),
-  for example *HRDS+ 30 H R K DC*. The integration was developed against this
-  unit.
+  for example *HRDS+ 30 H R K DC*.
 * **[Innova DEH+ 30 H / 50 H](https://www.innova.it/en/products/vmc/dehumidifiers/deh-ad-incasso-orizzontale/)**:
-  Innova's own name for the horizontal unit, with the same sizes and nominal
-  airflow (300 / 500 m³/h). It has **not been tested** with this integration,
-  and the DEH+ installation manual kept in `doc/references/` describes an older
-  controller than the HRDS+ board.
+  Innova's own name for the same unit, with the same sizes and nominal airflow
+  (300 / 500 m³/h). hej.luft does not build or change it: the maintainer's
+  HRDS+ 30 was shipped directly from Italy and is physically the same device as
+  the DEH+ 30 H, and the integration was developed against it. The 50 sizes are
+  untested (see the beta notice). The DEH+ installation manual kept in
+  `doc/references/` describes the older microswitch controller, not the EVCO "K"
+  board of the HRDS+; the registers and behaviour here come from the HRDS+
+  handbooks.
 
 > *If your unit uses the Innova board and is sold under another name, open an
 > issue and link its product page.*
@@ -161,7 +164,7 @@ Or by hand:
 
 1. In HACS, add this repository as a custom repository (category: *Integration*):
    `https://github.com/mikopp/homeassistant-innova-hrds`
-2. Install **Innova HRDS+ / hej.luft Dehumidifier** and restart Home Assistant.
+2. Install **Innova DEH+ / hej.luft HRDS+ Dehumidifier** and restart Home Assistant.
 
 HACS installs the `innova_hrds.zip` asset attached to each
 [GitHub release](https://github.com/mikopp/homeassistant-innova-hrds/releases);

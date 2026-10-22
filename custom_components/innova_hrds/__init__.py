@@ -1,4 +1,4 @@
-"""Innova HRDS+ / hej.luft dehumidifier — Modbus TCP integration."""
+"""Innova DEH+ / hej.luft HRDS+ dehumidifier — Modbus TCP integration."""
 
 from __future__ import annotations
 

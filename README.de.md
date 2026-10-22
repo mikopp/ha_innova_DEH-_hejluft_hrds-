@@ -30,14 +30,16 @@ nennt Innova als Hersteller der Entfeuchtungsgeräte HRDS und HRDS+.
 * **[hej.luft HRDS+ 30 / HRDS+ 50](https://www.hejluft.at/hrds)** (auch HRDS 30 / 50
   geschrieben), mit den Typenschild-Codes aus dem
   [Technischen Handbuch](https://www.hejluft.at/_files/ugd/714411_f1ffc5d222f4476da2e37f29c64a7f93.pdf),
-  zum Beispiel *HRDS+ 30 H R K DC*. Die Integration wurde mit diesem Gerät
-  entwickelt.
+  zum Beispiel *HRDS+ 30 H R K DC*.
 * **[Innova DEH+ 30 H / 50 H](https://www.innova.it/en/products/vmc/dehumidifiers/deh-ad-incasso-orizzontale/)**:
-  Innovas eigener Name für das liegende Gerät, mit denselben Größen und
-  demselben Nenn-Luftdurchsatz (300 / 500 m³/h). Es wurde mit dieser
-  Integration **nicht getestet**; die in `doc/references/` abgelegte
-  DEH+-Installationsanleitung beschreibt eine ältere Steuerung als die
-  HRDS+-Platine.
+  Innovas eigener Name für dasselbe Gerät, mit denselben Größen und demselben
+  Nenn-Luftdurchsatz (300 / 500 m³/h). hej.luft baut oder verändert es nicht:
+  das HRDS+ 30 des Maintainers wurde direkt aus Italien geliefert und ist
+  physisch dasselbe Gerät wie das DEH+ 30 H; die Integration wurde damit
+  entwickelt. Die 50er-Größen sind nicht getestet (siehe Beta-Hinweis). Die in
+  `doc/references/` abgelegte DEH+-Installationsanleitung beschreibt die ältere
+  Steuerung mit Mikroschaltern, nicht die EVCO-„K“-Platine des HRDS+; Register
+  und Verhalten stammen aus den HRDS+-Handbüchern.
 
 > *Wird Ihr Gerät mit der Innova-Platine unter einem anderen Namen verkauft,
 > eröffnen Sie ein Issue und verlinken Sie die Produktseite.*
