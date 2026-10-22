@@ -18,7 +18,7 @@ topics before the first edit: ADR-NNNN is `.claude/rules/adr/NNNN-*.md`; run
 - **modbus-writes** (any write to the unit, the write paths, EEPROM wear): ADR-0006, ADR-0009, ADR-0010, ADR-0022, ADR-0023
 - **requests** (switching the unit on/off, the DEU and INT requests, their guards): ADR-0012, ADR-0013, ADR-0014, ADR-0022, ADR-0024, ADR-0025
 - **state** (what an entity shows: read-back, unknown, unavailable, pending): ADR-0005, ADR-0006, ADR-0008, ADR-0011, ADR-0024
-- **entities** (adding, grouping and renaming entities and devices): ADR-0002, ADR-0016, ADR-0017, ADR-0026
+- **entities** (adding, grouping and renaming entities and devices): ADR-0002, ADR-0016, ADR-0017, ADR-0026, ADR-0030
 - **config** (config and options flows, options, device identity, installer menu): ADR-0008, ADR-0009, ADR-0010, ADR-0016, ADR-0017
 - **climate** (the climate entity): ADR-0011, ADR-0025
 - **fan** (the recirculation fan and the airflow estimate): ADR-0008
@@ -27,4 +27,4 @@ topics before the first edit: ADR-NNNN is `.claude/rules/adr/NNNN-*.md`; run
 - **dependencies** (Home Assistant and pymodbus versions): ADR-0004
 - **tests** (where a test goes, the simulator): ADR-0019
 - **ci** (workflows, releases, repository rules): ADR-0020, ADR-0021
-- **docs** (documentation and the ADRs themselves): ADR-0001, ADR-0027, ADR-0029
+- **docs** (documentation and the ADRs themselves): ADR-0001, ADR-0027, ADR-0029, ADR-0030

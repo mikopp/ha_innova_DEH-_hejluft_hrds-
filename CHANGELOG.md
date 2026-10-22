@@ -14,6 +14,15 @@ HACS, remove the custom repository and add
 domain (`innova_hrds`) and all entity IDs are unchanged. The README intro and
 model names were reworded to be easier to find.
 
+**Docs:** a short German README ([`README.de.md`](README.de.md)) with a table of
+contents of the English sections. The entity reference moved from the README
+to [`doc/entity-reference.md`](doc/entity-reference.md), regrouped by device
+(main, setup, installer) with the reason each device exists; it is now the only
+list of entities, and `tests/wiring_check.py` fails when it differs from the
+code (ADR-0030). The compatible-devices list no longer claims the integration
+works with UK or Messana units: it says only that the device is sold there and
+that those units are untested.
+
 **Breaking:** the Modbus enables **PH02** (on/off), **PH28** (dehumidify) and
 **PH27** (integration) are now yours: the integration no longer writes them at
 setup or on any poll, and switching one off stays off. With an enable off,

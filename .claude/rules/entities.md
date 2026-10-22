@@ -20,9 +20,13 @@ Decision behind this: ADR-0002. Steps:
 4. Add `en` and `de` translations under the platform key (and `state` slugs
    for enums).
 5. Put the key in at most one of `SETUP_KEYS`, `CONFIG_KEYS`,
-   `DIAGNOSTIC_KEYS` (ADR-0016); a fan-only key also in `FAN_KEYS`.
+   `DIAGNOSTIC_KEYS` (ADR-0016); a fan-only key also in `FAN_KEYS`. The
+   choice decides the device and section in the entity reference.
 6. Document the register in `doc/references/MODBUS_REGISTERS.md`.
-7. Run `python3 tests/wiring_check.py`; if entities change, update the
+7. List the entity in `doc/entity-reference.md`, in the device section and group
+   from step 5 (ADR-0030); installer parameters are the exception. Say why a
+   new device or group exists.
+8. Run `python3 tests/wiring_check.py`; if entities change, update the
    snapshots (`tests/CLAUDE.md`).
 
 Renaming a key: ADR-0026. Installer parameters are rows in
