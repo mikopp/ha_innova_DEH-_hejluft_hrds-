@@ -53,7 +53,7 @@ registers or values computed from them.
 
 ⁴ Only offered when a display or a room probe lets the unit raise requests by
 itself (handbook §6.1), and while that reading is healthy. Not tested on a real
-device (see the [beta banner](../README.md#release-09--beta-not-10-yet)).
+device (see the [beta banner](../README.md#release-094--beta-not-10-yet)).
 
 #### Fan
 

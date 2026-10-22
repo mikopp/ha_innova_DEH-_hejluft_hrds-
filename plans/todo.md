@@ -310,8 +310,10 @@ option is recommended.
 
 - [ ] Confirm on hardware that writing HB04 = 3 switches `operating_mode` to
       winter and 4 back to summer (no contact wired to DI4).
-- [ ] Watch `water_valve_pump` (1126) during a dehumidify request on the brine
-      installation: expect On with the request, Off after Pb01.
+- [x] Watch `water_valve_pump` (1126) during a dehumidify request on the brine
+      installation: expect On with the request, Off after Pb01. On with the
+      request and the pump on `PM` runs [T10]; the Off after `Pb01` was not
+      logged.
 - [ ] Verify the enum meaning of 1124 / 1126 (0/1/2 inferred from the
       misaligned PDF table).
 - [ ] Spot-check installer scaling for rows not covered by the snapshot

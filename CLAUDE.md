@@ -83,6 +83,7 @@ Each topic has one home; link to it instead of repeating it (ADR-0027).
 | Every entity, by device, and why each device exists | [`doc/entity-reference.md`](doc/entity-reference.md) (ADR-0030) |
 | Adding or changing an entity | `.claude/rules/entities.md` (loads with `const.py`) |
 | User-facing description | [`README.md`](README.md); German summary [`README.de.md`](README.de.md) (intro, devices, quick start, what it does, and a table of contents of the English sections: change it together with the English text) |
+| Which units and installations are known to work, and what was seen on each | [`doc/tested-setups.md`](doc/tested-setups.md) |
 | Open hardware questions and test plans | [`plans/todo.md`](plans/todo.md) |
 | Tests: layers, simulator, how to run | [`tests/CLAUDE.md`](tests/CLAUDE.md) |
 | Repository settings that are not files | [`.github/REPO_SETTINGS.md`](.github/REPO_SETTINGS.md) |

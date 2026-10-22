@@ -106,9 +106,9 @@ How to tell them apart from the controller: no register states size or `R`
 ### 1.3 Variants seen so far
 
 Only one unit has been read: **HRDS+ 30 `R` `DC`**, no display, no external
-probes, Modbus via an RS-485→TCP gateway, behind a Zehnder ComfoAir Q350
-[T1, T10]. Everything about the HRDS+ 50, non-`R` units, units with a display
-or external probes comes from the documents only.
+probes [T1]. Everything about the HRDS+ 50, non-`R` units, units with a display
+or external probes comes from the documents only. The installations the
+integration has been used in are in [`doc/tested-setups.md`](../tested-setups.md).
 
 ---
 
@@ -150,7 +150,7 @@ Hydraulic installations [HB 3.8.6–3.8.8]:
 | Variant | Water | Notes |
 |---------|-------|-------|
 | 1–3: heating/cooling circuit of a heat pump | 16–20 °C in cooling mode [INFERRED typical] | The heat pump must be in cooling mode for summer DEU/INT; the `VMC` contact can request it [HB 3.8.6]. With domestic hot water priority, open the `OFF` input during DHW [HB 3.8.6]. |
-| 4–6: brine circuit of a ground-source heat pump | brine | Independent of the heat pump's mode. **No winter heating possible; active winter dehumidification forbidden (coil freezing); anti-stagnation pulses can blow cold air → switch the unit OFF in winter or drive the brine pump separately** [HB 3.8.7]. |
+| 4–6: brine circuit of a ground-source heat pump (4: in series on the brine inlet side, 5: in series on the outlet side, 6: in a branch parallel to the heat pump) | brine | Independent of the heat pump's mode. **No winter heating possible; active winter dehumidification forbidden (coil freezing); anti-stagnation pulses can blow cold air → switch the unit OFF in winter or drive the brine pump separately** [HB 3.8.7]. |
 | separate ground loop | brine | Fully independent; same three winter notes [HB 3.8.8]. |
 
 ### 2.3 Terminals (inputs and outputs)
@@ -612,6 +612,8 @@ refrigerant circuit works on MVHR flow alone follows from the design
   [HB 6.4, 4.5]. Not opened in standby except the anti-stagnation pulses
   [HB 2.7].
 * Run-on `Pb01` after the request ends [HB 6.4].
+* A pump wired to `PM` starts with a request and the 1126 read-back follows
+  [T10].
 * Closed immediately on a blocking alarm [HB 6.4].
 * Not configured (output disabled) means the unit cannot drive a pump
   [MB p.15 "Disable"; INFERRED consequence]. As delivered `HD05 = 12` (water
@@ -672,7 +674,7 @@ Codes, bit positions and reset registers:
 ## 13. Evidence log: what was seen on real hardware
 
 Reference unit: **HRDS+ 30 `R` `DC`**, headless (no display, no external
-probes), RS-485→TCP gateway, behind a Zehnder ComfoAir Q350. "Dump" means
+probes). "Dump" means
 [`tests/devices/hrds_30+_headless_factory_state.json`](../../tests/devices/hrds_30+_headless_factory_state.json)
 (read-only diagnostic, taken before the integration wrote anything).
 
@@ -687,7 +689,7 @@ probes), RS-485→TCP gateway, behind a Zehnder ComfoAir Q350. "Dump" means
 | T7 | 2026-10-20 | `PH01 = 0`, `HA00 = 0`, `PH02 = 1` and a power cycle: still `off_by_display`. First Modbus ON → `on` at once (so `PH01` and `PH02` kept their values, §3.6) | [`plans/todo.md`](../../plans/todo.md), PR #31 |
 | T8 | 2026-10-21 | OFF written to `Status_OnOff_byBMS`: register read ON for several polls; register and `sm_UnitStatus` changed together at one later poll | PR #32 |
 | T9 | 2026-10-20 | Through the RS-485→TCP gateway a 120-register read got no reply at all; 10-register reads covered the whole map | PR #28 |
-| T10 | 2026-10 | Installation context: HRDS+ 30 behind a Zehnder ComfoAir Q350 | PR #14 |
+| T10 | 2026-10-22 | A pump on the `PM` output ran when the unit started a request; the water valve/pump read-back (1126) followed. Run-on `Pb01` and the OFF edge not logged | owner |
 
 Not yet observed on hardware (everything else in this file): a running DEU or
 INT cycle with recorded fan/damper/compressor/valve read-backs, the passive

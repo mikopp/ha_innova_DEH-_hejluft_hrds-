@@ -4,7 +4,7 @@ All notable changes to this project are documented here, newest first.
 
 ---
 
-## Unreleased
+## 0.9.4 (2026-10-22): new repository name, German README, entity reference by device
 
 **Changed:** the repository is now `mikopp/homeassistant-innova-hrds` (it was
 `ha_innova_DEH-_hejluft_hrds-`). GitHub redirects the old address and HACS
@@ -25,6 +25,21 @@ DEH+, the same unit); the claims about UK and US sellers, Messana, RDZ, "HRD+" a
 HRD ventilation unit were removed because no product page for them was found.
 The integration is now called *Innova DEH+ / hej.luft HRDS+ Dehumidifier* in HACS
 and Home Assistant (domain and entity IDs unchanged).
+
+**Docs:** the architecture decisions are recorded as ADRs in
+[`doc/adr/`](doc/adr/README.md). The README's beta section is reworded: it
+says what was developed against and tested on and what is not tested. New page
+[`doc/tested-setups.md`](doc/tested-setups.md): which units and installation
+scenarios (control path, water circuit, operating modes) are known to work,
+partly seen or untested, with the evidence; the first entry is the maintainer's
+unit in the brine circuit of a ground-source heat pump, with its own brine pump
+on the `PM` output (handbook variant 6). `UNIT_BEHAVIOUR.md` stays free of
+installation details; its evidence log gained the observation that a pump on
+`PM` runs with a request (T10).
+
+---
+
+## 0.9.3 (2026-10-21): Modbus enables are yours, climate follows what the unit does
 
 **Breaking:** the Modbus enables **PH02** (on/off), **PH28** (dehumidify) and
 **PH27** (integration) are now yours: the integration no longer writes them at
@@ -171,6 +186,26 @@ off while the water is below PU08, handbook §6.3), what PU05 *Force dehumidify
 when cooling* does, and how to drive the modes from Home Assistant. The entity
 reference moved below the usage sections.
 
+**Docs:** the `references/` folder moved to `doc/references/`. New [`doc/references/UNIT_BEHAVIOUR.md`](doc/references/UNIT_BEHAVIOUR.md),
+the single description of how the unit itself behaves: variants, a state
+diagram with start and stop sequences, the decision procedure as pseudo-code,
+summer and winter operation, display and probe configurations, fan,
+compressor, water circuit, alarm effects, and how each action is done at the
+display, the terminals and over Modbus. Every statement names its source
+(handbook section, Modbus manual page, forum post) or is marked as tested on
+the real unit or as inferred. An evidence log lists what has been seen on real
+hardware, and a table compares the reference unit's as-delivered settings with
+the handbook defaults (they differ, e.g. PC08 10 °C instead of 20 °C, PU13
+10 °C instead of 22 °C, PS01 90 s instead of 20 s). `MODBUS_REGISTERS.md` now
+only defines registers; `doc/references/README.md` is an index plus the technical
+data. Corrected: PC08's factory value is 20 °C (handbook), not 10 °C; the
+factory PH10 cap does not stop the unit's own winter heating, it only caps the
+winter setpoint.
+
+---
+
+## 0.9.2 (2026-10-21): readable probe inputs, setup hints
+
 **Changed:** the *AI2 allocation (HA02)* and *AI3 allocation (HA03)* numbers on
 the setup device are now dropdowns named *T/H probe temperature input* and
 *T/H probe humidity input*, with the options *Unused*, *Room temperature probe
@@ -206,22 +241,6 @@ setting that says whether the unit has the integration function, already shown
 read-only as `binary_sensor.active_cooling_available` (now "Unit has
 integration function (PG02)"). The switch is removed from the entity registry
 on the next start.
-
-**Docs:** the `references/` folder moved to `doc/references/`. New [`doc/references/UNIT_BEHAVIOUR.md`](doc/references/UNIT_BEHAVIOUR.md),
-the single description of how the unit itself behaves: variants, a state
-diagram with start and stop sequences, the decision procedure as pseudo-code,
-summer and winter operation, display and probe configurations, fan,
-compressor, water circuit, alarm effects, and how each action is done at the
-display, the terminals and over Modbus. Every statement names its source
-(handbook section, Modbus manual page, forum post) or is marked as tested on
-the real unit or as inferred. An evidence log lists what has been seen on real
-hardware, and a table compares the reference unit's as-delivered settings with
-the handbook defaults (they differ, e.g. PC08 10 °C instead of 20 °C, PU13
-10 °C instead of 22 °C, PS01 90 s instead of 20 s). `MODBUS_REGISTERS.md` now
-only defines registers; `doc/references/README.md` is an index plus the technical
-data. Corrected: PC08's factory value is 20 °C (handbook), not 10 °C; the
-factory PH10 cap does not stop the unit's own winter heating, it only caps the
-winter setpoint.
 
 ---
 

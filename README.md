@@ -48,43 +48,43 @@ names Innova as the manufacturer of the HRDS and HRDS+ dehumidification units.
 > *If your unit uses the Innova board and is sold under another name, open an
 > issue and link its product page.*
 
-> ## Release 0.9 — beta, not 1.0 yet
->
-> The integration is released and usable, but it is a **beta**.
->
-> * **Tested:** the automated test suite in CI (a simulated unit, plus the
->   integration running in a real Home Assistant container).
-> * **Developed against:** one **HRDS+ 30 with recirculation (`R` variant)**, run
->   **headless**: no CNU2 display, no external room/outdoor probes, behind a
->   Modbus RTU→TCP gateway.
-> * **Smoke test on real hardware:** only tested on the HRDS+30 with Cooling and Recirculation. The unit is without display and no external sensors. Other versions like the HRDS+ 50, units
->   without recirculation (non-`R`), units with a display or external probes
->   (automatic setpoint control), brine circuits, winter heating, free cooling are untested.
->   How the manual fan speed maps to the actual fan output is also not tested yet. The open items
->   are listed in [`plans/todo.md`](plans/todo.md).
-> * **Climate *Auto* mode is not tested on a real device.** It only appears
->   with a display or room probe. CI tests it against a simulated display unit
->   derived from the headless dump, not against a real display unit.
->
-> Reports from other units are very welcome, see
-> [Reporting issues](#reporting-issues). The aim for 1.0 is in
-> [Road to 1.0](#road-to-10).
+## Release 0.9.4 — beta, not 1.0 yet
 
-> ## Quick start
->
-> 1. [Install](#1-install) the integration with HACS and restart Home Assistant.
-> 2. [Add it](#2-add-the-integration) under *Settings → Devices & Services*,
->    with the address of your Modbus-TCP gateway.
-> 3. [Check the setup](#3-check-the-setup): open the **HRDS+ setup** device and
->    make sure **Setup check** reads `ok`.
-> 4. **[Choose what Home Assistant may control](#4-choose-what-home-assistant-may-control).**
->    Turn on the **Modbus enables** for the functions you want (on/off,
->    dehumidify, integration), then **Allow operational requests**. Both are
->    **off after a fresh install** (the unit's on/off enable from factory), and
->    the integration never turns them on by itself. Without them it monitors:
->    readings and settings work.
-> 5. Read [How the unit works](#how-the-unit-works) for the operating modes,
->    including the passive cold-water path, and how to drive them.
+The integration is released and usable, but it is a **beta**.
+
+* **Developed against and tested on:** one hej.luft **HRDS+ 30 with
+  recirculation** (`R` variant), run **headless**: no CNU2 display, no external
+  room/outdoor probes, behind a Modbus RTU→TCP gateway, in the brine circuit of
+  a ground-source heat pump. Which units and installations are known to work,
+  and what was seen on each: [Tested units and installations](doc/tested-setups.md).
+* **Not tested on real hardware:** Other versions like the HRDS+ 50, units
+  without recirculation (non-`R`), units with a display or external probes
+  (automatic setpoint control), winter heating, free cooling.
+  How the manual fan speed maps to the actual fan output is also not tested
+  yet. The open items are listed in [`plans/todo.md`](plans/todo.md).
+* **Climate *Auto* mode is not tested on a real device.** It only appears
+  with a display or room probe. CI tests it against a simulated display unit
+  derived from the headless dump, not against a real display unit.
+
+Reports from other units are very welcome, see
+[Reporting issues](#reporting-issues). The aim for 1.0 is in
+[Road to 1.0](#road-to-10).
+
+## Quick start
+
+1. [Install](#1-install) the integration with HACS and restart Home Assistant.
+2. [Add it](#2-add-the-integration) under *Settings → Devices & Services*,
+   with the address of your Modbus-TCP gateway.
+3. [Check the setup](#3-check-the-setup): open the **HRDS+ setup** device and
+   make sure **Setup check** reads `ok`.
+4. **[Choose what Home Assistant may control](#4-choose-what-home-assistant-may-control).**
+   Turn on the **Modbus enables** for the functions you want (on/off,
+   dehumidify, integration), then **Allow operational requests**. Both are
+   **off after a fresh install** (the unit's on/off enable from factory), and
+   the integration never turns them on by itself. Without them it monitors:
+   readings and settings work.
+5. Read [How the unit works](#how-the-unit-works) for the operating modes,
+   including the passive cold-water path, and how to drive them.
 
 ## What it does
 
@@ -602,9 +602,11 @@ freeze. The integration refuses winter integration requests regardless of the
 heating option. Winter dehumidify requests are refused too, unless a brine
 temperature guard is configured and passing. Without a guard, the setup check
 flags PU02 if it allows winter dehumidifying.
-In the handbook's parallel brine variants the HRDS+'s PM output switches the
-brine pump through a relay; that wiring is what `sensor.water_valve_pump`
-reflects.
+In the handbook's brine variants (4 to 6, §3.8.7) the HRDS+'s PM output
+switches an additional brine pump through a relay; that wiring is what
+`sensor.water_valve_pump` reflects. The maintainer's unit is wired as variant 6
+(a branch parallel to the heat pump) and the pump starts on a request; see
+[Tested units and installations](doc/tested-setups.md).
 
 #### Brine temperature guard
 
