@@ -52,17 +52,15 @@ names Innova as the manufacturer of the HRDS and HRDS+ dehumidification units.
 
 The integration is released and usable, but it is a **beta**.
 
-* **Tested:** Tested on a hejluft **HRDS+ 30 with recirculation** (`R` variant)**, run
-  **headless**: no CNU2 display, no external room/outdoor probes, behind a
-  Modbus RTU→TCP gateway. The unit is hydrological connected to a brine circuit.
-* **Developed against:** one **HRDS+ 30 with recirculation (`R` variant)**, run
-  **headless**: no CNU2 display, no external room/outdoor probes, behind a
-  Modbus RTU→TCP gateway.
+* **Developed against and tested on:** one hej.luft **HRDS+ 30 with
+  recirculation** (`R` variant), run **headless**: no CNU2 display, no external
+  room/outdoor probes, behind a Modbus RTU→TCP gateway. Its water circuit is a
+  brine circuit.
 * **Not tested on real hardware:** Other versions like the HRDS+ 50, units
   without recirculation (non-`R`), units with a display or external probes
   (automatic setpoint control), winter heating, free cooling.
-  How the manual fan speed maps to the actual fan output is also not tested yet. The open items
-  are listed in [`plans/todo.md`](plans/todo.md).
+  How the manual fan speed maps to the actual fan output is also not tested
+  yet. The open items are listed in [`plans/todo.md`](plans/todo.md).
 * **Climate *Auto* mode is not tested on a real device.** It only appears
   with a display or room probe. CI tests it against a simulated display unit
   derived from the headless dump, not against a real display unit.

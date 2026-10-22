@@ -44,17 +44,26 @@ nennt Innova als Hersteller der Entfeuchtungsgeräte HRDS und HRDS+.
 > *Wird Ihr Gerät mit der Innova-Platine unter einem anderen Namen verkauft,
 > eröffnen Sie ein Issue und verlinken Sie die Produktseite.*
 
-> ## Version 0.9: Beta, noch nicht 1.0
->
-> Die Integration ist veröffentlicht und nutzbar, aber eine **Beta**. Entwickelt
-> und auf echter Hardware getestet wurde sie nur mit **einem HRDS+ 30 mit
-> Umluft (`R`-Variante)**, ohne Display und ohne externe Fühler, hinter einem
-> Modbus-RTU-zu-TCP-Gateway. Nicht getestet sind unter anderem das HRDS+ 50,
-> Geräte ohne Umluft, Geräte mit Display oder Fühlern (automatische
-> Sollwertregelung, der Klima-Modus *Auto*), Solekreise, Winterbetrieb und
-> Freikühlung. Berichte von anderen Geräten sind sehr willkommen, siehe
-> [Reporting issues](README.md#reporting-issues) (EN). Details: das
-> [englische Beta-Banner](README.md#release-09--beta-not-10-yet).
+## Release 0.9.4: Beta, noch nicht 1.0
+
+Die Integration ist veröffentlicht und nutzbar, aber eine **Beta**.
+
+* **Entwickelt und getestet** wurde sie nur mit **einem HRDS+ 30 mit Umluft
+  (`R`-Variante)**, ohne Display und ohne externe Fühler, hinter einem
+  Modbus-RTU-zu-TCP-Gateway. Dessen Wasserkreis ist ein Solekreis.
+* **Auf echter Hardware nicht getestet:** das HRDS+ 50, Geräte ohne Umluft,
+  Geräte mit Display oder Fühlern (automatische Sollwertregelung), Winterbetrieb
+  und Freikühlung. Auch wie die manuelle Lüfterstufe zur tatsächlichen
+  Lüfterleistung passt, ist noch nicht geprüft. Offene Punkte:
+  [`plans/todo.md`](plans/todo.md).
+* **Der Klima-Modus *Auto* ist nicht an echter Hardware getestet.** Er erscheint
+  nur mit Display oder Raumfühler; die CI prüft ihn gegen ein simuliertes
+  Display-Gerät.
+
+Berichte von anderen Geräten sind sehr willkommen, siehe
+[Reporting issues](README.md#reporting-issues) (EN). Der Weg zu 1.0:
+[Road to 1.0](README.md#road-to-10) (EN). Details: der
+[englische Abschnitt](README.md#release-094--beta-not-10-yet).
 
 ## Schnellstart
 

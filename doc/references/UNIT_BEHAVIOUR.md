@@ -106,8 +106,8 @@ How to tell them apart from the controller: no register states size or `R`
 ### 1.3 Variants seen so far
 
 Only one unit has been read: **HRDS+ 30 `R` `DC`**, no display, no external
-probes, Modbus via an RS-485→TCP gateway, behind a Zehnder ComfoAir Q350
-[T1, T10]. Everything about the HRDS+ 50, non-`R` units, units with a display
+probes, Modbus via an RS-485→TCP gateway, behind a Zehnder ComfoAir Q350,
+water circuit is a brine circuit [T1, T10]. Everything about the HRDS+ 50, non-`R` units, units with a display
 or external probes comes from the documents only.
 
 ---
@@ -687,7 +687,7 @@ probes), RS-485→TCP gateway, behind a Zehnder ComfoAir Q350. "Dump" means
 | T7 | 2026-10-20 | `PH01 = 0`, `HA00 = 0`, `PH02 = 1` and a power cycle: still `off_by_display`. First Modbus ON → `on` at once (so `PH01` and `PH02` kept their values, §3.6) | [`plans/todo.md`](../../plans/todo.md), PR #31 |
 | T8 | 2026-10-21 | OFF written to `Status_OnOff_byBMS`: register read ON for several polls; register and `sm_UnitStatus` changed together at one later poll | PR #32 |
 | T9 | 2026-10-20 | Through the RS-485→TCP gateway a 120-register read got no reply at all; 10-register reads covered the whole map | PR #28 |
-| T10 | 2026-10 | Installation context: HRDS+ 30 behind a Zehnder ComfoAir Q350 | PR #14 |
+| T10 | 2026-10 | Installation context: HRDS+ 30 behind a Zehnder ComfoAir Q350; the water circuit is a brine circuit (owner's statement, no brine behaviour observed yet, see `plans/todo.md`) | PR #14, README 0.9.4 |
 
 Not yet observed on hardware (everything else in this file): a running DEU or
 INT cycle with recorded fan/damper/compressor/valve read-backs, the passive
