@@ -610,4 +610,12 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        code = main()
+        sys.stdout.flush()
+    except BrokenPipeError:
+        # The reader left early (`| grep -q`, `| head`): not an error, and under
+        # `pipefail` a traceback here would fail the reader's pipeline.
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+        code = 1 if FAILURES else 0
+    sys.exit(code)
