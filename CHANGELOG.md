@@ -28,10 +28,14 @@ and Home Assistant (domain and entity IDs unchanged).
 
 **Docs:** the architecture decisions are recorded as ADRs in
 [`doc/adr/`](doc/adr/README.md). The README's beta section is reworded: it
-says what was developed against and tested on (one HRDS+ 30 `R`, headless, in
-the brine circuit of a ground-source heat pump with its own brine pump on the
-`PM` output) and what is not tested. The brine pump wiring and its working are
-recorded in the evidence log of [`doc/references/UNIT_BEHAVIOUR.md`](doc/references/UNIT_BEHAVIOUR.md).
+says what was developed against and tested on and what is not tested. New page
+[`doc/tested-setups.md`](doc/tested-setups.md): which units and installation
+scenarios (control path, water circuit, operating modes) are known to work,
+partly seen or untested, with the evidence; the first entry is the maintainer's
+unit in the brine circuit of a ground-source heat pump, with its own brine pump
+on the `PM` output (handbook variant 6). `UNIT_BEHAVIOUR.md` stays free of
+installation details; its evidence log gained the observation that a pump on
+`PM` runs with a request (T10).
 
 ---
 
