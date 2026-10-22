@@ -19,31 +19,28 @@ und **Innova DEH+ 30 / 50** (auch DEH 30 / DEH 50): Taupunktentfeuchtung mit
 Lüftung und Flächenkühlung. Die Integration steuert und überwacht das Gerät
 **lokal über Modbus TCP, ganz ohne Cloud**.
 
-## Kompatible Geräte und OEM-Varianten
+## Kompatible Geräte
 
-Die Integration spricht mit Lüftungs- und Entfeuchtungsgeräten von
-**[INNOVA S.r.l.](https://www.innova.it/)**. Da Innova seine Geräte auch unter
-anderen Marken liefert, kann Ihr Gerät unter verschiedenen Namen, Serien oder
-regionalen Bezeichnungen verkauft werden:
+Das Gerät wird von **[INNOVA S.r.l.](https://www.innova.it/)** (Storo, Italien)
+hergestellt. hej.luft verkauft es in Österreich unter eigenem Namen als
+OEM-Produkt. Die
+[CE-Konformitätserklärung auf der hej.luft-Seite](https://www.hejluft.at/_files/ugd/714411_e735ab85400c485fa7c042fac92d3230.pdf)
+nennt Innova als Hersteller der Entfeuchtungsgeräte HRDS und HRDS+.
 
-* **Österreich / DACH:**
-  * **[HejLuft](https://www.hejluft.at/)**: vertrieben als *HRDS+ 30* /
-    *HRDS+ 50* / *HRD+*-Serie, also der Innova *DEH+ 30* / *DEH+ 50*
-    (z. B. *HejLuft HRDS+ 30 H R K DC*).
-  * **[INNOVA S.r.l.](https://www.innova.it/)**: Originalbezeichnung
-    *[INNOVA DEH+ / HRD+ / HRDS+ Serie](https://www.innova.it/en/products/vmc/active-integration/hrd/)*
-    (liegende und stehende Kanal-Entfeuchter mit Wärmerückgewinnung und
-    aktiver Flächenkühlung).
-* **Italien und übriges Europa:** über HLK-Großhändler als **Innova DEH+** oder
-  **Innova HRD**, oder in Flächenkühl-Paketen von Systempartnern (etwa *RDZ*).
-* **Vereinigtes Königreich und USA:** das Gerät wird auch dort verkauft, im
-  Vereinigten Königreich als *Innova DEH+ Horizontal Ductable Dehumidifier*,
-  in den USA über Anbieter von Flächenkühlung wie
-  **[Messana Radiant Cooling](https://messana.com/)**. Die Integration wurde
-  mit Geräten dieser Anbieter **nicht getestet**; Hinweis unten.
+* **[hej.luft HRDS+ 30 / HRDS+ 50](https://www.hejluft.at/hrds)** (auch HRDS 30 / 50
+  geschrieben), mit den Typenschild-Codes aus dem
+  [Technischen Handbuch](https://www.hejluft.at/_files/ugd/714411_f1ffc5d222f4476da2e37f29c64a7f93.pdf),
+  zum Beispiel *HRDS+ 30 H R K DC*. Die Integration wurde mit diesem Gerät
+  entwickelt.
+* **[Innova DEH+ 30 H / 50 H](https://www.innova.it/en/products/vmc/dehumidifiers/deh-ad-incasso-orizzontale/)**:
+  Innovas eigener Name für das liegende Gerät, mit denselben Größen und
+  demselben Nenn-Luftdurchsatz (300 / 500 m³/h). Es wurde mit dieser
+  Integration **nicht getestet**; die in `doc/references/` abgelegte
+  DEH+-Installationsanleitung beschreibt eine ältere Steuerung als die
+  HRDS+-Platine.
 
-> *Nutzt Ihr Gerät die Innova-Elektronik und wird unter einem hier nicht
-> genannten Namen verkauft, eröffnen Sie gern ein Issue oder einen Pull Request.*
+> *Wird Ihr Gerät mit der Innova-Platine unter einem anderen Namen verkauft,
+> eröffnen Sie ein Issue und verlinken Sie die Produktseite.*
 
 > ## Version 0.9: Beta, noch nicht 1.0
 >

@@ -19,9 +19,10 @@ contents of the English sections. The entity reference moved from the README
 to [`doc/entity-reference.md`](doc/entity-reference.md), regrouped by device
 (main, setup, installer) with the reason each device exists; it is now the only
 list of entities, and `tests/wiring_check.py` fails when it differs from the
-code (ADR-0030). The compatible-devices list no longer claims the integration
-works with UK or Messana units: it says only that the device is sold there and
-that those units are untested.
+code (ADR-0030). The compatible-devices list now names only units with a link
+to the actual product (hej.luft HRDS+ with Innova's CE declaration, Innova
+DEH+); the claims about UK and US sellers, Messana, RDZ, "HRD+" and the Innova
+HRD ventilation unit were removed because no product page for them was found.
 
 **Breaking:** the Modbus enables **PH02** (on/off), **PH28** (dehumidify) and
 **PH27** (integration) are now yours: the integration no longer writes them at
