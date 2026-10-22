@@ -11,33 +11,20 @@ decoding, guards and writes all run for real; only the device is fake.
 | Device model | `sim/test_device.py` | The simulator on its own | seconds |
 | Consistency | `wiring_check.py` | Register map, translations, platforms; no HA installed | seconds |
 
-## The rule
+## Where does my new test go?
 
-**A test goes in `ha/`. It goes in `e2e/` only if an in-process HA cannot show
-what it checks**, and it says why with `@pytest.mark.needs_real_ha("<reason>")`.
-Collection fails for an e2e test without one of these reasons:
+The rule and its reasons are ADR-0019 (it loads with any file here):
+in-process by default, the real container only for what it alone can show.
 
-| Reason | What only the real container shows |
-|---|---|
-| `install-path` | HA itself installs the manifest requirement and loads `custom_components/` from disk |
-| `http-surface` | Flows and services as REST/websocket JSON: form schema and selector serialisation, error codes |
-| `real-time` | The real scheduler polls, with no time manipulation |
-| `persistence` | State written to disk and read back after a real restart |
-| `boot-order` | HA starting before the unit is reachable, and the setup retry that follows |
-| `runtime-logs` | The real HA log has no errors or deprecations from this integration |
-| `ha-drift` | The same checks against the `beta` image, nightly |
-
-Do **not** repeat an in-process scenario in e2e "to be sure". The same scenario
-in two layers doubles the runtime and tells us nothing new. The two layers
-complement each other: in-process proves what the *code* does, e2e proves what
-only a *real Home Assistant* can show.
-
-### Where does my new test go?
 1. Behaviour of the integration given a unit state (entities, services, guards,
    alarms, fan, climate, flows' logic)? → `ha/`.
-2. Needs one of the reasons above? → `e2e/`, with the marker.
+2. Needs a real container? → `e2e/`, marked
+   `@pytest.mark.needs_real_ha("<reason>")` with a reason from
+   `REAL_HA_REASONS` in `e2e/conftest.py` (each says what only the container
+   shows). Never a copy of an in-process scenario.
 3. Behaviour of the fake device itself? → `sim/test_device.py`.
 4. Register map, translations, platforms? → `wiring_check.py`.
+5. ADR format and scopes? → `adr_check.py`.
 
 ## The restart contract
 
@@ -63,6 +50,15 @@ gateways, and real hardware. The device model's rules come from
 `doc/references/UNIT_BEHAVIOUR.md`, `doc/references/MODBUS_REGISTERS.md` and one real
 dump, not from hardware: run
 `tests/diagnose_hrds.py` (read-only) against a unit to check the model.
+
+## Bring-up diagnostic (`diagnose_hrds.py`)
+`python3 tests/diagnose_hrds.py <host> [--port N] [--unit N] [--json FILE]`
+reads a real unit (FC 03/04/43 only, it never writes) before the integration
+is installed: identification, connected probes, settings to review, and what
+the integration would write on first connect. It reuses `const.py` and the
+block plan; keep its `build_blocks` in sync with `_build_blocks` (ADR-0018).
+Needs only `pip install 'pymodbus>=3.13.1'`. Its `--json` output is a
+simulator seed (`devices/README.md`).
 
 ## Running
 ```
@@ -121,13 +117,9 @@ from the image's modbus manifest and installs that. A bare `pytest` skips
   session, restarts included, and fails on errors, tracebacks and deprecations
   from the integration (a short allowlist covers errors the tests cause on
   purpose).
-* Version alignment (`ha/test_versions.py`): fails when the in-process Home
-  Assistant release (year.month) differs from the image tag in
-  `.github/ha-versions/Dockerfile`, or when the pinned `pymodbus` differs from
-  the one HA's modbus manifest requires. Dependabot bumps the two layers in
-  separate PRs, so bump `requirements_test.txt` and the Dockerfile together.
-  Dependabot ignores `pymodbus`: it follows Home Assistant and is never bumped
-  alone.
+* Version alignment (`ha/test_versions.py`, ADR-0004): Dependabot bumps the
+  two layers in separate PRs, so bump `requirements_test.txt` and
+  `.github/ha-versions/Dockerfile` together; never `pymodbus` alone.
 * Snapshots (`ha/snapshots/`): `pytest tests/ha/test_seeds.py --snapshot-update`,
   then review the diff.
 
@@ -135,4 +127,4 @@ from the image's modbus manifest and installs that. A bare `pytest` skips
 `tests.yaml` runs `sim`, `ha` and `test_wiring` (coverage gate 90 %);
 `e2e.yaml` runs `e2e` (nightly also against the HA `beta` image, allowed to
 fail); `release.yaml` runs both on the tagged commit before packaging. Triggers
-and branch protection are in the main `CLAUDE.md`.
+and branch protection: ADR-0020.

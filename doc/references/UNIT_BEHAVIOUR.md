@@ -8,7 +8,7 @@ Scope rules:
 
 * **Only the unit.** Nothing here describes what the Home Assistant
   integration does on top (guards, entities, defaults it writes). That is in
-  [`../../CLAUDE.md`](../../CLAUDE.md) (for agents) and [`../../README.md`](../../README.md)
+  [`../adr/`](../adr/README.md) (the decisions) and [`../../README.md`](../../README.md)
   (for users).
 * **Registers are named, not defined.** Which registers exist, their
   addresses, encodings, ranges and enum values are only in

@@ -10,7 +10,7 @@ and **not** here. Adding it here as well makes the CI slower and shows nothing
 new. A test here must name what only the real container shows:
 
 ```python
-@pytest.mark.needs_real_ha("persistence")  # one of the reasons in ../CLAUDE.md
+@pytest.mark.needs_real_ha("persistence")  # a key of REAL_HA_REASONS in conftest.py
 def test_something(hl, restart_ha): ...
 ```
 `conftest.py` rejects an unmarked test or an unknown reason at collection.

@@ -1,7 +1,7 @@
 # End-to-end tests: the integration in a real Home Assistant container.
 #
 # Deliberately small: only what an in-process Home Assistant (tests.yaml) cannot
-# show. Every test names why (tests/CLAUDE.md): HA installing the integration
+# show. Every test names why (ADR-0019, tests/CLAUDE.md): HA installing the integration
 # itself, flows and services as HTTP/JSON, the real scheduler, the setup
 # surviving real restarts, booting before the unit is up, and the real log.
 # Behaviour scenarios (modes, fan, alarms, display, ...) live in tests/ha.
