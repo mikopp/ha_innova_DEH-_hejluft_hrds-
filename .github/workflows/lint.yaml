@@ -7,8 +7,9 @@
 #   * `ruff format --check` -> fails if any file is not formatted
 #   * tests/wiring_check.py -> classification, platforms, translations,
 #     register docs and block plan, with Home Assistant stubbed out
-#   * tests/adr_check.py -> the ADRs (.claude/rules/adr, .claude/adr): format,
-#     scopes, folders, doc/adr index, topic map, citations, confirmation checks
+#   * tests/adr_check.py -> the ADRs (.claude/rules/adr, doc/adr/proposed and
+#     /superseded): format, scopes, folders, indexes, topic map, citations,
+#     revival records, confirmation checks
 # It does NOT import Home Assistant, so it is quick and has no HA dependency.
 name: Lint
 

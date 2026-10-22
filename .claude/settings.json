@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "ask": [
+      "Read(/doc/adr/proposed/**)",
+      "Read(/doc/adr/superseded/**)"
+    ]
+  }
+}

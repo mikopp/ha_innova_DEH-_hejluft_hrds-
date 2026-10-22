@@ -10,12 +10,15 @@ dehumidification module over **Modbus TCP**. Domain `innova_hrds`, code in
 Every design decision is an ADR in [`doc/adr/`](doc/adr/README.md) (index
 there). The accepted ADRs that govern a file load into your context
 automatically when you read that file (real files in `.claude/rules/adr/`,
-path-scoped; the rest are in `.claude/adr/`, never loaded).
+path-scoped). Proposed and superseded ADRs (`doc/adr/proposed/`,
+`doc/adr/superseded/`) are history: do not read, search or list them in normal
+work; `/adr` gets a digest from `python3 tests/adr_check.py --history`.
 For logic in a file no ADR path covers (a new module), the topic map
 `.claude/rules/adr-topics.md` (loads with any code) names the ADRs per topic:
 read those before the first edit. ADRs are binding: follow them, or stop and
 propose a superseding ADR. Use the `/adr` skill to record a new decision
-(`new`), change one (`supersede`), or check a diff before a PR (`check`).
+(`new`), change one (`supersede`), reject one, or check a diff before a PR
+(`check`); it challenges a decision that revives a retired one (ADR-0029).
 Do not restate ADR content in this file.
 
 ## Invariants (details in the cited ADR)
@@ -85,7 +88,7 @@ Each topic has one home; link to it instead of repeating it (ADR-0027).
 ```
 ruff check . && ruff format .
 python3 tests/wiring_check.py   # registers, translations, platforms, groups; no HA needed
-python3 tests/adr_check.py      # ADR format, scopes, folders, index, topic map (--fix)
+python3 tests/adr_check.py      # ADR format, scopes, folders, indexes, topic map (--fix)
 pytest tests/sim tests/ha tests/test_wiring.py   # needs requirements_test.txt, Python 3.14
 ```
 

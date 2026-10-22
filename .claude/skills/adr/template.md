@@ -39,4 +39,7 @@ repeating it (`UNIT_BEHAVIOUR.md` T-row or §, handbook §, PR #).
 
 ## More information
 
-Origin (PR #, commit), related ADRs.
+Origin (PR #, commit), related ADRs. A decision that supersedes another
+adds `supersedes: [ADR-NNNN]` to the frontmatter; one that revives a retired
+decision adds `revives: [ADR-NNNN]` and a `## What changed since ADR-NNNN`
+section (ADR-0029).

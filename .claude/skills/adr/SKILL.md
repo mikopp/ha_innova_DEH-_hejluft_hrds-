@@ -1,15 +1,19 @@
 ---
 name: adr
-description: Records, supersedes and checks the architecture decision records (index doc/adr/README.md, files in .claude/rules/adr and .claude/adr). Use when a change makes or reverses a design decision (a rule the code must keep following), when asked to log, write or propose an ADR, when a planned change would contradict an ADR, or before opening a PR to check the diff against the ADRs that govern the changed files.
-argument-hint: "new <decision> | supersede <ADR-NNNN> <decision> | check [base]"
+description: Records, supersedes, rejects and checks the architecture decision records (accepted in .claude/rules/adr, proposed and superseded in doc/adr, index doc/adr/README.md). Use when a change makes or reverses a design decision (a rule the code must keep following), when asked to log, write, propose, supersede or reject an ADR, when a planned change would contradict an ADR, or before opening a PR to check the diff against the ADRs that govern the changed files.
+argument-hint: "new <decision> | supersede <ADR-NNNN> <decision> | reject <ADR-NNNN> | check [base]"
 ---
 
 # ADRs
 
-Format and rules: `.claude/rules/adr/0001-record-decisions-as-path-scoped-adrs.md`.
-Template: `.claude/adr/template.md`. Validator: `python3 tests/adr_check.py`.
-Accepted ADRs live in `.claude/rules/adr/` (loaded by path), all others in
-`.claude/adr/` (never loaded); `--fix` moves a file when its status changes.
+Rules for the format and the folders: ADR-0001 and ADR-0029 (both in
+`.claude/rules/adr/`). Template: `template.md` next to this file. Validator:
+`python3 tests/adr_check.py`.
+
+Folders: accepted = `.claude/rules/adr/` (loaded by path), proposed =
+`doc/adr/proposed/`, superseded/rejected/deprecated = `doc/adr/superseded/`.
+**Do not open the last two** except as the revival challenge below says. Get
+history with `python3 tests/adr_check.py --history [--topic T...]`.
 
 ## Is it an ADR?
 
@@ -21,34 +25,62 @@ skill), a fact about the unit (`doc/references/UNIT_BEHAVIOUR.md`).
 ## new: record a decision
 
 ```
-- [ ] 1. python3 tests/adr_check.py --for <files the decision governs>
-        and --topic <its topics> → read those ADRs; if one already covers
-        it, edit or supersede instead
-- [ ] 2. cp .claude/adr/template.md .claude/adr/NNNN-kebab-title.md
-        (next free number across both folders)
-- [ ] 3. Decision first: one RFC 2119 rule per bullet, naming code symbols
-- [ ] 4. paths: the narrowest globs that cover the governed files;
-        topics: every topic in TOPICS (tests/adr_check.py) it is about.
-        A new topic only if none fits: add it to TOPICS with a description
-- [ ] 5. Confirmation: existing test ids and/or an sh check that exits 0
-- [ ] 6. Context/Consequences: a few lines; link evidence, PRs, commits
-- [ ] 7. status: proposed (accepted only when the user agreed or it records
-        what the code already does)
-- [ ] 8. python3 tests/adr_check.py --fix && python3 tests/adr_check.py
-        → fix every FAIL, repeat until ALL PASS
+- [ ] 1. Topics: pick from .claude/rules/adr-topics.md what the decision is about
+- [ ] 2. Accepted ADRs: python3 tests/adr_check.py --for <files> and --topic <topics>
+        → read them; if one already covers it, edit or supersede instead
+- [ ] 3. History: python3 tests/adr_check.py --history --topic <topics>
+        → REVIVAL CHALLENGE below if the new decision matches anything listed
+- [ ] 4. python3 tests/adr_check.py --next; cp template.md
+        doc/adr/proposed/NNNN-kebab-title.md
+- [ ] 5. Decision first: one RFC 2119 rule per bullet, naming code symbols
+- [ ] 6. paths: the narrowest globs over the governed files; topics: every
+        topic it is about (a new one only if none fits: add it to TOPICS)
+- [ ] 7. Confirmation: existing test ids and/or an sh check that exits 0
+- [ ] 8. Context/Consequences: a few lines; link evidence, PRs, commits
+- [ ] 9. status: proposed; accepted only when the user agreed or it records
+        what the code already does
+- [ ] 10. python3 tests/adr_check.py --fix && python3 tests/adr_check.py
+         → fix every FAIL, repeat until ALL PASS (--fix moves an accepted ADR
+         into .claude/rules/adr/ and regenerates the indexes)
 ```
 
 Keep an ADR under 90 lines: it loads into context whenever a governed file is
 read. Never restate it in CLAUDE.md; a one-line invariant citing the id is
 enough.
 
+### Revival challenge (step 3)
+
+The digest shows, per proposed or retired ADR, what it decided and why it was
+retired. Compare each with the new decision's rules.
+
+* No overlap: go on. Open nothing.
+* The new rule re-adopts what a retired ADR dropped, or repeats a rejected
+  one: **stop**. Tell the user the old id and title, what it decided, why it
+  was retired, and the new decision that would undo that. Ask what changed (a
+  hardware test, a PR, a premise that no longer holds). Write nothing until
+  they answer.
+* They give evidence: open the retired file (accept the Read prompt), then
+  write the new ADR with `revives: [ADR-OLD]` in the frontmatter and a
+  `## What changed since ADR-OLD` section stating the evidence. If the old
+  ADR was only superseded in part, say which part.
+* They give none: do not write the ADR; keep the old decision.
+* A proposed ADR that overlaps: tell the user, and edit that proposal instead
+  of adding a second one.
+
 ## supersede: change a decision
 
-1. Write the new ADR as above with `supersedes: [ADR-OLD]`.
+1. Run steps 1–3 above. Write the new ADR with `supersedes: [ADR-OLD]`.
 2. In the old ADR set `status: superseded by ADR-NEW`, delete its `paths`, and
-   add a short "Why it was superseded" section; `--fix` moves it out of
-   `.claude/rules/adr/` so it stops loading.
-3. Update CLAUDE.md lines that cite the old id; run the validator.
+   add a `## Why it was superseded` section: what failed or changed, with
+   evidence.
+3. Update CLAUDE.md lines that cite the old id. `--fix` moves the old file to
+   `doc/adr/superseded/`, which stops it loading; then run the validator.
+
+## reject: a decision not taken
+
+Write the ADR with `status: rejected` and a `## Why it was rejected` section
+(who decided, why), so the next proposal of it meets the revival challenge.
+`--fix` puts it in `doc/adr/superseded/`.
 
 ## check: a diff against the ADRs
 
