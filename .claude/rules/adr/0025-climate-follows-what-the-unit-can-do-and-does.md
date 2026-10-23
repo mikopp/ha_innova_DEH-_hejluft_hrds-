@@ -1,8 +1,8 @@
 ---
 status: accepted
-date: 2026-10-21
+date: 2026-10-23
 decision-makers: mikopp
-topics: [climate, requests]
+topics: [climate, requests, fan]
 paths:
   - "custom_components/innova_hrds/climate.py"
   - "custom_components/innova_hrds/__init__.py"
@@ -36,6 +36,11 @@ paths:
   requests and switch on; COOL sets INT and DEU, HEAT sets INT and clears
   DEU, DRY sets DEU and clears INT. `turn_on` = AUTO if `auto_capable` else FAN_ONLY; `turn_off` = OFF.
   `_usable` drops writes a disabled enable makes pointless.
+- The climate entity MUST NOT show a fan: no `FAN_MODE` feature, no
+  `fan_mode` / `fan_modes`, now or later, because the unit takes no
+  fan-speed request over Modbus, so a fan mode could never be set
+  (ADR-0034). FAN_ONLY is only Standby renamed and MUST NOT write any fan
+  register. The FAN action stays: it reports what the unit does.
 - Targets: humidity ← `humidity_setpoint` within PH29/PH30; temperature ←
   SEtC (15–35 °C) in summer, SEtH clamped to PH09..PH10 in winter.
 
@@ -64,6 +69,11 @@ refused Dry used to clear a running Cool before being refused.
 - `tests/ha/test_failures.py::test_off_switches_the_unit_off_when_a_request_cannot_be_cleared`
 - `tests/ha/test_display.py::test_auto_lets_the_unit_dehumidify_on_its_own`
 - `tests/ha/test_display.py::test_target_temperature_range_follows_the_season`
+- `tests/ha/test_fan.py::test_no_speed_control_and_nothing_written_to_pm20`
+
+```sh
+! grep -nE "FAN_MODE|fan_mode" custom_components/innova_hrds/climate.py
+```
 
 ## More information
 

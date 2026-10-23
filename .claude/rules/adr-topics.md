@@ -21,7 +21,7 @@ topics before the first edit: ADR-NNNN is `.claude/rules/adr/NNNN-*.md`; run
 - **entities** (adding, grouping and renaming entities and devices): ADR-0002, ADR-0016, ADR-0017, ADR-0026, ADR-0030, ADR-0033
 - **config** (config and options flows, options, device identity, installer menu): ADR-0009, ADR-0010, ADR-0016, ADR-0017, ADR-0034
 - **climate** (the climate entity): ADR-0011, ADR-0025, ADR-0034
-- **fan** (the recirculation fan and the airflow estimate): ADR-0033, ADR-0034
+- **fan** (the recirculation fan and the airflow estimate): ADR-0025, ADR-0033, ADR-0034
 - **season** (summer and winter, heating): ADR-0013, ADR-0014
 - **water** (the water circuit and brine): ADR-0014, ADR-0015
 - **dependencies** (Home Assistant and pymodbus versions): ADR-0004
