@@ -468,13 +468,15 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "SWITCH": {"off": 0, "on": 1},
         "NAME": "Dehumidify requested",
     },
-    # "Fans integration request" (MB). Not recirculation: it stayed 0 through
-    # recirculating dehumidify runs (UNIT_BEHAVIOUR.md T16, T18).
+    # "Fans integration request" (MB): a 0-100 % fan request like 1113-1116,
+    # not a flag and not recirculation; 0 through dehumidify runs
+    # (MODBUS_REGISTERS.md section 6, UNIT_BEHAVIOUR.md T16, T18).
     C_FAN_INTEGRATION_REQUEST: {
         "RT": C_REG_TYPE_INPUT_REGISTERS,
         "REG": 1112,
         "DT": C_DT_UINT16,
-        "SWITCH": {"off": 0, "on": 1},
+        "FAKTOR": 0.01,
+        "UNIT": "%",
         "NAME": "Fan integration request",
     },
     C_RECIRCULATION_DAMPER: {
@@ -902,8 +904,8 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "UNIT": "\u00b0C",
         "NAME": "Evaporator temperature",
     },
-    # Mirrors the *display's* manual fan request, not ours. Diagnostic only:
-    # the faithful read-back of our own write is holding register 1614.
+    # The *display's* manual fan request. Diagnostic only; 1614 (PM20) reads
+    # the same and does not hold a Modbus write (UNIT_BEHAVIOUR.md T22, T23).
     C_FAN_MANUAL_REQUEST: {
         "RT": C_REG_TYPE_INPUT_REGISTERS,
         "REG": 1114,

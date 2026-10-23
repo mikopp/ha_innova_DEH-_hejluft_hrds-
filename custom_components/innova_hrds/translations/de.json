@@ -113,6 +113,9 @@
       "fan_manual_request": {
         "name": "Manuelle Lüfteranforderung (Display)"
       },
+      "fan_integration_request": {
+        "name": "Lüfter-Integrationsanforderung"
+      },
       "max_total_airflow": {
         "name": "Max. Gesamt-Volumenstrom"
       },
@@ -453,9 +456,6 @@
       },
       "recirculation_active": {
         "name": "Umluft aktiv"
-      },
-      "fan_integration_request": {
-        "name": "Lüfter-Integrationsanforderung"
       },
       "alarm_active": {
         "name": "Alarm aktiv"

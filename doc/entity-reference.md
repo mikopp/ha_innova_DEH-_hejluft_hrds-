@@ -59,7 +59,7 @@ device (see the [beta banner](../README.md#release-094--beta-not-10-yet)).
 
 | Entity | Name | What it does |
 |---|---|---|
-| `fan.hrds_supply_fan` | Supply fan | `R` units only (a non-R unit has no fan of its own; its damper output reads *disabled*, and the fan entity, the climate fan modes, the fan speed numbers and the fan sensors are not created). The unit's supply/recirculation fan as a percentage. Reports the **actual** output (reg 639) — what the fan is doing — while `fan.set_percentage` writes the setpoint PM20 (1614). The commanded value, RPM and fan status are state attributes. Because the unit's own fan recirculates room air *in addition* to whatever the central MVHR pushes through the duct, this is the lever for topping combined airflow up to a target. |
+| `fan.hrds_supply_fan` | Supply fan | `R` units only (a non-R unit has no fan of its own; its damper output reads *disabled*, and the fan entity, the climate fan modes, the fan speed numbers and the fan sensors are not created). The unit's supply/recirculation fan as a percentage. Reports the **actual** output (reg 639) — what the fan is doing — while `fan.set_percentage` writes the setpoint PM20 (1614). **On the reference unit that write has no effect:** PM20 is the display's setpoint and the unit overwrites it, so the fan stays at the band minimum (PF28) ([UNIT_BEHAVIOUR §9.1](references/UNIT_BEHAVIOUR.md#91-bands-and-sources), T23). Until that is resolved, change the speed with `number.fan_min_speed_dehumidify` / `_cooling` (untested, [plan](../plans/fan-speed-tests.md)). The commanded value (`commanded_percent`, which shows PM20, the display's request), RPM and fan status are state attributes. Because the unit's own fan recirculates room air *in addition* to whatever the central MVHR pushes through the duct, it adds airflow on top of the MVHR. |
 
 #### Request switches
 
@@ -79,7 +79,7 @@ device (see the [beta banner](../README.md#release-094--beta-not-10-yet)).
 
 | Entity | Name | Register | Range | Notes |
 |---|---|---|---|---|
-| `number.fan_manual_speed` | Manual fan speed | 1614 | 0–100 % | PM20; the fan **setpoint** — what was asked for. The fan entity and climate fan mode write here too. The unit also sets it itself: to the band minimum (PF28) when the fan starts and to 0 when a request ends ([UNIT_BEHAVIOUR §9.1](references/UNIT_BEHAVIOUR.md#91-bands-and-sources)). See [Commanded vs actual fan speed](../README.md#commanded-vs-actual-fan-speed). |
+| `number.fan_manual_speed` | Manual fan speed | 1614 | 0–100 % | PM20, the **display's** manual setpoint. The fan entity and climate fan mode write here too, but the unit does not keep a written value: it sets PM20 itself, to the band minimum (PF28) when the fan starts and to 0 when a request ends, and a value written during a run read back as the band minimum (T23, [UNIT_BEHAVIOUR §9.1](references/UNIT_BEHAVIOUR.md#91-bands-and-sources)). It shows the display's request, not the fan speed; the speed is `sensor.supply_fan_output` (639). See [Commanded vs actual fan speed](../README.md#commanded-vs-actual-fan-speed). |
 
 #### Sensors
 
@@ -173,18 +173,13 @@ shows it.
 
 | Entity | Name | Unit | Probe needed | Notes |
 |---|---|---|---|---|
-| `sensor.fan_manual_request` | Manual fan request (display) | % | ³ Built-in | Reg 1114; the **display's** manual request, not ours — diagnostic |
+| `sensor.fan_manual_request` | Manual fan request (display) | % | ³ Built-in | Reg 1114; the **display's** manual request, not ours — diagnostic. Without a display it reads the band minimum while the fan runs |
+| `sensor.fan_integration_request` | Fan integration request | % | ³ Built-in | Reg 1112 (`FanIntegration_Request`, ×0.01 %); the fan request of the integration (INT) fan control, one of the requests the unit's fan speed is the highest of ([UNIT_BEHAVIOUR §9.1](references/UNIT_BEHAVIOUR.md#91-bands-and-sources)). 0 during dehumidify; a non-zero value during INT is not yet seen on hardware. R variant only |
 | `sensor.water_valve_pump` | Water valve / pump output | enum | ³ Built-in | Diagnostic. Reg 1126; relay K5 — external water valve (V3V) and the pump output (PM) switched with it: Off / On / Not configured |
 | `sensor.water_condenser_valve` | Water condenser valve | enum | ³ Built-in | Diagnostic. Reg 1124; relay K4, the internal valve. A real unit reads On in standby, against the handbook's description, so its meaning is unverified ([UNIT_BEHAVIOUR §11.1](references/UNIT_BEHAVIOUR.md#111-internal-valve-relay-k4)); the climate action does not use it |
 | `sensor.water_check` | Water circuit check | enum | — | Diagnostic. `ok` / `attention`; attribute `issues`, see [Water circuit](../README.md#water-circuit-and-brine) |
 | `sensor.supply_fan_max_airflow` | Supply fan max airflow | m³/h | — | Computed constant; maximum fan airflow (from config) |
 | `sensor.max_total_airflow` | Max total airflow | m³/h | — | Computed constant; same as supply_fan_max_airflow (from config) |
-
-#### Binary sensors
-
-| Entity | Name | Register | What ON means |
-|---|---|---|---|
-| `binary_sensor.fan_integration_request` | Fan integration request | 1112 | `FanIntegration_Request` (Modbus manual: fans integration request). Meaning unconfirmed: it stayed off through two recirculating dehumidify runs; possibly on only for an INT request. R variant only |
 
 ## Setup device: HRDS+ setup
 

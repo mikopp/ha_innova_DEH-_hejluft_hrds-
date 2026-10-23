@@ -117,8 +117,9 @@ async def test_recirculation_is_damper_open_and_fan_running(setup, clock):
     await clock.poll()
     assert s.state("sensor", "supply_fan_status").state == "on"
     assert s.state("binary_sensor", "recirculation_active").state == "on"
-    # 1112 stays 0 while the unit recirculates (UNIT_BEHAVIOUR.md T16, T18).
-    assert s.state("binary_sensor", "fan_integration_request").state == "off"
+    # 1112 is a fan request in %; it stays 0 while the unit recirculates for
+    # a dehumidify request (UNIT_BEHAVIOUR.md T16, T18).
+    assert float(s.state("sensor", "fan_integration_request").state) == 0
 
     await set_hvac_mode(s, clock, "fan_only")
     assert s.state("binary_sensor", "recirculation_active").state == "off"

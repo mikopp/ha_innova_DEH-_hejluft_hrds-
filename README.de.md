@@ -55,8 +55,11 @@ Die Integration ist veröffentlicht und nutzbar, aber eine **Beta**.
   [Getestete Geräte und Installationen](doc/tested-setups.md) (EN).
 * **Auf echter Hardware nicht getestet:** das HRDS+ 50, Geräte ohne Umluft,
   Geräte mit Display oder Fühlern (automatische Sollwertregelung), Winterbetrieb
-  und Freikühlung. Auch wie die manuelle Lüfterstufe zur tatsächlichen
-  Lüfterleistung passt, ist noch nicht geprüft. Offene Punkte:
+  und Freikühlung. **Die Lüfterdrehzahl lässt sich noch nicht einstellen:**
+  Das Gerät übernimmt die manuelle Lüfterstufe (PM20) nicht und lässt den
+  Lüfter am Minimum seines Bands laufen
+  ([Commanded vs actual fan speed](README.md#commanded-vs-actual-fan-speed), EN).
+  Offene Punkte:
   [`plans/todo.md`](plans/todo.md).
 * **Der Klima-Modus *Auto* ist nicht an echter Hardware getestet.** Er erscheint
   nur mit Display oder Raumfühler; die CI prüft ihn gegen ein simuliertes

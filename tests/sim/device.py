@@ -444,8 +444,9 @@ class HrdsDevice:
         manual_fan = on and not request and h.get(R.FAN_MANUAL, 0) > 0
 
         i[R.DEHUM_REQUEST] = 1 if request and not heating else 0
-        # 1112 (FanIntegration_Request) is left as dumped: it stayed 0 through
-        # recirculating dehumidify runs, and what sets it is unknown.
+        # 1112 (FanIntegration_Request, a 0-100 % fan request) is left as
+        # dumped: it stayed 0 through recirculating dehumidify runs, and its
+        # value during INT is not yet seen on hardware.
         if self.r_variant:
             i[R.DAMPER] = 1 if request else 0
         if self.pump_configured:

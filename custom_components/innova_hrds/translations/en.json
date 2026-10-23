@@ -113,6 +113,9 @@
       "fan_manual_request": {
         "name": "Manual fan request (display)"
       },
+      "fan_integration_request": {
+        "name": "Fan integration request"
+      },
       "max_total_airflow": {
         "name": "Max total airflow"
       },
@@ -453,9 +456,6 @@
       },
       "recirculation_active": {
         "name": "Recirculation active"
-      },
-      "fan_integration_request": {
-        "name": "Fan integration request"
       },
       "alarm_active": {
         "name": "Alarm active"
