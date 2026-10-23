@@ -11,11 +11,11 @@ in this order, empty ones left out: `### ⚠️ Breaking changes`,
 
 ---
 
-## Unreleased
+## 0.9.5 (2026-10-23): Read-only fan, recirculation from damper and fan
 
 ### ⚠️ Breaking changes
 
-- **The fan is no longer a fan entity; it is shown by sensors only.** Modbus can neither switch the unit's fan nor set its speed: the unit runs it with every request and stops it after a run-on, acknowledged the speeds written and ignored them, and refused those below its band. So `fan.hrds_supply_fan` is gone, the climate entity has no fan mode, and *Manual fan speed* is a sensor that shows the unit's own manual request. The new *Supply fan running* is on while the unit's fan status says *On* or *Stopping* (the run-on).
+- **The fan is no longer a fan entity; sensors show it instead.** Modbus can neither switch the unit's fan nor set its speed: the unit runs it with every request and ignores written speeds. So `fan.hrds_supply_fan` and the climate fan mode are gone, *Manual fan speed* is a sensor, and the new *Supply fan running* is on while the fan runs or runs on.
   * Remove `fan.*` service calls, `climate.set_fan_mode` and `number.set_value` on the manual fan speed from automations and scripts; they now fail.
   * Use *Supply fan running* for on/off and *Supply fan output* for the speed instead of the fan entity's state and attributes.
   * To run the fan faster, raise *Fan min speed (dehumidify)* or *(cooling)*. Lowering it does not slow a running fan.
@@ -33,8 +33,7 @@ in this order, empty ones left out: `### ⚠️ Breaking changes`,
 
 - **The installer parameter Pb08 (anti-stagnation wait) now shows minutes, not hours.**
   The handbook gives minutes; on a real unit the valve and pump open for about a minute every hour while the unit is on.
-- **Register 1112 is no longer described as "supply fan running".** It stayed 0 while the fan ran.
-- **Recirculation active now shows when the unit recirculates.** It is on while the damper is open and the fan runs; before, it read a register that stayed off. That register is now its own diagnostic sensor, *Fan integration request*, in percent: the Modbus manual lists it as a 0–100 % fan request, not an on/off flag.
+- **Recirculation active now shows when the unit recirculates.** It is on while the damper is open and the fan runs; before, it read a register that stayed off. That register is now its own diagnostic sensor, *Fan integration request*, in percent.
 - **Supply fan speed shows unknown when the unit cannot measure it.** It needs an input allocated to the fan tachometer; without one the unit reports 0 rpm with the fan running.
 - **The room probe OK sensors show unknown when no room probe is set up.** They used to say OK for a probe that is not there.
 
@@ -44,7 +43,7 @@ in this order, empty ones left out: `### ⚠️ Breaking changes`,
 - **A fan speed written to PM20 is never taken:** inside the band the unit acknowledges it and keeps its own value, below the band it refuses it (T27, T28). The evidence row T23 now gives the right run and values.
 - **The running-hour counters (PM00–PM04) count whole hours,** not tenths as the docs said; the handbook's "Hours x10" is the display's unit (T29). The installer entities already showed hours.
 - **Unit behaviour cites parameters by code, with a lookup of handbook default and shipped value** (`UNIT_BEHAVIOUR.md` §15), plus evidence rows T11 to T22 from the first two dehumidify runs and new open points in `plans/todo.md`.
-- **Why the supply fan speed reads 0:** the unit only measures it when an input is allocated to the fan tachometer, and the reference unit has none. Also documented: the stop sequence, that the unit sets the manual fan speed itself at each start and stop, and that register 1112 is not a recirculation flag.
+- **Why the supply fan speed reads 0:** the unit only measures it when an input is allocated to the fan tachometer, and the reference unit has none. Also documented: the stop sequence, that the unit sets the manual fan speed itself at each start and stop, and that register 1112 is a 0–100 % fan request, neither "supply fan running" nor a recirculation flag (it stayed 0 while the fan ran).
 
 ### 🧪 Tests and CI
 

@@ -21,8 +21,8 @@ evidence log, replace the `[INFERRED]` tags it settles, and fix the code/docs.
       value. No: the Modbus manual's full map gives `FanIntegration_Request`
       the range 0.00–100.00 like the fan requests 1113–1116 next to it
       [MB p.14], so it is a fan request in % (`MODBUS_REGISTERS.md` §6). It
-      stayed 0 through two recirculating DEU runs (T16, T18). The entity PR
-      shows it as a % sensor. Still to see on hardware: a non-zero value during
+      stayed 0 through two recirculating DEU runs (T16, T18). It is shown as
+      the % sensor `sensor.fan_integration_request`. Still to see on hardware: a non-zero value during
       an INT run ([`fan-speed-tests.md`](fan-speed-tests.md) test E).
 - [ ] **Air quality (506)** unit/scale and whether the probe is even fitted.
       The device class is now left unset: `AQI` accepts only a `None` unit in
@@ -97,21 +97,21 @@ in `doc/references/UNIT_BEHAVIOUR.md` §13. What they left open:
       and by the MVHR flow dip at its start (T18). `diagnose_hrds.py` now prints
       the tachometer allocation in its snapshot; one read of the running unit
       confirms the dump. Whether the fan's tachometer wire could be connected to
-      a free input is an installer question. Integration side: show the speed
-      only when an input is allocated (entity PR).
+      a free input is an installer question. Integration side: done, the
+      supply fan speed shows unknown when no input is allocated.
 - [ ] **What is 1112 (`FanIntegration_Request`)?** It stayed 0 through two
       recirculating DEU runs (T16, T18), so it is neither "fan running" nor
       "recirculating". The Modbus map makes it a 0–100 % fan request (see the
       scaling item above). Hypothesis: the request of the INT fan control
       (`PF31`, `PF12`/`PF13`), non-zero only during an INT request. Read it
       during the first INT run ([`fan-speed-tests.md`](fan-speed-tests.md)
-      test E). Integration side: derive `recirculation_active` from the
-      damper (1134) and fan status (1119) and show 1112 under its own name
-      (entity PR).
+      test E). Integration side: done, `recirculation_active` comes from the
+      damper (1134) and fan status (1119), and 1112 is
+      `sensor.fan_integration_request`.
 - [x] **Who wrote `PM20` (1614) and the display request (1114)?** The unit: both
       went 0 → 50 % at the fan start of both runs and 50 → 0 at the stop, with no
-      write from Home Assistant (T22). So `commanded_percent` and
-      `number.manual_fan_speed` show the unit's value, a percentage written while
+      write from Home Assistant (T22). So `sensor.fan_manual_speed` shows the
+      unit's value, a percentage written while
       idle is overwritten at the next start, and the rescale/clamp sweep below
       has to write `PM20` while a request runs. Open: does a `PM20` written
       during a request hold until its end? **No** (T23, 2026-10-23): a value
@@ -218,17 +218,17 @@ in `doc/references/UNIT_BEHAVIOUR.md` §13. What they left open:
       Modbus PDF lists Max `158.0`. Confirm the real usable range and adjust
       MIN/MAX/STEP if the device accepts more.
 
-## Fan mode — implemented, needs hardware verification
+## Fan — read-only, needs hardware verification
 
-> **2026-10-23: the integration's fan write does not work.** `PM20` (1614) is
+> **2026-10-23: a fan write over Modbus does not work.** `PM20` (1614) is
 > the display's setpoint ("via Display (read only)", handbook §5.3); the unit
 > overwrites a Modbus write (T22, T23). No register takes a fan-speed request
 > from the BMS; the documented Modbus lever is the band (`PF28`/`PF27`,
 > `UNIT_BEHAVIOUR.md` §9.1). Seen on hardware: raising `PF28` above the
 > running speed raises it within a poll, lowering `PF28` does not lower it
 > (T24–T26). The remaining hardware tests are in
-> [`fan-speed-tests.md`](fan-speed-tests.md); the code change waits for them
-> (item *Fan write target* below).
+> [`fan-speed-tests.md`](fan-speed-tests.md). The integration no longer writes
+> the fan (0.9.5, item *Fan write target* below).
 
 > The simulator (`tests/sim/device.py`) now models what the hardware showed:
 > the unit owns `PM20`, clamps it into the band and drives the fan at it; a
@@ -283,14 +283,16 @@ in `doc/references/UNIT_BEHAVIOUR.md` §13. What they left open:
 
       This decides whether an external airflow controller can command percent
       directly or must open the band first.
-- [ ] Confirm `SupplyFan_Status` (1119) reports `1` (OFF) when fan mode = off
-      and a mode is active, and that `recirculation_active` (1112) goes 0.
-      Covered by the fan = 0 test below.
+- [ ] Confirm `SupplyFan_Status` (1119) reports `1` (OFF) when the fan is
+      set to 0 while a request is active, and that `recirculation_active`
+      goes off. Covered by the fan = 0 test below.
 - [ ] **Does the fan stand still while 1119 reads `2` (wait_on, "Starting")
       and turn while it reads `4` (wait_off, "Stopping")?** Record 1119 and 639
       from a request's start to the end of the PF03 run-on, and look at the
       fan. ADR-0028 counts On and Wait OFF as running (T19 saw 40 % in Wait
-      OFF); Wait ON as stopped is [INFERRED].
+      OFF); Wait ON as stopped is [INFERRED]. More urgent since 0.9.5:
+      `binary_sensor.supply_fan_running` and `recirculation_active` now
+      depend on it.
 - [x] ~~Verify the Low / Medium / High fan mode percentages~~: the climate
       entity has no fan mode any more (ADR-0034).
 
