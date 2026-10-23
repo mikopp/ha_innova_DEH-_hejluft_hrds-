@@ -87,7 +87,8 @@ Each topic has one home; link to it instead of repeating it (ADR-0027).
 | Open hardware questions and test plans | [`plans/todo.md`](plans/todo.md) |
 | Tests: layers, simulator, how to run | [`tests/CLAUDE.md`](tests/CLAUDE.md) |
 | Repository settings that are not files | [`.github/REPO_SETTINGS.md`](.github/REPO_SETTINGS.md) |
-| Preparing a release | `/release-prep` skill |
+| Preparing a release | `python3 scripts/release.py X.Y.Z` (owner) or the `/release-prep` skill (agent); ADR-0031 |
+| Writing a CHANGELOG entry (`## Unreleased`, never a version) | `.claude/rules/changelog.md` (ADR-0032) |
 
 ## Commands
 
@@ -95,7 +96,8 @@ Each topic has one home; link to it instead of repeating it (ADR-0027).
 ruff check . && ruff format .
 python3 tests/wiring_check.py   # registers, translations, platforms, groups; no HA needed
 python3 tests/adr_check.py      # ADR format, scopes, folders, indexes, topic map (--fix)
-pytest tests/sim tests/ha tests/test_wiring.py   # needs requirements_test.txt, Python 3.14
+python3 scripts/release.py check   # CHANGELOG under Unreleased, versions agree
+pytest tests/sim tests/ha tests/test_wiring.py tests/test_release_script.py   # needs requirements_test.txt, Python 3.14
 ```
 
 Run `wiring_check.py` after any entity change and `adr_check.py` after any
@@ -104,7 +106,7 @@ ADR change.
 ## CI
 
 GitHub Actions in `.github/workflows/`: `lint.yaml` (Ruff, wiring check, ADR
-check), `hassfest.yaml`, `hacs.yaml`, `tests.yaml` (in-process, coverage
-≥ 90 %), `e2e.yaml` (real HA container), `release.yaml` (all of them on the
-tag, then the zip). Triggers, permissions and pins: ADR-0020. Release
-packaging and brand images: ADR-0021. Test layering: ADR-0019.
+check, changelog check), `hassfest.yaml`, `hacs.yaml`, `tests.yaml` (in-process, coverage
+≥ 90 %), `e2e.yaml` (real HA container), `release-draft.yaml` (drafts the release when a release PR is merged),
+`release.yaml` (version check, then all of them on the tag, then the zip). Triggers, permissions and pins: ADR-0020. Release
+packaging and brand images: ADR-0031. Test layering: ADR-0019.

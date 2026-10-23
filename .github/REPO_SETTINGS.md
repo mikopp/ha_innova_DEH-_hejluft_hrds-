@@ -33,6 +33,8 @@ this page; it can go stale.
   release creates its tag). Bypass: Repository admin role only.
 * Do not turn on "Immutable releases": `package` uploads the zip after the
   release is published.
+* `release-draft.yaml` creates only **draft** releases (no tag). Publishing
+  the draft creates the tag, so it stays with the admin (ADR-0020, ADR-0031).
 
 ## Who can merge or release
 

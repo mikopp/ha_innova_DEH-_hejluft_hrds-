@@ -1,17 +1,20 @@
-# Release checks and packaging.
+# Release checks and packaging (ADR-0031).
 #
-# Triggered when a GitHub Release is published:
+# Triggered when a GitHub Release is published. The release is prepared before
+# the tag exists (scripts/release.py, merged as a release PR; release-draft.yaml
+# then drafts it), so the tagged commit already carries the version.
+#   0. verify    -> scripts/release.py check <tag>: the tag, manifest.json, the
+#                   top CHANGELOG heading and both README banners name one
+#                   version, with no Unreleased entries left. Fails in seconds.
 #   1. hassfest  -> manifest/translations are valid
 #   2. hacs      -> repository is installable via HACS (only runs if hassfest passes)
 #   3. tests     -> in-process tests against the simulated unit (tests.yaml)
 #   4. e2e       -> the integration in a real Home Assistant container (e2e.yaml)
-#   5. package   -> stamps manifest.json with the release tag via
-#                   .github/scripts/update_hacs_manifest.py, zips
-#                   custom_components/innova_hrds and attaches innova_hrds.zip
-#                   to the release. hacs.json sets zip_release, so HACS installs
-#                   that asset and Home Assistant shows the release version
-#                   regardless of what the tagged commit's manifest says.
-#                   Only runs when all four checks above pass.
+#   5. package   -> zips custom_components/innova_hrds as committed (nothing is
+#                   stamped: the zip equals the tagged commit), attaches
+#                   innova_hrds.zip to the release and fills an empty release
+#                   body from the CHANGELOG. hacs.json sets zip_release, so HACS
+#                   installs that asset. Only runs when all checks above pass.
 name: Release checks
 
 on:
@@ -22,10 +25,24 @@ permissions:
   contents: read
 
 jobs:
-  hassfest:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Tag, manifest, changelog and README agree
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: python3 scripts/release.py check "$TAG"
+
+  hassfest:
+    runs-on: ubuntu-latest
+    needs: verify
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       # home-assistant/actions has no release tags, so Dependabot cannot bump
       # this pin: re-pin to the current master commit by hand now and then. The
       # action only runs the ghcr.io/home-assistant/hassfest image (latest).
@@ -36,28 +53,30 @@ jobs:
     needs: hassfest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: hacs/action@d556e736723344f83838d08488c983a15381059a # 22.5.0
         with:
           category: integration
           ignore: brands
 
   tests:
+    needs: verify
     uses: ./.github/workflows/tests.yaml
 
   e2e:
+    needs: verify
     uses: ./.github/workflows/e2e.yaml
 
   package:
     runs-on: ubuntu-latest
-    needs: [hassfest, hacs, tests, e2e]
+    needs: [verify, hassfest, hacs, tests, e2e]
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Stamp manifest with the release version
-        env:
-          TAG: ${{ github.event.release.tag_name }}
-        run: python3 .github/scripts/update_hacs_manifest.py --version "$TAG"
+        with:
+          persist-credentials: false
       - name: Zip the integration
         run: |
           cd custom_components/innova_hrds
@@ -67,3 +86,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.event.release.tag_name }}
         run: gh release upload "$TAG" innova_hrds.zip --clobber --repo "$GITHUB_REPOSITORY"
+      - name: Fill an empty release body from the CHANGELOG
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          body=$(gh release view "$TAG" --json body --jq .body --repo "$GITHUB_REPOSITORY")
+          if [ -z "${body//[[:space:]]/}" ]; then
+            python3 scripts/release.py notes "${TAG#v}" > notes.md
+            gh release edit "$TAG" --notes-file notes.md --repo "$GITHUB_REPOSITORY"
+          fi

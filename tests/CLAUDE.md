@@ -10,6 +10,7 @@ decoding, guards and writes all run for real; only the device is fake.
 | **Real HA** | `e2e/` | The official Home Assistant container, driven over REST/websocket | about 2.5 min, needs Docker |
 | Device model | `sim/test_device.py` | The simulator on its own | seconds |
 | Consistency | `wiring_check.py` | Register map, translations, platforms; no HA installed | seconds |
+| Release script | `test_release_script.py` | `scripts/release.py` on temporary files (ADR-0031, ADR-0032) | seconds |
 
 ## Where does my new test go?
 
@@ -64,7 +65,7 @@ simulator seed (`devices/README.md`).
 ```
 # in-process + model + consistency (fresh venv; Python 3.14)
 pip install -r requirements_test.txt
-pytest tests/sim tests/ha tests/test_wiring.py
+pytest tests/sim tests/ha tests/test_wiring.py tests/test_release_script.py
 
 # real HA (needs Docker; logs in tests/e2e/.artifacts/)
 pip install -r tests/e2e/requirements.txt
@@ -124,7 +125,7 @@ from the image's modbus manifest and installs that. A bare `pytest` skips
   then review the diff.
 
 ## CI
-`tests.yaml` runs `sim`, `ha` and `test_wiring` (coverage gate 90 %);
+`tests.yaml` runs `sim`, `ha`, `test_wiring` and `test_release_script` (coverage gate 90 %);
 `e2e.yaml` runs `e2e` (nightly also against the HA `beta` image, allowed to
 fail); `release.yaml` runs both on the tagged commit before packaging. Triggers
 and branch protection: ADR-0020.

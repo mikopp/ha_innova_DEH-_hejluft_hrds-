@@ -26,5 +26,5 @@ topics before the first edit: ADR-NNNN is `.claude/rules/adr/NNNN-*.md`; run
 - **water** (the water circuit and brine): ADR-0014, ADR-0015
 - **dependencies** (Home Assistant and pymodbus versions): ADR-0004
 - **tests** (where a test goes, the simulator): ADR-0019
-- **ci** (workflows, releases, repository rules): ADR-0020, ADR-0021
-- **docs** (documentation and the ADRs themselves): ADR-0001, ADR-0027, ADR-0029, ADR-0030
+- **ci** (workflows, releases, repository rules): ADR-0020, ADR-0031, ADR-0032
+- **docs** (documentation and the ADRs themselves): ADR-0001, ADR-0027, ADR-0029, ADR-0030, ADR-0032

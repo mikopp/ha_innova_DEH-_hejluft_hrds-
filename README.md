@@ -48,7 +48,7 @@ names Innova as the manufacturer of the HRDS and HRDS+ dehumidification units.
 > *If your unit uses the Innova board and is sold under another name, open an
 > issue and link its product page.*
 
-## Release 0.9.4 — beta, not 1.0 yet
+## Release 0.9.3 — beta, not 1.0 yet
 
 The integration is released and usable, but it is a **beta**.
 
@@ -168,8 +168,9 @@ Or by hand:
 
 HACS installs the `innova_hrds.zip` asset attached to each
 [GitHub release](https://github.com/mikopp/homeassistant-innova-hrds/releases);
-the release workflow stamps the release tag into `manifest.json` before zipping,
-so the version Home Assistant shows is the release version. Updates appear in
+each release is prepared so that `manifest.json`, the changelog and the tag
+name the same version, and the release workflow checks that before zipping, so
+the version Home Assistant shows is the release version. Updates appear in
 HACS when a new release is published. Releases 0.9.x are normal (not
 "pre-release") releases, so they are offered without enabling HACS' beta versions.
 

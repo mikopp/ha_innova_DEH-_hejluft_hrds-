@@ -10,6 +10,9 @@
 #   * tests/adr_check.py -> the ADRs (.claude/rules/adr, doc/adr/proposed and
 #     /superseded): format, scopes, folders, indexes, topic map, citations,
 #     revival records, confirmation checks
+#   * scripts/release.py check -> CHANGELOG entries sit under `## Unreleased`
+#     in the fixed subsections, no PR sets a version, the manifest and README
+#     banners agree (ADR-0032)
 # It does NOT import Home Assistant, so it is quick and has no HA dependency.
 name: Lint
 
@@ -27,6 +30,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
@@ -40,3 +45,5 @@ jobs:
         run: python3 tests/wiring_check.py
       - name: ADR check
         run: python3 tests/adr_check.py
+      - name: Changelog and version check
+        run: python3 scripts/release.py check
