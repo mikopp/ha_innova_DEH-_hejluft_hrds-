@@ -11,9 +11,12 @@ Tags (`[HB 6.2]`, `[MB p.7]`, `T23`) are explained in §0 of that file.
   poll (T25), and lowering `PF28` does not lower it (T24, T26). The unit
   **clamps** its own manual request into the band, and does not rescale it
   ([run file](../tests/devices/runs/hrds_30+_fan_band_2026-10-23.json)).
+* Test C is done: no `PM20` write inside the band ever showed in a read
+  0.5 s apart, and one below the band minimum is refused with exception 04
+  (T27, T28).
 * Still open:
   * A: jump or ramp, at 5 s resolution;
-  * B, C, D (optional), E, F;
+  * B, D (optional), E, F;
   * new test G: lowering through the maximum.
 
 ## Why
@@ -39,7 +42,7 @@ Tags (`[HB 6.2]`, `[MB p.7]`, `T23`) are explained in §0 of that file.
 | A3 | The output jumps to a new minimum, or ramps in `PF11` steps | [INFERRED] | A, open |
 | A4 | `PM20`/1114 follow the band minimum (they show the scaled manual request) | [INFERRED from T22] | A, **seen** (T25): they mirror the clamped manual request |
 | A5 | `PF28 = PF10` is accepted and gives that speed | [INFERRED] | B |
-| A6 | A write to `PM20` is overwritten within one controller cycle, and 639 never moves | [T23; INFERRED] | C |
+| A6 | A write to `PM20` is overwritten within one controller cycle, and 639 never moves | [T23; INFERRED] | C, **seen** (T28): never visible at 0.5 s; below the band refused (T27) |
 | A7 | 0–10 V on FAN+ raises 639 and 1116, but not 1114/1614 | [HB 6.2] | D |
 | A8 | 1112 is a 0–100 % request that is non-zero only during INT | [MB p.14; INFERRED] | E |
 | A9 | A `PF28` written while idle applies from the next fan start | [INFERRED] | F |
@@ -67,8 +70,10 @@ Tags (`[HB 6.2]`, `[MB p.7]`, `T23`) are explained in §0 of that file.
     (639), `sensor.fan_manual_request` (1114), `number.fan_manual_speed`
     (1614), `sensor.supply_fan_status` (1119).
   * For 1–5 s resolution, and for registers without an entity (1113, 1115,
-    1116), run a read-only pymodbus loop with FC 04, plus FC 03 for 1614 and
-    1853. Use the same host, port and unit id as `tests/diagnose_hrds.py`.
+    1116), run `python3 tests/diagnose_hrds.py <host> --no-snapshot --watch
+    <seconds> --interval 1`: read-only, it prints every change of the status
+    and output registers (1100–1140, 630–645, …), of 1614 and of the fan band
+    (1644–1647, 1852, 1853).
   * Keep each request at 10 registers or fewer (T9): read 639, then
     1112–1119, then 1614 and 1853.
   * Never write from that script.

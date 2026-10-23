@@ -1009,7 +1009,11 @@ SNAPSHOT_AREAS = [
     (IN, 768, 775),  # packed alarms
     (IN, 1100, 1140),  # status / request registers
 ]
-WATCH_AREAS = [a for a in SNAPSHOT_AREAS if a[0] == IN and a[1] >= 380]
+WATCH_AREAS = [a for a in SNAPSHOT_AREAS if a[0] == IN and a[1] >= 380] + [
+    (HOLD, 1614, 1614),  # PM20 manual fan setpoint: does a written value stay?
+    (HOLD, 1644, 1647),  # PF07, PF08, PF09, PF10 fan band limits
+    (HOLD, 1852, 1853),  # PF27, PF28 fan band minima
+]
 SNAPSHOT_CHUNK = 10
 
 

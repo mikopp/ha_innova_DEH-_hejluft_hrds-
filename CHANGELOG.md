@@ -21,18 +21,19 @@ in this order, empty ones left out: `### ⚠️ Breaking changes`,
 - **Recirculation active now shows when the unit recirculates.** It is on while the damper is open and the fan runs; before, it read a register that stayed off. That register is now its own diagnostic sensor, *Fan integration request*, in percent: the Modbus manual lists it as a 0–100 % fan request, not an on/off flag.
 - **Supply fan speed shows unknown when the unit cannot measure it.** It needs an input allocated to the fan tachometer; without one the unit reports 0 rpm with the fan running.
 - **The room probe OK sensors show unknown when no room probe is set up.** They used to say OK for a probe that is not there.
-
 - **The fan speed set through the fan entity or fan mode is not kept by the unit, and the docs now say so.** The unit treats the manual fan speed (PM20) as its own and overwrites it. To run the fan faster, raise *Fan min speed*; lowering it does not slow a running fan. How the integration will set the speed is decided after more hardware tests.
 
 ### 📚 Documentation
 
 - **Why the fan speed cannot be set over Modbus, and what works instead:** PM20 (1614) is the display's setpoint and no register takes a fan-speed request from the BMS (T23). The band clamps the unit's own manual request: a raised PF28 raised a running fan, a lowered one did not (`UNIT_BEHAVIOUR.md` §9.1, T24–T26). Test plan: `plans/fan-speed-tests.md`.
-
+- **A fan speed written to PM20 is never taken:** inside the band the unit acknowledges it and keeps its own value, below the band it refuses it (T27, T28). The evidence row T23 now gives the right run and values.
+- **The running-hour counters (PM00–PM04) count whole hours,** not tenths as the docs said; the handbook's "Hours x10" is the display's unit (T29). The installer entities already showed hours.
 - **Unit behaviour cites parameters by code, with a lookup of handbook default and shipped value** (`UNIT_BEHAVIOUR.md` §15), plus evidence rows T11 to T22 from the first two dehumidify runs and new open points in `plans/todo.md`.
 - **Why the supply fan speed reads 0:** the unit only measures it when an input is allocated to the fan tachometer, and the reference unit has none. Also documented: the stop sequence, that the unit sets the manual fan speed itself at each start and stop, and that register 1112 is not a recirculation flag.
 
 ### 🧪 Tests and CI
 
+- **The bring-up diagnostic's watch (`--watch`) also reads PM20 and the fan band registers.**
 - **The bring-up diagnostic reports whether an input is allocated to the fan tachometer.** Run observations moved to `tests/devices/runs/`, so the seed tests no longer load them as register dumps.
 
 ---
