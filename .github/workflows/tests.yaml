@@ -4,7 +4,8 @@
 # pinned in requirements_test.txt (always the latest; Dependabot bumps it).
 # The integration's real pymodbus client talks over TCP to the simulator in
 # tests/sim, so config flow, polling, decoding, guards and writes run for
-# real. Fast (about a minute) and the only layer that measures coverage.
+# real. Fast (about a minute) and the only layer that measures coverage. On a
+# pull request without a code change the tests are skipped (ADR-0035).
 #   * tests/sim       - the device model on its own
 #   * tests/ha        - the default home of behaviour tests: config flow, setup,
 #                       operation, fan, failures, display, restart (fresh start
@@ -40,14 +41,36 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 2  # the PR merge commit and its base
+
+      # A pull request that changes no code, test or dependency (the patterns
+      # in .github/test-paths) skips the steps below; the job still reports,
+      # so the required check passes (ADR-0035). Every other event runs all.
+      - name: Changed code, tests or dependencies?
+        id: changes
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          # The PR merge commit's first parent is the base branch.
+          git diff --name-only HEAD^1 HEAD | tee /tmp/changed.txt
+          if grep -qEf .github/test-paths /tmp/changed.txt; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No code, test or dependency change: tests skipped (ADR-0035)"
+          fi
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        if: steps.changes.outputs.run == 'true'
         with:
           python-version: "3.14"
           cache: pip
           cache-dependency-path: requirements_test.txt
       - name: Install test requirements
+        if: steps.changes.outputs.run == 'true'
         run: pip install -r requirements_test.txt
       - name: Run tests
+        if: steps.changes.outputs.run == 'true'
         run: >-
           pytest tests/sim tests/ha tests/test_wiring.py tests/test_release_script.py
           --timeout=120
@@ -56,7 +79,7 @@ jobs:
           --cov-report=xml
           --cov-fail-under=90
       - name: Upload coverage
-        if: always()
+        if: always() && steps.changes.outputs.run == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage

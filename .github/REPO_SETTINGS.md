@@ -21,6 +21,8 @@ this page; it can go stale.
 * Require a pull request (0 approvals; the owner merges their own), squash
   merge only.
 * Require the checks `ruff`, `hassfest`, `hacs`, `pytest`, `e2e (pinned)`.
+  `pytest` and `e2e (pinned)` pass without testing on a PR that changes no
+  code (ADR-0035), so a docs-only PR is not blocked.
 * Block force pushes and deletion.
 * Bypass: the Repository admin role only, in mode **pull request** (never
   "always", so no direct pushes).

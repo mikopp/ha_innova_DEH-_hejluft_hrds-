@@ -33,6 +33,7 @@ in this order, empty ones left out: `### ⚠️ Breaking changes`,
 
 ### 🧪 Tests and CI
 
+- **A pull request that changes only documentation no longer runs the in-process and Home Assistant container tests.** The two required checks pass at once; `main`, the nightly run and releases still run everything (ADR-0035).
 - **The bring-up diagnostic's watch (`--watch`) also reads PM20 and the fan band registers.**
 - **The bring-up diagnostic reports whether an input is allocated to the fan tachometer.** Run observations moved to `tests/devices/runs/`, so the seed tests no longer load them as register dumps.
 
