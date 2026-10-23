@@ -29,6 +29,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Tag, manifest, changelog and README agree
         env:
           TAG: ${{ github.event.release.tag_name }}
@@ -39,6 +41,8 @@ jobs:
     needs: verify
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       # home-assistant/actions has no release tags, so Dependabot cannot bump
       # this pin: re-pin to the current master commit by hand now and then. The
       # action only runs the ghcr.io/home-assistant/hassfest image (latest).
@@ -49,6 +53,8 @@ jobs:
     needs: hassfest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: hacs/action@d556e736723344f83838d08488c983a15381059a # 22.5.0
         with:
           category: integration
@@ -69,6 +75,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Zip the integration
         run: |
           cd custom_components/innova_hrds

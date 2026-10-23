@@ -30,6 +30,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Is this commit a prepared release?
         id: info
         run: |
@@ -47,7 +49,7 @@ jobs:
             echo "A release or draft $TAG exists already; nothing to do."
             exit 0
           fi
-          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null; then
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" >/dev/null 2>&1; then
             echo "Tag $TAG exists already; nothing to do."
             exit 0
           fi

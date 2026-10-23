@@ -17,7 +17,9 @@ paths:
   tests and e2e MUST cancel a superseded PR run (`concurrency`).
 - Every workflow MUST set `permissions: contents: read` at the top; only
   `release.yaml`'s `package` job and `release-draft.yaml`'s `draft` job MAY
-  raise it to `contents: write`.
+  raise it to `contents: write`. Every `actions/checkout` MUST set
+  `persist-credentials: false`; a job that needs the token uses `gh` with
+  `GH_TOKEN`, so no token is left in `.git/config` for later steps.
 - Actions MUST be pinned to commit SHAs with a version comment (Dependabot
   bumps them). hassfest has no release tags: it is pinned to a `master`
   commit and re-pinned by hand.
@@ -49,6 +51,7 @@ for f in .github/workflows/*.yaml; do grep -q '^permissions:' "$f"; done
 ! grep -hE '^\s*-?\s*uses: [^.]' .github/workflows/*.yaml | grep -vE '@[0-9a-f]{40}( |$)'
 ! grep -nE -A1 '^  push:' .github/workflows/*.yaml | grep -E -- '-[0-9]+-' | grep -v 'branches: \[main\]'
 test "$(grep -l 'contents: write' .github/workflows/*.yaml | tr '\n' ' ')" = ".github/workflows/release-draft.yaml .github/workflows/release.yaml "
+test "$(cat .github/workflows/*.yaml | grep -c 'uses: actions/checkout@')" = "$(cat .github/workflows/*.yaml | grep -c 'persist-credentials: false')"
 ```
 
 ## More information

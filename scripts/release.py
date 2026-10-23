@@ -355,8 +355,12 @@ def info(root: pathlib.Path) -> dict[str, str]:
 # --- prepare -----------------------------------------------------------------
 
 
-def prepare(root: pathlib.Path, version: str, title: str, date: str) -> None:
-    """Write the version into the manifest, CHANGELOG and README banners."""
+def prepare(root: pathlib.Path, version: str, title: str, date: str) -> list[str]:
+    """Write the version into the manifest, CHANGELOG and README banners.
+
+    Returns the paths it wrote, relative to ``root``, so git mode stages
+    exactly those and nothing else.
+    """
     current = check(root)
     if not VERSION_RE.match(version):
         raise ReleaseError(f"version {version!r} is not X.Y.Z")
@@ -376,16 +380,20 @@ def prepare(root: pathlib.Path, version: str, title: str, date: str) -> None:
     lines[top.start] = f"## {version} ({date}): {title}"
     write(root, CHANGELOG, "\n".join(lines) + "\n")
     set_manifest_version(root, version)
+    written = [CHANGELOG, MANIFEST]
     for name in READMES:
         text = BANNER.sub(f"## Release {version}", read(root, name), count=1)
         write(root, name, text)
+        written.append(name)
     digits = anchor_digits(version)
     for path in tracked_markdown(root):
         text = path.read_text(encoding="utf-8")
         new = BANNER_ANCHOR.sub(rf"\g<1>{digits}\g<3>", text)
         if new != text:
             path.write_text(new, encoding="utf-8")
+            written.append(path.relative_to(root).as_posix())
     check(root)
+    return sorted(set(written))
 
 
 def changed_files(root: pathlib.Path) -> list[str]:
@@ -438,10 +446,12 @@ def run_checks(root: pathlib.Path) -> None:
         )
 
 
-def open_pull_request(root: pathlib.Path, version: str, title: str) -> None:
+def open_pull_request(
+    root: pathlib.Path, version: str, title: str, files: list[str]
+) -> None:
     branch = f"release/v{version}"
     git(root, "switch", "-c", branch)
-    git(root, "add", "-A")
+    git(root, "add", "--", *files)
     git(root, "commit", "-m", f"Release v{version}: {title}")
     git(root, "push", "-u", "origin", branch)
     body = (
@@ -506,7 +516,7 @@ def cmd_prepare(argv: list[str], root: pathlib.Path) -> None:
         preflight(root, version)
     top, _ = top_section(root)
     title = args.title or ask_title(default_title(top))
-    prepare(root, version, title, args.date)
+    files = prepare(root, version, title, args.date)
     print(f"Prepared v{version}: {title}")
     if not args.skip_checks:
         run_checks(root)
@@ -517,7 +527,7 @@ def cmd_prepare(argv: list[str], root: pathlib.Path) -> None:
     if args.no_git:
         print("Files changed; commit them and open the release PR.")
     else:
-        open_pull_request(root, version, title)
+        open_pull_request(root, version, title, files)
 
 
 def main(argv: list[str] | None = None, root: pathlib.Path = ROOT) -> int:

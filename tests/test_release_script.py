@@ -76,7 +76,8 @@ def test_lint_passes_with_unreleased_on_top(repo):
 
 
 def test_prepare_writes_every_version_place(repo):
-    release.prepare(repo, "0.9.4", "auto mode", "2026-10-23")
+    written = release.prepare(repo, "0.9.4", "auto mode", "2026-10-23")
+    assert written == ["CHANGELOG.md", "README.de.md", "README.md", release.MANIFEST]
     manifest = json.loads((repo / release.MANIFEST).read_text())
     assert manifest["version"] == "0.9.4"
     assert list(manifest)[:2] == ["domain", "name"]
