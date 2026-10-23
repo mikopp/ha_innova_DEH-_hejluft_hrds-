@@ -237,8 +237,10 @@ C_COMPRESSOR_STATUS = "compressor_status"
 C_OPERATING_MODE = "operating_mode"
 # Read-only binary sensors
 C_DEHUM_REQUEST = "dehumidify_request"
-C_RECIRCULATION_ACTIVE = "recirculation_active"
+C_FAN_INTEGRATION_REQUEST = "fan_integration_request"
 C_ALARM_ACTIVE = "alarm_active"
+# Computed binary sensor: damper open and fan running (no register says it).
+C_RECIRCULATION_ACTIVE = "recirculation_active"
 # Read-only sensors derived from holding registers (RW=0)
 C_MACHINE_TYPE = "machine_type"
 C_INTEGRATION_AVAILABLE = "integration_available"
@@ -466,12 +468,14 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "SWITCH": {"off": 0, "on": 1},
         "NAME": "Dehumidify requested",
     },
-    C_RECIRCULATION_ACTIVE: {
+    # "Fans integration request" (MB). Not recirculation: it stayed 0 through
+    # recirculating dehumidify runs (UNIT_BEHAVIOUR.md T16, T18).
+    C_FAN_INTEGRATION_REQUEST: {
         "RT": C_REG_TYPE_INPUT_REGISTERS,
         "REG": 1112,
         "DT": C_DT_UINT16,
         "SWITCH": {"off": 0, "on": 1},
-        "NAME": "Recirculation active",
+        "NAME": "Fan integration request",
     },
     C_RECIRCULATION_DAMPER: {
         "RT": C_REG_TYPE_INPUT_REGISTERS,
@@ -1021,8 +1025,27 @@ INSTALLER_KEYS: frozenset[str] = frozenset(
 # Installer values the hub's own checks use (water check, heating evidence,
 # the unit's own heating band); read once at setup even without the installer
 # device.
-INSTALLER_LOGIC_KEYS: frozenset[str] = frozenset(
-    installer_key(code) for code in ("PC07", "PC08", "PU08", "PF12", "PH09", "PH10")
+# Inputs that can carry the fan tachometer (input function 45 supply fan, 46
+# return fan; HB 5.3 input functions). Without one, 1117 has nothing to count.
+# AI2/AI3 (HA02/HA03) are left out: there 45/46 are the room/outdoor probes.
+TACHOMETER_INPUT_CODES = frozenset({45, 46})
+TACHOMETER_ALLOCATION_KEYS: frozenset[str] = frozenset(
+    installer_key(code)
+    for code in (
+        "HA01",
+        *(f"HA{n:02}" for n in range(4, 19)),
+        "HB01",
+        "HB02",
+        "HB05",
+        "HB06",
+        "HB07",
+    )
+)
+INSTALLER_LOGIC_KEYS: frozenset[str] = (
+    frozenset(
+        installer_key(code) for code in ("PC07", "PC08", "PU08", "PF12", "PH09", "PH10")
+    )
+    | TACHOMETER_ALLOCATION_KEYS
 )
 # Button on the installer device: the only regular way its registers are read.
 C_INSTALLER_REFRESH = "refresh_installer"
@@ -1297,6 +1320,7 @@ DIAGNOSTIC_KEYS = frozenset(
         C_WATER_VALVE_PUMP,
         C_WATER_CONDENSER_VALVE,
         C_WATER_CHECK,
+        C_FAN_INTEGRATION_REQUEST,
     }
 )
 # Suffixes of the child devices' identifiers (parent identifier + suffix).
@@ -1324,6 +1348,7 @@ FAN_KEYS = frozenset(
         C_FAN_MIN_RUNTIME,
         C_FAN_POST_RUN_TIME,
         C_RECIRCULATION_ACTIVE,
+        C_FAN_INTEGRATION_REQUEST,
     }
 )
 
@@ -1385,6 +1410,9 @@ COMPUTED_BINARY_SENSORS: Dict[str, Dict[str, Any]] = {
     # attributes say on what. Hidden when the unit has no room temperature
     # source or no integration function.
     C_AUTO_HEATING: {"NAME": "Unit heats on its own"},
+    # On while the damper (1134) is open and the fan (1119) runs: the R
+    # variant's recirculation. No register reports it (UNIT_BEHAVIOUR.md §9.3).
+    C_RECIRCULATION_ACTIVE: {"NAME": "Recirculation active"},
 }
 
 # Requests that make the unit do something. They are refused until the user

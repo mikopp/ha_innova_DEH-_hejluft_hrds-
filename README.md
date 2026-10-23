@@ -750,10 +750,14 @@ produce roughly 60 % output, and a request of 0 % would not stop the fan.
 The integration therefore keeps the two apart:
 
 * **Actual** — `sensor.hrds_supply_fan_output` (%),
-  `sensor.hrds_supply_fan_airflow` (m³/h), `sensor.hrds_supply_fan_rpm`, and the
+  `sensor.hrds_supply_fan_airflow` (m³/h), `sensor.hrds_supply_fan_rpm` (only
+  when an input is allocated to the fan tachometer, else unknown), and the
   state of `fan.hrds_supply_fan` and the climate entity's `fan_mode`.
 * **Commanded** — `number.hrds_manual_fan_speed`, and the fan entity's
-  `commanded_percent` attribute.
+  `commanded_percent` attribute. The unit writes this setpoint too: on a real
+  unit it went to the band minimum when the fan started and back to 0 when the
+  request ended, so a speed set while the unit is idle does not carry over to
+  the next run.
 
 If you want a commanded percentage to mean an absolute percentage, set the
 active mode's minimum to `0` and its maximum to `100` — both are writable
@@ -795,9 +799,9 @@ triggers are inactive. Probe inputs that are not wired report no value: room
 temperature, room humidity, outdoor, exhaust, supply air temperature and air
 quality show **unknown**, and the climate entity shows no current temperature or
 humidity. That is expected, not an error. The factory-wired water and evaporator
-temperatures keep working. (The `temp_probe_ok` / `humidity_probe_ok` sensors
-follow alarms AL28/AL34, which a headless unit did not necessarily raise, so
-judge by the sensors above rather than by those two.)
+temperatures keep working. The `temp_probe_ok` / `humidity_probe_ok` sensors
+show **unknown** too: with no probe allocated there is nothing for alarms
+AL28/AL34 to check.
 
 See [UNIT_BEHAVIOUR §8](doc/references/UNIT_BEHAVIOUR.md#8-display-and-probe-configurations)
 for what each display/probe configuration does, and

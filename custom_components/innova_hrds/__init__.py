@@ -65,6 +65,7 @@ from .const import (
     C_MODE_STATUS,
     C_OPERATING_MODE,
     C_OUTDOOR_TEMPERATURE,
+    C_RECIRCULATION_ACTIVE,
     C_RECIRCULATION_DAMPER,
     C_REG_TYPE_HOLDING_REGISTERS,
     C_REG_TYPE_INPUT_REGISTERS,
@@ -75,6 +76,7 @@ from .const import (
     C_SUPPLY_FAN_AIRFLOW,
     C_SUPPLY_FAN_MAX_AIRFLOW,
     C_SUPPLY_FAN_OUTPUT,
+    C_SUPPLY_FAN_RPM,
     C_SUPPLY_FAN_STATUS,
     C_TEMP_PROBE_OK,
     C_TEMPERATURE_UNIT,
@@ -122,6 +124,8 @@ from .const import (
     REQUIRED_SETTING_MAX_WRITES,
     ROOM_HUMIDITY_PROBE_CODES,
     ROOM_TEMP_PROBE_CODES,
+    TACHOMETER_ALLOCATION_KEYS,
+    TACHOMETER_INPUT_CODES,
     TEMPERATURE_TARGET_KEYS,
     WATER_CIRCUIT_BRINE,
     get_entity_bitmask,
@@ -480,6 +484,9 @@ class HrdsModbusHub:
         self.has_fan = True
         self.show_temperature_target = True
         self.show_humidity_target = True
+        # An input carries the fan tachometer, so 1117 can count; decided in
+        # update_hidden_keys from the input allocations read at setup.
+        self.has_tachometer = True
 
         # The installer menu is opt-in, and never part of the regular poll:
         # it is read at setup and on its refresh button only.
@@ -762,6 +769,29 @@ class HrdsModbusHub:
             # shown.
             hidden |= INSTALLER_KEYS | INSTALLER_DEVICE_EXTRA_KEYS
         self.hidden_keys = frozenset(hidden)
+        # An allocation not read counts as a possible tachometer: the speed is
+        # then shown as the unit reports it.
+        self.has_tachometer = any(
+            d.get(key) is None or int(d[key]) in TACHOMETER_INPUT_CODES
+            for key in TACHOMETER_ALLOCATION_KEYS
+        )
+        # The primed read-back is published when the entities are added.
+        self._blank_unfed_readings()
+
+    def _blank_unfed_readings(self) -> None:
+        """Unknown, not a value, for readings nothing on this unit feeds.
+
+        Without a tachometer input the speed register reads 0 with the fan
+        running (UNIT_BEHAVIOUR.md §9.1); without a display or allocated room
+        probe AL28/AL34 cannot fire, so "probe OK" would claim a probe that is
+        not there.
+        """
+        if not self.has_tachometer:
+            self.data[C_SUPPLY_FAN_RPM] = None
+        if not self.show_temperature_target:
+            self.data[C_TEMP_PROBE_OK] = None
+        if not self.show_humidity_target:
+            self.data[C_HUMIDITY_PROBE_OK] = None
 
     # ---- brine temperature guard -----------------------------------------
     def _read_brine_sensor(
@@ -1498,7 +1528,20 @@ class HrdsModbusHub:
         return issues
 
     def _compute_derived(self) -> None:
-        """Write computed values: setup check and airflow (m³/h)."""
+        """Write computed values: setup check, recirculation and airflow (m³/h)."""
+        self._blank_unfed_readings()
+        # Recirculation is the damper open with the fan running; Wait ON (damper
+        # open, fan not yet started) and Wait OFF (run-on, damper already
+        # closed, T19) are not.
+        damper = self.data.get(C_RECIRCULATION_DAMPER)
+        fan = self.data.get(C_SUPPLY_FAN_STATUS)
+        self.data[C_RECIRCULATION_ACTIVE] = (
+            None
+            if damper is None or fan is None
+            else "on"
+            if damper == "on" and fan == "on"
+            else "off"
+        )
         self.setup_issues = self._compute_setup_issues()
         self.data[C_SETUP_CHECK] = "attention" if self.setup_issues else "ok"
         self.water_issues = self._compute_water_issues()

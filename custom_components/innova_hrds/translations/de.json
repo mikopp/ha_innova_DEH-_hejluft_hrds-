@@ -454,6 +454,9 @@
       "recirculation_active": {
         "name": "Umluft aktiv"
       },
+      "fan_integration_request": {
+        "name": "Lüfter-Integrationsanforderung"
+      },
       "alarm_active": {
         "name": "Alarm aktiv"
       },

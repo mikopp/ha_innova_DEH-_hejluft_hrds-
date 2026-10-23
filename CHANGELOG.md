@@ -18,6 +18,9 @@ in this order, empty ones left out: `### ⚠️ Breaking changes`,
 - **The installer parameter Pb08 (anti-stagnation wait) now shows minutes, not hours.**
   The handbook gives minutes; on a real unit the valve and pump open for about a minute every hour while the unit is on.
 - **Register 1112 is no longer described as "supply fan running".** It stayed 0 while the fan ran.
+- **Recirculation active now shows when the unit recirculates.** It is on while the damper is open and the fan runs; before, it read a register that stayed off. That register is now its own diagnostic entity, *Fan integration request*.
+- **Supply fan speed shows unknown when the unit cannot measure it.** It needs an input allocated to the fan tachometer; without one the unit reports 0 rpm with the fan running.
+- **The room probe OK sensors show unknown when no room probe is set up.** They used to say OK for a probe that is not there.
 
 ### 📚 Documentation
 

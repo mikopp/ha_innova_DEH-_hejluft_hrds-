@@ -444,9 +444,10 @@ class HrdsDevice:
         manual_fan = on and not request and h.get(R.FAN_MANUAL, 0) > 0
 
         i[R.DEHUM_REQUEST] = 1 if request and not heating else 0
+        # 1112 (FanIntegration_Request) is left as dumped: it stayed 0 through
+        # recirculating dehumidify runs, and what sets it is unknown.
         if self.r_variant:
             i[R.DAMPER] = 1 if request else 0
-            i[R.RECIRCULATION] = 1 if request else 0
         if self.pump_configured:
             i[R.WATER_VALVE_PUMP] = 1 if request and not self.pump_fault else 0
 
@@ -461,7 +462,12 @@ class HrdsDevice:
             i[R.FAN_STATUS] = 3
             out = self._fan_output(h.get(R.FAN_MANUAL, 0), self._fan_band(deu, integ))
         i[R.FAN_OUTPUT] = out
-        i[R.FAN_RPM] = round(out * 0.28)  # ~2800 rpm at 100 %
+        # The speed needs a tachometer input; without one 1117 reads 0 with the
+        # fan running (UNIT_BEHAVIOUR.md 9.1, T16, T21).
+        tachometer = any(
+            h.get(a) in R.TACHOMETER_CODES for a in R.TACHOMETER_ALLOCATIONS
+        )
+        i[R.FAN_RPM] = round(out * 0.28) if tachometer else 0  # ~2800 rpm at 100 %
 
         # Compressor: dehumidify / summer integration; winter integration heats
         # with warm water only.

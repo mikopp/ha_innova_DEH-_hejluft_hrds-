@@ -79,7 +79,7 @@ device (see the [beta banner](../README.md#release-094--beta-not-10-yet)).
 
 | Entity | Name | Register | Range | Notes |
 |---|---|---|---|---|
-| `number.fan_manual_speed` | Manual fan speed | 1614 | 0–100 % | PM20; the fan **setpoint** — what was asked for. The fan entity and climate fan mode write here too. See [Commanded vs actual fan speed](../README.md#commanded-vs-actual-fan-speed). |
+| `number.fan_manual_speed` | Manual fan speed | 1614 | 0–100 % | PM20; the fan **setpoint** — what was asked for. The fan entity and climate fan mode write here too. The unit also sets it itself: to the band minimum (PF28) when the fan starts and to 0 when a request ends ([UNIT_BEHAVIOUR §9.1](references/UNIT_BEHAVIOUR.md#91-bands-and-sources)). See [Commanded vs actual fan speed](../README.md#commanded-vs-actual-fan-speed). |
 
 #### Sensors
 
@@ -94,7 +94,7 @@ device (see the [beta banner](../README.md#release-094--beta-not-10-yet)).
 | `sensor.actual_setpoint` | Active setpoint | °C | — | Reg 1111; active room setpoint in use |
 | `sensor.supply_fan_output` | Supply fan output | % | ³ Built-in | Reg 639 (×0.01 %); actual fan analog output |
 | `sensor.compressor_output` | Compressor output | % | ³ Built-in | Reg 641 (×0.01 %); compressor modulation level |
-| `sensor.supply_fan_rpm` | Supply fan speed | rpm | ³ Built-in | Reg 1117; 0 unless an input is allocated to the fan tachometer, which none is on the reference unit |
+| `sensor.supply_fan_rpm` | Supply fan speed | rpm | ³ Built-in | Reg 1117. **Unknown** when no input is allocated to the fan tachometer (input function 45/46 on HA01, HA04–HA18, HB01, HB02, HB05–HB07, read at setup): the unit then has no speed to report and the register reads 0 with the fan running |
 | `sensor.exhaust_temperature` | Exhaust air temperature | °C | External NTC | Reg 502; monitoring only |
 | `sensor.evaporator_temperature` | Evaporator temperature | °C | ³ Built-in | Reg 511; drives compressor modulation, works on a headless unit |
 | `sensor.recirculation_damper` | Recirculation damper | enum | ³ Built-in | Reg 1134; Off/On/Disabled, the state of the motorised recirculation damper (R-variant only). *On* confirms room air is being recirculated across the coil; *Disabled* means no damper is wired (non-`R`) |
@@ -112,7 +112,7 @@ Alarm sensors map to a single bit of a packed alarm register (§9.1 in
 | Entity | Name | Probe needed | What ON means |
 |---|---|---|---|
 | `binary_sensor.dehumidify_request` | Dehumidify requested | ³ | Dehumidification currently requested |
-| `binary_sensor.recirculation_active` | Recirculation active | ³ | Reg 1112 (`FanIntegration_Request`); not a recirculation flag: stays 0 while the unit recirculates. Recirculation shows as damper output on with the fan running |
+| `binary_sensor.recirculation_active` | Recirculation active | ³ | (not a register) Damper (1134) open **and** supply fan status *On* (1119): room air is drawn across the coil. Off while the fan is still starting or runs on after the damper closed. R variant only |
 | `binary_sensor.alarm_active` | Alarm active | ³ | At least one alarm is active |
 | `binary_sensor.alarm_compressor_lowpressure` | Alarm: compressor low-pressure / frost | ³ | AL11, reg 768 bit 10: Compressor stopped (low pressure / frost thermostat) |
 | `binary_sensor.alarm_compressor_highpressure` | Alarm: compressor high-pressure | ³ | AL12, reg 768 bit 11: Compressor stopped (high pressure switch) |
@@ -180,6 +180,12 @@ shows it.
 | `sensor.supply_fan_max_airflow` | Supply fan max airflow | m³/h | — | Computed constant; maximum fan airflow (from config) |
 | `sensor.max_total_airflow` | Max total airflow | m³/h | — | Computed constant; same as supply_fan_max_airflow (from config) |
 
+#### Binary sensors
+
+| Entity | Name | Register | What ON means |
+|---|---|---|---|
+| `binary_sensor.fan_integration_request` | Fan integration request | 1112 | `FanIntegration_Request` (Modbus manual: fans integration request). Meaning unconfirmed: it stayed off through two recirculating dehumidify runs; possibly on only for an INT request. R variant only |
+
 ## Setup device: HRDS+ setup
 
 **Why it exists.** A headless unit needs a dozen settings reviewed before it is
@@ -211,8 +217,8 @@ Entity ids carry the device name, for example `sensor.hrds_setup_setup_check`.
 
 | Entity | Name | Register | Shows |
 |---|---|---|---|
-| `binary_sensor.temp_probe_ok` | Room temperature probe OK | 769 bit 11 | Room temperature probe healthy (AL28 not active) |
-| `binary_sensor.humidity_probe_ok` | Room humidity probe OK | 770 bit 1 | Room humidity probe healthy (AL34 not active) |
+| `binary_sensor.temp_probe_ok` | Room temperature probe OK | 769 bit 11 | Room temperature probe healthy (AL28 not active). **Unknown** without a display or a room temperature probe on AI2 (HA02): there is nothing to check |
+| `binary_sensor.humidity_probe_ok` | Room humidity probe OK | 770 bit 1 | Room humidity probe healthy (AL34 not active). **Unknown** without a display or a humidity probe on AI3 (HA03) |
 | `binary_sensor.integration_available` | Unit has integration function (PG02) | 1798 | ON: the unit has the integration (INT) function (PG02 = 1). Read-only: an installer setting, not a Modbus permission |
 | `binary_sensor.remote_contact_closed` | Remote on/off contact closed | 257 bit 0 | State of the remote on/off contact (meaning inferred, unverified) |
 

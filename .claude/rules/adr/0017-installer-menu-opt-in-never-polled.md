@@ -1,6 +1,6 @@
 ---
 status: accepted
-date: 2026-10-20
+date: 2026-10-23
 decision-makers: mikopp
 topics: [entities, config, modbus-reads]
 paths:
@@ -21,8 +21,9 @@ paths:
   poll (`_poll_keys`), and no poll block may span one. They are read at
   setup, on `button.refresh_installer`, and one register after its write;
   `sensor.installer_last_read` shows when. With the option off only
-  `INSTALLER_LOGIC_KEYS` (PC07, PC08, PU08, PF12, PH09, PH10) are read, once
-  at setup.
+  `INSTALLER_LOGIC_KEYS` (PC07, PC08, PU08, PF12, PH09, PH10, and the input
+  allocations `TACHOMETER_ALLOCATION_KEYS` of ADR-0033) are read, once at
+  setup.
 - MUST NOT expose passwords (PSd*), PH15 (restore factory defaults) or PH18
   (clear alarm history). Link settings, I/O allocation, PE05 and test mode
   MUST be read-only. MUST NOT add registers above 1900.

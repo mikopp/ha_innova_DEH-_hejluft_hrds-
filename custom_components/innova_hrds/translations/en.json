@@ -454,6 +454,9 @@
       "recirculation_active": {
         "name": "Recirculation active"
       },
+      "fan_integration_request": {
+        "name": "Fan integration request"
+      },
       "alarm_active": {
         "name": "Alarm active"
       },
