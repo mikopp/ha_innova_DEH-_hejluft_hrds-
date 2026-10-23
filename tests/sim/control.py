@@ -17,7 +17,7 @@ Stdlib only. All bodies are JSON; every POST answers with ``GET /state``.
 ``POST /fault``        any of ``illegal_addresses``, ``reject_writes``, ``ignore_writes``
                        (lists), ``delay`` (s), ``fc43`` (bool), ``identity``
                        (``{"0": vendor, "1": product, "2": revision}``),
-                       ``pump_fault``, ``display_on`` (bool), ``fan_model``,
+                       ``pump_fault``, ``display_on`` (bool),
                        ``water_temperature`` (degC), ``room_humidity`` (%RH),
                        ``sequence_delay`` (s)
 =====================  =====================================================
@@ -115,8 +115,6 @@ class ControlApi:
             dev.set_pump_fault(bool(body["pump_fault"]))
         if "display_on" in body:
             dev.set_display_on(bool(body["display_on"]))
-        if "fan_model" in body:
-            dev.set_fan_model(body["fan_model"])
         if "water_temperature" in body:
             dev.set_water_temperature(float(body["water_temperature"]))
         if "room_humidity" in body:

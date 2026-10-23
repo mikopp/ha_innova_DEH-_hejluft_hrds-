@@ -230,32 +230,10 @@ in `doc/references/UNIT_BEHAVIOUR.md` §13. What they left open:
 > [`fan-speed-tests.md`](fan-speed-tests.md); the code change waits for them
 > (item *Fan write target* below).
 
-> The test simulator (`tests/sim/device.py`) models all three hypotheses below
-> as `fan_model` = `rescale` (default) / `clamp` / `direct`. **None of them
-> fits the hardware:** all three take `PM20` as a command. The unit keeps its
-> own manual request, clamps it into the band and mirrors it in `PM20`
-> (T22–T26). Replace the three with that model together with *Fan write
-> target*.
-
-The climate entity now exposes **fan_mode** (off / low / medium / high):
-
-| Mode   | Manual fan speed written to reg 1614 |
-|--------|--------------------------------------|
-| off    | 0 %  |
-| low    | 30 % |
-| medium | 55 % |
-| high   | 85 % |
-
-Read-back maps the **actual** output (`outAO_SupplyFan`, 639) to the nearest
-preset via midpoint thresholds (42.5 / 70.0 %). `fan.hrds_supply_fan` reads the
-same register, so the two entities always agree about what the fan is doing.
-The **commanded** setpoint is `number.fan_manual_speed` (1614) and the fan
-entity's `commanded_percent` attribute.
-
-The gap between commanded and actual is the interesting measurement — see the
-rescale-vs-clamp item below. Note the presets are written to 1614 as-is, so if
-the band scales them, "low" will not read back as `low` until PF28/PF10 are
-opened to 0/100.
+> The simulator (`tests/sim/device.py`) now models what the hardware showed:
+> the unit owns `PM20`, clamps it into the band and drives the fan at it; a
+> write is acknowledged and not kept, one outside the band is refused (T22–T28).
+> The fan entity and the climate entity no longer set the speed (ADR-0034).
 
 - [x] **Core assumption: compressor/dehumidify can run on passive MVHR flow
       alone (no unit fan running)** — this is architecturally confirmed: the
@@ -266,27 +244,14 @@ opened to 0/100.
       regardless of PM20 (`doc/references/UNIT_BEHAVIOUR.md` §9.3). A user
       reports the fan would not go below 30 %, and an unofficial I/O
       reassignment as the only way around it.
-- [ ] **Fan write target (decide after [`fan-speed-tests.md`](fan-speed-tests.md)).**
-      `fan.set_percentage`, `climate.set_fan_mode` and
-      `number.fan_manual_speed` write `PM20`, which does not hold (T23).
-      What does work (T24–T26): the band clamps the unit's own manual request,
-      so raising the minimum above the running speed raises it, and lowering
-      the minimum afterwards keeps the new speed until the request ends.
-      Lowering it should work the same way through the maximum (`PF10`/`PF09`),
-      untested ([`fan-speed-tests.md`](fan-speed-tests.md) test G).
-      Options:
-      * set speed X by writing the active band's minimum (to raise) or maximum
-        (to lower) to X and then restoring the band: two EEPROM writes per
-        change (ADR-0023), lost at the end of each request, since the next run
-        starts at `PF28`;
-      * keep the band at X for the whole run (one write, but X becomes the
-        floor for every later run);
-      * make the fan read-only and leave the band numbers to the user. Either supersedes
-      ADR-0008 (`/adr supersede`). Affected: `fan.py`, `climate.py`
-      (`_FAN_MODE_PCT`, "off" cannot stop the fan), `number.fan_manual_speed`
-      and `OPERATIONAL_KEYS` (`const.py`), the simulator's `fan_model`
-      (`tests/sim/device.py`: `PM20` must become unit-owned), the fan tests,
-      README *Commanded vs actual fan speed*.
+- [x] **Fan write target.** Decided by the owner on 2026-10-23 (ADR-0034,
+      supersedes ADR-0008): the fan is read-only, the climate entity has no fan
+      mode, and `fan_manual_speed` (PM20) is a read-only sensor. A write to
+      `PM20` never acts without a display (T23, T27, T28), and whether it acts
+      with one is unknown. The band numbers stay the user's lever. A speed
+      control built on the band (raise via the minimum, lower via the maximum,
+      [`fan-speed-tests.md`](fan-speed-tests.md) test G) can be proposed once
+      G is run; it costs EEPROM writes per change (ADR-0023).
 - [x] **Rescale or clamp? (R variant only) — the key fan question.**
       **Answered (T23–T26).** The unit does not take `PM20` from Modbus at
       all (T23). Its own manual request, which `PM20` mirrors, is an absolute

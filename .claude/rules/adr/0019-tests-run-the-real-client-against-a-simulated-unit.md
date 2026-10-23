@@ -1,6 +1,6 @@
 ---
 status: accepted
-date: 2026-10-20
+date: 2026-10-23
 decision-makers: mikopp
 topics: [tests]
 paths:
@@ -19,7 +19,7 @@ paths:
   `MODBUS_REGISTERS.md` (`sim/registers.py`), behaviour from
   `UNIT_BEHAVIOUR.md` (`sim/device.py`), so a wrong address fails a test
   instead of being copied. Device behaviour not confirmed on hardware MUST
-  be a switchable hypothesis (e.g. `fan_model`), not a guess.
+  be a switchable hypothesis (as `fan_model` was until ADR-0034), not a guess.
 - A test MUST go in `tests/ha` (real HA core in-process). It MAY go in
   `tests/e2e` only when an in-process HA cannot show it, marked
   `@pytest.mark.needs_real_ha("<reason>")` with a reason from

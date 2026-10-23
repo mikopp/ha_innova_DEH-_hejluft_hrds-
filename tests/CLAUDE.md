@@ -35,7 +35,7 @@ any state of the unit:
 | # | Contract | In-process (`ha/test_restart.py`) | Real restart (`e2e/test_restart.py`) |
 |---|---|---|---|
 | 1 | What the user configured is still in force: options (a cleared brine sensor stays cleared), the *Allow operational requests* gate, registry edits (rename, enabled installer entity), entity and device ids | `test_options_are_authoritative_after_restart`, `test_gate_defaults_off_and_is_restored`, `test_restored_gate_allows_requests_straight_away`, `test_user_registry_changes_are_kept` | `test_setup_survives_restart` |
-| 2 | Nothing the unit is doing is disturbed: the first poll writes only headless settings the unit lost (none, if it kept them), never on/off, requests or fan | `test_restart_leaves_a_running_unit_alone`, `test_restart_keeps_season_and_fan_setpoint` | `test_running_unit_is_untouched_and_polling_resumes` |
+| 2 | Nothing the unit is doing is disturbed: the first poll writes only headless settings the unit lost (none, if it kept them), never on/off, requests or fan | `test_restart_leaves_a_running_unit_alone`, `test_restart_keeps_season_and_fan_band` | `test_running_unit_is_untouched_and_polling_resumes` |
 | 3 | HA booting before the unit is reachable ends loaded by itself | `test_boot_before_the_unit_is_reachable` | `test_ha_booting_before_the_unit_is_reachable` |
 | 4 | Restart together with a unit power cycle: the unit loses nothing, so nothing is written and control works at once | `test_restart_together_with_a_unit_power_cycle` | `test_restart_together_with_a_unit_power_cycle` |
 | 5 | Derived state comes back identical (setup check, hidden setpoints, brine guard, modes) | `test_every_entity_comes_back_identical` | (ids checked in contract 1) |
@@ -99,9 +99,10 @@ from the image's modbus manifest and installs that. A bare `pytest` skips
   the room humidity (PU01/PU07, a display with H or an AI3 probe) and INT from
   the room temperature (summer above SEtC + PF12, winter below SEtH − PF12 with
   SEtH clamped to PH09..PH10; a display or an AI2 probe, PG02).
-* The PM20 → fan output mapping is unconfirmed on hardware, so the model offers
-  `fan_model` = `rescale` (default) / `clamp` / `direct`; the fan tests cover
-  all three. Remove two once the hardware answer is known (`plans/todo.md`).
+* The fan runs at the unit's own manual request (PM20), clamped into the
+  active band as seen on hardware (T22–T28): a raised minimum raises it, a
+  lowered one leaves it, 0 when the request ends. A PM20 write is acknowledged
+  and not kept; one outside the band answers exception 04.
 * `python -m tests.sim --port 5020 --control-port 8020` runs it as a process;
   the HTTP control API (`sim/control.py`) injects alarms, probe faults, a power
   cycle, offline, slow replies, rejected writes, a wrong identity.

@@ -113,6 +113,9 @@
       "fan_manual_request": {
         "name": "Manual fan request (display)"
       },
+      "fan_manual_speed": {
+        "name": "Manual fan speed"
+      },
       "fan_integration_request": {
         "name": "Fan integration request"
       },
@@ -641,9 +644,6 @@
       },
       "fan_max_speed_cooling": {
         "name": "Fan max speed (cooling)"
-      },
-      "fan_manual_speed": {
-        "name": "Manual fan speed"
       },
       "dehumidify_differential": {
         "name": "Dehumidify differential"

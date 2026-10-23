@@ -55,10 +55,10 @@ Die Integration ist veröffentlicht und nutzbar, aber eine **Beta**.
   [Getestete Geräte und Installationen](doc/tested-setups.md) (EN).
 * **Auf echter Hardware nicht getestet:** das HRDS+ 50, Geräte ohne Umluft,
   Geräte mit Display oder Fühlern (automatische Sollwertregelung), Winterbetrieb
-  und Freikühlung. **Lüfter-Entität und Lüfterstufen stellen die Drehzahl noch
-  nicht ein:** Das Gerät übernimmt die manuelle Lüfterstufe (PM20) nicht. Ein
-  erhöhtes *Fan min speed* hebt einen laufenden Lüfter an
-  ([Commanded vs actual fan speed](README.md#commanded-vs-actual-fan-speed), EN).
+  und Freikühlung. **Die Lüfterdrehzahl bestimmt das Gerät:** Home Assistant
+  zeigt sie an, kann sie aber nicht einstellen, denn das Gerät nimmt über
+  Modbus keine Drehzahlvorgabe an. Ein erhöhtes *Fan min speed* hebt einen
+  laufenden Lüfter an ([Fan speed](README.md#fan-speed), EN).
   Offene Punkte:
   [`plans/todo.md`](plans/todo.md).
 * **Der Klima-Modus *Auto* ist nicht an echter Hardware getestet.** Er erscheint
@@ -100,7 +100,7 @@ Sie spricht über Modbus TCP mit der Steuerplatine des Geräts und stellt bereit
   einstellbaren Modus: **Aus**, **Standby** (nichts angefordert),
   **Entfeuchten**, **Kühlen** (Sommer), **Heizen** (Winter, nur wenn in den
   Optionen erlaubt, nie bei Sole) und, nur mit Display oder Raumfühler,
-  **Auto**. Beim `R`-Gerät auch die Lüfterstufe.
+  **Auto**. Keine Lüfterstufe: die Drehzahl ist nur ablesbar.
 * **Sensoren, Binärsensoren, Schalter, Zahlen und Auswahlfelder**: Messwerte,
   Betriebszustand, Alarme, Anforderungen (Entfeuchten, Integration), Sollwerte
   und Lüfterbänder, Saison.
@@ -147,10 +147,10 @@ steht.
   * [Water circuit and brine](README.md#water-circuit-and-brine) (EN): Wasserkreis und Sole
     * [Brine temperature guard](README.md#brine-temperature-guard) (EN): Solewächter (Temperaturschutz)
   * [Setting target humidity and target temperature](README.md#setting-target-humidity-and-target-temperature) (EN): Soll-Feuchte und Soll-Temperatur einstellen
-  * [Fan mode and recirculation](README.md#fan-mode-and-recirculation) (EN): Lüfterstufe und Umluft
+  * [Fan and recirculation](README.md#fan-and-recirculation) (EN): Lüfter und Umluft
   * [Drying with the fan on, but active cooling off](README.md#drying-with-the-fan-on-but-active-cooling-off) (EN): Entfeuchten mit Lüfter, ohne aktive Kühlung
   * [Airflow sensors](README.md#airflow-sensors) (EN): Luftmengen-Sensoren
-  * [Commanded vs actual fan speed](README.md#commanded-vs-actual-fan-speed) (EN): Vorgegebene und tatsächliche Lüfterdrehzahl
+  * [Fan speed](README.md#fan-speed) (EN): Lüfterdrehzahl
 * [Entity reference](doc/entity-reference.md) (EN): Alle Entitäten, nach Gerät gegliedert (eigene Datei)
 * [Probe requirements](README.md#probe-requirements) (EN): Anforderungen an Temperatur- und Feuchtefühler
 * [Requirements](README.md#requirements) (EN): Mindestversionen (Home Assistant, pymodbus)

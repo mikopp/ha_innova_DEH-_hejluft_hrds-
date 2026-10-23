@@ -213,21 +213,23 @@ async def test_same_value_again_writes_nothing(setup, clock):
     s = setup
     await allow_operation(s)
     await set_hvac_mode(s, clock, "dry")
-    await s.service("fan", "set_percentage", "hrds_supply_fan", percentage=40)
+    await s.service("number", "set_value", "fan_min_speed_dehumidify", value=55)
     await s.service("select", "select_option", "season", option="summer")
     await clock.settle()
     for _ in range(len(PENDING_RECHECK_SECONDS)):
         await clock.poll()  # the requests are confirmed, nothing pending
     s.device.clear_write_log()
     await set_hvac_mode(s, clock, "dry")
-    await s.service("fan", "set_percentage", "hrds_supply_fan", percentage=40)
+    await s.service("number", "set_value", "fan_min_speed_dehumidify", value=55)
     await s.service("select", "select_option", "season", option="summer")
     await s.service("switch", "turn_on", "dehumidify")
     await clock.settle()
     assert s.device.write_log == []
     # A real change is still written.
-    await s.service("fan", "set_percentage", "hrds_supply_fan", percentage=50)
-    assert [(w.address, w.value) for w in s.device.write_log] == [(R.FAN_MANUAL, 5000)]
+    await s.service("number", "set_value", "fan_min_speed_dehumidify", value=60)
+    assert [(w.address, w.value) for w in s.device.write_log] == [
+        (R.PF28_FAN_MIN_DEU, 6000)
+    ]
 
 
 async def test_probe_inputs_are_named_options(setup, clock):
@@ -345,10 +347,6 @@ async def test_unit_on_without_request_is_standby(setup, clock):
     assert climate.attributes["hvac_action"] == "idle"
     assert "fan_only" in climate.attributes["hvac_modes"]
     assert "auto" not in climate.attributes["hvac_modes"]
-    # A manual fan speed runs the R unit's fan: the action says so.
-    await s.service("climate", "set_fan_mode", CLIMATE, fan_mode="low")
-    await clock.settle()
-    assert s.state("climate", CLIMATE).attributes["hvac_action"] == "fan"
     # Off stops it: the unit goes off, so the mode and the switch agree.
     await set_hvac_mode(s, clock, "off")
     assert s.state("switch", "unit_on_off").state == "off"
@@ -399,7 +397,7 @@ async def test_non_r_unit_has_no_fan_entities(setup):
     s = setup
     assert s.entity_id("fan", "hrds_supply_fan") is None
     for platform, key in (
-        ("number", "fan_manual_speed"),
+        ("sensor", "fan_manual_speed"),
         ("sensor", "supply_fan_output"),
         ("sensor", "supply_fan_airflow"),
         ("number", "fan_min_speed_dehumidify"),

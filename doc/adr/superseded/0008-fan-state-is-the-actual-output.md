@@ -1,14 +1,9 @@
 ---
-status: accepted
+status: superseded by ADR-0034
 date: 2026-10-21
 decision-makers: mikopp
 topics: [fan, state, config]
 supersedes: [ADR-0007]
-paths:
-  - "custom_components/innova_hrds/fan.py"
-  - "custom_components/innova_hrds/climate.py"
-  - "custom_components/innova_hrds/config_flow.py"
-  - "custom_components/innova_hrds/__init__.py"
 ---
 
 # ADR-0008: Fan state is the actual output; device limits stay device registers
@@ -59,6 +54,16 @@ formula jumped at fan start.
 - `tests/ha/test_fan.py::test_airflow_zero_when_fan_off`
 - `tests/ha/test_headless.py::test_non_r_unit_has_no_fan_entities`
 - `tests/sim/test_device.py::test_fan_models_during_dehumidify`
+
+## Why it was superseded
+
+On the reference unit PM20 is not a command (UNIT_BEHAVIOUR.md §9.1): the
+unit owns it, a write inside the band was acknowledged and not kept (T23,
+T28), one below the band was refused with exception 04 (T27). So
+`fan.set_percentage`, `climate.set_fan_mode` and `number.fan_manual_speed`
+did nothing or failed. The band clamps the unit's request (T24–T26), which
+settled the rescale/clamp question the simulator's three models stood in
+for. ADR-0034 keeps the read side and the option rule and drops the writes.
 
 ## More information
 

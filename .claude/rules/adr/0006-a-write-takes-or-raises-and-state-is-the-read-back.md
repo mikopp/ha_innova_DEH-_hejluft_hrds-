@@ -1,6 +1,6 @@
 ---
 status: accepted
-date: 2026-10-21
+date: 2026-10-23
 decision-makers: mikopp
 topics: [modbus-writes, state]
 paths:
@@ -31,7 +31,7 @@ paths:
 `_write_registers` once returned `None` on every path, so a rejected write
 looked like success. An immediate poll after each write read the pre-write
 value, clobbered state, and cost three full cycles per HVAC mode change.
-The unit does not always adopt a value verbatim (fan, ADR-0008), so an
+The unit does not always adopt a value verbatim (fan, ADR-0034), so an
 optimistic state would show numbers the unit never took.
 
 ## Consequences

@@ -1,6 +1,6 @@
 ---
 status: accepted
-date: 2026-10-21
+date: 2026-10-23
 decision-makers: mikopp
 topics: [requests, state]
 paths:
@@ -21,7 +21,7 @@ paths:
   entry as soon as the read-back agrees, and after the last re-read let the
   unit's value stand and log a warning.
 - Fan and climate MUST NOT be pending: they report what the unit does
-  (ADR-0006, ADR-0008).
+  (ADR-0006, ADR-0034).
 - Unload MUST cancel the pending re-reads.
 
 ## Context

@@ -16,8 +16,11 @@ On top of it the model implements the behaviour documented in
   temperature (summer above SEtC + PF12, winter below SEtH - PF12);
 * a request starts water valve, damper (R units), fan and compressor; winter
   integration heats (compressor off, pump on);
-* the fan output follows PM20 under one of three hypotheses (``fan_model``),
-  because the real behaviour is not confirmed yet (``plans/todo.md``);
+* the fan runs at the unit's own manual request (PM20, mirrored in 1114),
+  clamped into the active band: up to the minimum at start and when the
+  minimum is raised, kept when it is lowered, 0 when the request ends; a
+  Modbus write to PM20 is acknowledged and ignored, one outside the band is
+  refused (exception 04);
 * alarms, probe faults and a power cycle can be injected.
 
 Outputs are recomputed after every write or injected change, so a poll that
@@ -35,13 +38,16 @@ from typing import Optional
 from . import registers as R
 from .seeds import DEFAULT_SEED, Seed, load_seed
 
-FAN_MODELS = ("rescale", "clamp", "direct")
 COMPRESSOR_ALARMS = ("AL11", "AL12")  # stop the compressor
 SHUTDOWN_ALARMS = ("AL25",)  # stop everything
 
 
 class IllegalAddress(Exception):
     """The device does not serve this address (Modbus exception 02)."""
+
+
+class DeviceFailure(Exception):
+    """The device refuses the value (Modbus exception 04)."""
 
 
 @dataclass
@@ -71,13 +77,11 @@ class HrdsDevice:
         self,
         seed: str = DEFAULT_SEED,
         overlays: tuple[str, ...] = (),
-        fan_model: str = "rescale",
         sequence_delay: float = 0.0,
     ) -> None:
         self._lock = threading.RLock()
         self.seed_name = seed
         self.overlays = tuple(overlays)
-        self.default_fan_model = fan_model
         self.default_sequence_delay = sequence_delay
         self._seed: Seed = load_seed(seed, self.overlays)
         self.reset()
@@ -99,7 +103,6 @@ class HrdsDevice:
             # R variant = has a damper output (1134 not "disabled").
             self.r_variant = self.input.get(R.DAMPER, 2) != 2
             self.pump_configured = self.input.get(R.WATER_VALVE_PUMP, 0) != 2
-            self.fan_model = self.default_fan_model
             self.sequence_delay = self.default_sequence_delay
             self.alarms: set[str] = set()
             self.unplugged: set[int] = set()
@@ -149,7 +152,11 @@ class HrdsDevice:
             if address not in self.holding:
                 self.write_log.append(Write(address, value, False, None))
                 raise IllegalAddress(f"holding {address}")
-            accepted = self._apply_write(address, value)
+            try:
+                accepted = self._apply_write(address, value)
+            except DeviceFailure:
+                self.write_log.append(Write(address, value, False, None))
+                raise
             self.write_log.append(
                 Write(address, value, accepted, self.holding[address])
             )
@@ -191,6 +198,14 @@ class HrdsDevice:
                 self.alarms.discard(f"AL{address - R.ALARM_RESET_BASE:02d}")
             self.holding[address] = 0
             return True
+        if address == R.FAN_MANUAL:
+            # PM20 is the unit's own (UNIT_BEHAVIOUR.md 9.1): refused outside
+            # the band (T27), acknowledged and not kept inside it (T23, T28).
+            # [INFERRED] the dehumidify band applies while no request runs.
+            low, high = self._fan_band(self._integ)
+            if not low <= value <= high:
+                raise DeviceFailure(f"PM20 {value} outside {low}..{high}")
+            return False
         if address == R.FAN_HOURS and value == 0:
             self.alarms.discard("AL22")
         if self.lag_reads.get(address):
@@ -272,13 +287,6 @@ class HrdsDevice:
     def set_display_on(self, on: bool) -> None:
         with self._lock:
             self.display_on = on
-            self._recompute()
-
-    def set_fan_model(self, model: str) -> None:
-        if model not in FAN_MODELS:
-            raise ValueError(f"fan_model must be one of {FAN_MODELS}")
-        with self._lock:
-            self.fan_model = model
             self._recompute()
 
     # ---- derived state -------------------------------------------------------
@@ -383,22 +391,12 @@ class HrdsDevice:
                 self._auto_int = False
         return self._auto_int
 
-    def _fan_band(self, deu: bool, integ: bool) -> tuple[int, int]:
+    def _fan_band(self, integ: bool) -> tuple[int, int]:
+        """The active band: INT's while it runs, else dehumidify's."""
         h = self.holding
         if integ:
             return h.get(R.PF27_FAN_MIN_INT, 5000), h.get(R.PF09_FAN_MAX_INT, 8500)
-        if deu:
-            return h.get(R.PF28_FAN_MIN_DEU, 5000), h.get(R.PF10_FAN_MAX_DEU, 8500)
-        return h.get(R.PF07_FAN_MIN_VMC, 3000), 10000
-
-    def _fan_output(self, request: int, band: tuple[int, int]) -> int:
-        low, high = band
-        request = max(0, min(10000, request))
-        if self.fan_model == "direct":
-            return request
-        if self.fan_model == "clamp":
-            return max(low, min(high, request))
-        return round(low + request * (high - low) / 10000)
+        return h.get(R.PF28_FAN_MIN_DEU, 5000), h.get(R.PF10_FAN_MAX_DEU, 8500)
 
     def _recompute(self) -> None:
         h, i = self.holding, self.input
@@ -410,7 +408,6 @@ class HrdsDevice:
         i[R.MODE_STATUS] = self._mode_base + (0 if summer else 1)
         setpoint = R.SUMMER_SETPOINT if summer else R.WINTER_SETPOINT
         i[R.ACTUAL_SETPOINT] = h.get(setpoint, 0)
-        i[R.FAN_MANUAL_REQUEST] = h.get(R.FAN_MANUAL, 0)
 
         status = self._unit_status()
         alarms = set(self.alarms) | self._probe_alarms(status)
@@ -441,7 +438,7 @@ class HrdsDevice:
             time.monotonic() - (self._running_since or 0) >= self.sequence_delay
         )
         heating = integ and not summer
-        manual_fan = on and not request and h.get(R.FAN_MANUAL, 0) > 0
+        self._integ = integ
 
         i[R.DEHUM_REQUEST] = 1 if request and not heating else 0
         # 1112 (FanIntegration_Request, a 0-100 % fan request) is left as
@@ -452,16 +449,20 @@ class HrdsDevice:
         if self.pump_configured:
             i[R.WATER_VALVE_PUMP] = 1 if request and not self.pump_fault else 0
 
-        # Fan
-        if not (request or manual_fan):
+        # Fan: the unit's manual request (PM20) clamped into the active band
+        # and driven as the output (T22, T24-T26). [INFERRED] a lowered maximum
+        # pulls it down (plans/fan-speed-tests.md test G).
+        if not request:
             i[R.FAN_STATUS] = 1
-            out = 0
-        elif request and not started:
+            h[R.FAN_MANUAL] = 0
+        elif not started:
             i[R.FAN_STATUS] = 2  # wait_on (PS01 damper pre-start)
-            out = 0
         else:
             i[R.FAN_STATUS] = 3
-            out = self._fan_output(h.get(R.FAN_MANUAL, 0), self._fan_band(deu, integ))
+            low, high = self._fan_band(integ)
+            h[R.FAN_MANUAL] = min(high, max(low, h.get(R.FAN_MANUAL, 0)))
+        out = h[R.FAN_MANUAL] if i[R.FAN_STATUS] == 3 else 0
+        i[R.FAN_MANUAL_REQUEST] = h.get(R.FAN_MANUAL, 0)
         i[R.FAN_OUTPUT] = out
         # The speed needs a tachometer input; without one 1117 reads 0 with the
         # fan running (UNIT_BEHAVIOUR.md 9.1, T16, T21).
@@ -507,7 +508,6 @@ class HrdsDevice:
                 "overlays": list(self.overlays),
                 "has_display": self.has_display,
                 "display_on": self.display_on,
-                "fan_model": self.fan_model,
                 "alarms": sorted(self.active_alarms),
                 "unit_status": i[R.UNIT_STATUS],
                 "season": i[R.SEASON_READBACK],

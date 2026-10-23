@@ -63,7 +63,7 @@ async def test_fan_is_not_pending_but_enables_are(setup, clock):
     await allow_operation(s)
     await clock.settle()
     hub = s.entry.runtime_data
-    await s.service("number", "set_value", "fan_manual_speed", value=30)
+    await s.service("number", "set_value", "fan_min_speed_dehumidify", value=55)
     assert hub._pending == {}
     # What may be requested follows an enable at once, before the read-back.
     await s.service("switch", "turn_off", "enable_onoff_bms")

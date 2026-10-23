@@ -585,15 +585,16 @@ ENTITIES_DICT: Dict[str, Dict[str, Any]] = {
         "STEP": 1,
         "NAME": "Fan max speed (cooling)",
     },
+    # PM20, the unit's own manual fan request ("via Display (read only)",
+    # handbook 5.3). Shown read-only: a written value does not hold, and one
+    # outside the band is refused (UNIT_BEHAVIOUR.md 9.1, T23, T27, T28).
     C_FAN_MANUAL: {
         "RT": C_REG_TYPE_HOLDING_REGISTERS,
         "REG": 1614,
         "DT": C_DT_UINT16,
         "FAKTOR": 0.01,
         "UNIT": "%",
-        "MIN": 0,
-        "MAX": 100,
-        "STEP": 1,
+        "RW": 0,
         "NAME": "Manual fan speed",
     },
     # --- Read-write switches (0/1 holding registers) ---
@@ -1419,8 +1420,8 @@ COMPUTED_BINARY_SENSORS: Dict[str, Dict[str, Any]] = {
 
 # Requests that make the unit do something. They are refused until the user
 # turns on "Allow operational requests"; switching things OFF and all
-# configuration writes always go through. A fan setpoint of 0 is not a request.
-OPERATIONAL_KEYS = (C_UNIT_ON_OFF, C_DEHUMIDIFY, C_INTEGRATION_REQUEST, C_FAN_MANUAL)
+# configuration writes always go through.
+OPERATIONAL_KEYS = (C_UNIT_ON_OFF, C_DEHUMIDIFY, C_INTEGRATION_REQUEST)
 
 # The request switches among them mean "what was commanded". The unit mirrors a
 # request into its register late (seen: OFF read back as ON for several polls),
@@ -1489,7 +1490,6 @@ class MyClimateEntityDescription(ClimateEntityDescription):
     supported_features: ClimateEntityFeature = (
         ClimateEntityFeature.TARGET_TEMPERATURE
         | ClimateEntityFeature.TARGET_HUMIDITY
-        | ClimateEntityFeature.FAN_MODE
         | ClimateEntityFeature.TURN_ON
         | ClimateEntityFeature.TURN_OFF
     )

@@ -1,98 +1,70 @@
-"""Fan speeds: commanded (PM20) vs actual (639) under each firmware hypothesis.
+"""The fan is the unit's: Home Assistant reads it and cannot set its speed.
 
-The real mapping from PM20 to fan output is not confirmed yet (plans/todo.md),
-so the simulator offers three models. Whichever applies, the integration must
-report the actual output as state, the commanded value as attribute / number,
-and derive airflow from the actual output.
+The unit takes no fan-speed request over Modbus. It runs the fan at its own
+manual request (PM20, 1614), clamped into the active band, and keeps it there
+(UNIT_BEHAVIOUR.md 9.1, T22-T28). The band numbers are the only lever.
 """
 
 from __future__ import annotations
 
 import pytest
+from homeassistant.components.climate import ClimateEntityFeature
 from homeassistant.const import STATE_UNKNOWN
+from homeassistant.exceptions import HomeAssistantError
 
 from tests.sim import registers as R
 
 from .conftest import CLIMATE, FAN, add_entry, allow_operation, set_hvac_mode
 
-# Factory band during dehumidify: PF28 = 50 %, PF10 = 85 %.
-EXPECTED_ACTUAL = {
-    "rescale": {0: 50.0, 30: 60.5, 55: 69.25, 85: 79.75, 100: 85.0},
-    "clamp": {0: 50.0, 30: 50.0, 55: 55.0, 85: 85.0, 100: 85.0},
-    "direct": {0: 0.0, 30: 30.0, 55: 55.0, 85: 85.0, 100: 100.0},
-}
 
-
-def _fan_mode(actual: float) -> str:
-    if actual < 5:
-        return "off"
-    if actual < 42.5:
-        return "low"
-    if actual < 70:
-        return "medium"
-    return "high"
-
-
-@pytest.mark.parametrize("model", list(EXPECTED_ACTUAL))
-async def test_fan_percentage_during_dehumidify(setup, clock, model):
+async def test_fan_follows_the_band_during_dehumidify(setup, clock):
     s = setup
-    s.device.set_fan_model(model)
     await allow_operation(s)
     await set_hvac_mode(s, clock, "dry")
+    fan = s.state("fan", FAN)
+    assert fan.attributes["percentage"] == 50
+    assert fan.attributes["manual_request_percent"] == pytest.approx(50)
+    assert float(s.state("sensor", "fan_manual_speed").state) == pytest.approx(50)
+    assert float(s.state("sensor", "supply_fan_airflow").state) == pytest.approx(150)
 
-    for commanded, actual in EXPECTED_ACTUAL[model].items():
-        await s.service("fan", "set_percentage", FAN, percentage=commanded)
-        await clock.settle()
-        assert s.device.holding[R.FAN_MANUAL] == commanded * 100
-
-        fan = s.state("fan", FAN)
-        assert fan.attributes["commanded_percent"] == pytest.approx(commanded)
-        assert fan.attributes["percentage"] == round(actual)
-        assert float(s.state("sensor", "supply_fan_output").state) == pytest.approx(
-            actual
-        )
-        assert float(s.state("number", "fan_manual_speed").state) == pytest.approx(
-            commanded
-        )
-        airflow = float(s.state("sensor", "supply_fan_airflow").state)
-        assert airflow == pytest.approx(min(300.0, actual / 100 * 300.0))
-        assert s.state("climate", CLIMATE).attributes["fan_mode"] == _fan_mode(actual)
+    # A raised minimum raises the running fan (T25) ...
+    await s.service("number", "set_value", "fan_min_speed_dehumidify", value=55)
+    await clock.settle()
+    assert s.state("fan", FAN).attributes["percentage"] == 55
+    assert float(s.state("sensor", "supply_fan_output").state) == pytest.approx(55)
+    assert float(s.state("sensor", "fan_manual_speed").state) == pytest.approx(55)
+    # ... a lowered one leaves it (T24, T26).
+    await s.service("number", "set_value", "fan_min_speed_dehumidify", value=50)
+    await clock.settle()
+    assert s.state("fan", FAN).attributes["percentage"] == 55
 
 
-@pytest.mark.parametrize(
-    ("fan_mode", "commanded"), [("low", 30), ("medium", 55), ("high", 85)]
-)
-async def test_climate_fan_modes_write_pm20(setup, clock, fan_mode, commanded):
+async def test_no_speed_control_and_nothing_written_to_pm20(setup, clock):
     s = setup
     await allow_operation(s)
-    await s.service("climate", "set_fan_mode", CLIMATE, fan_mode=fan_mode)
+    await set_hvac_mode(s, clock, "dry")
+    s.device.clear_write_log()
+    assert s.state("fan", FAN).attributes["supported_features"] == 0
+    climate = s.state("climate", CLIMATE).attributes
+    assert not climate["supported_features"] & ClimateEntityFeature.FAN_MODE
+    assert "fan_modes" not in climate
+    assert s.entity_id("number", "fan_manual_speed") is None
+    with pytest.raises(HomeAssistantError):
+        await s.service("fan", "set_percentage", FAN, percentage=60)
     await clock.settle()
-    assert s.device.holding[R.FAN_MANUAL] == commanded * 100
+    assert s.device.writes_to(R.FAN_MANUAL) == []
 
 
 async def test_no_optimistic_update_before_poll(setup, clock):
     s = setup
-    s.device.set_fan_model("direct")
     await allow_operation(s)
     await set_hvac_mode(s, clock, "dry")
-    await s.service("fan", "set_percentage", FAN, percentage=30)
-    # Before the debounced refresh the state still shows the old actual value.
-    assert s.state("fan", FAN).attributes["percentage"] == 0
+    await s.service("number", "set_value", "fan_min_speed_dehumidify", value=60)
+    # Before the debounced refresh the state still shows the old values.
+    assert s.state("fan", FAN).attributes["percentage"] == 50
+    assert float(s.state("number", "fan_min_speed_dehumidify").state) == 50
     await clock.settle()
-    assert s.state("fan", FAN).attributes["percentage"] == 30
-
-
-async def test_per_mode_minimum_moves_output(setup, clock):
-    s = setup
-    s.device.set_fan_model("clamp")
-    await allow_operation(s)
-    await set_hvac_mode(s, clock, "dry")
-    await s.service("fan", "set_percentage", FAN, percentage=20)
-    await clock.settle()
-    assert float(s.state("sensor", "supply_fan_output").state) == 50.0
-    await s.service("number", "set_value", "fan_min_speed_dehumidify", value=20)
-    await clock.settle()
-    assert float(s.state("sensor", "supply_fan_output").state) == 20.0
+    assert s.state("fan", FAN).attributes["percentage"] == 60
 
 
 async def test_airflow_zero_when_fan_off(setup, clock):

@@ -55,6 +55,7 @@ from .const import (
     C_DT_INT16,
     C_ENABLE_FREE_COOLING,
     C_ENABLE_INT_BMS,
+    C_FAN_MANUAL,
     C_HUMIDITY_PROBE_OK,
     C_INSTALLER_LAST_READ,
     C_INTEGRATION_AVAILABLE,
@@ -299,10 +300,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _migrate_setup_entities(hass, entry)
     _migrate_renamed_keys(hass, entry)
 
-    # HA02/HA03 were numbers up to 0.9.1 and are selects now, with the same
-    # unique id: drop the orphaned number entities.
+    # Same unique id on another platform: HA02/HA03 were numbers up to 0.9.1
+    # and are selects now, PM20 was a number up to 0.9.4 and is a sensor now.
+    # Drop the orphaned number entities.
     ent_registry = er.async_get(hass)
-    for key in (C_AI2_ALLOCATION, C_AI3_ALLOCATION):
+    for key in (C_AI2_ALLOCATION, C_AI3_ALLOCATION, C_FAN_MANUAL):
         if old_id := ent_registry.async_get_entity_id(
             Platform.NUMBER, DOMAIN, f"{entry.entry_id}-{key}"
         ):

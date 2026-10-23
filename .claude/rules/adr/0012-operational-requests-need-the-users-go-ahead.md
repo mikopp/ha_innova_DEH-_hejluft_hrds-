@@ -1,6 +1,6 @@
 ---
 status: accepted
-date: 2026-10-20
+date: 2026-10-23
 decision-makers: mikopp
 topics: [requests]
 paths:
@@ -13,7 +13,7 @@ paths:
 ## Decision
 
 - A non-zero write to an `OPERATIONAL_KEYS` register (unit on/off,
-  dehumidify, integration request, manual fan) MUST be refused until
+  dehumidify, integration request) MUST be refused until
   `switch.allow_operational_requests` (`hub.operation_allowed`) is on. The
   gate never refuses switching something off (a disabled Modbus enable
   still can, ADR-0022).

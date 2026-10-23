@@ -31,7 +31,7 @@ Do not restate ADR content in this file.
   operation gate (ADR-0012, ADR-0013, ADR-0014).
 * Verify the device before anything can write (ADR-0009).
 * Entities show the unit's read-back, and unknown or unavailable rather than
-  stale (ADR-0005, ADR-0006). No option may shadow a register (ADR-0008).
+  stale (ADR-0005, ADR-0006). No option may shadow a register (ADR-0034).
 * The entity reference `doc/entity-reference.md` is the only list of entities
   and mirrors the devices (main / setup / installer). Change it in the same
   commit as any entity, group or device change; `wiring_check.py` fails on a

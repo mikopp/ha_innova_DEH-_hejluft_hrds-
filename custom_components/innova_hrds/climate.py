@@ -49,11 +49,9 @@ from .const import (
     C_COMPRESSOR_STATUS,
     C_DEHUM_REQUEST,
     C_DEHUMIDIFY,
-    C_FAN_MANUAL,
     C_HUMIDITY_PROBE_OK,
     C_INTEGRATION_AVAILABLE,
     C_INTEGRATION_REQUEST,
-    C_SUPPLY_FAN_OUTPUT,
     C_SUPPLY_FAN_STATUS,
     C_TEMP_PROBE_OK,
     C_UNIT_ON_OFF,
@@ -73,30 +71,6 @@ from .entity_common import HubBackedEntity, setup_platform_from_types
 from .installer_params import installer_key
 
 _LOGGER = logging.getLogger(__name__)
-
-# Fan mode labels and the percentages written to PM20 (reg 1614).
-#
-# Read-back is the *actual* output (reg 639), so the mode shown is what the fan
-# is doing, not what was asked of it. Those can differ: the manual describes the
-# manual request as being scaled linearly across the active mode's min/max band
-# (PF28/PF10 for dehumidify, PF27/PF09 for integration), so with the factory
-# 50-85 % band, "low" (30) may read back as `medium`. Open PF28 to 0 and PF10 to
-# 100 - both writable numbers - for the presets to map one-for-one.
-# See plans/todo.md.
-_FAN_OFF = "off"
-_FAN_LOW = "low"
-_FAN_MEDIUM = "medium"
-_FAN_HIGH = "high"
-_FAN_MODES = [_FAN_OFF, _FAN_LOW, _FAN_MEDIUM, _FAN_HIGH]
-_FAN_MODE_PCT: dict[str, float] = {
-    _FAN_OFF: 0.0,
-    _FAN_LOW: 30.0,
-    _FAN_MEDIUM: 55.0,
-    _FAN_HIGH: 85.0,
-}
-# Midpoints between preset values for read-back mapping (nearest neighbour).
-_FAN_LOW_THRESHOLD = (_FAN_MODE_PCT[_FAN_LOW] + _FAN_MODE_PCT[_FAN_MEDIUM]) / 2  # 42.5
-_FAN_MED_THRESHOLD = (_FAN_MODE_PCT[_FAN_MEDIUM] + _FAN_MODE_PCT[_FAN_HIGH]) / 2  # 70.0
 
 # Target temperature range: the setpoint registers' own limits (SEtC in summer,
 # SEtH in winter, where the unit's PH09/PH10 clamp narrows it).
@@ -130,9 +104,6 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
             features &= ~ClimateEntityFeature.TARGET_TEMPERATURE
         if not hub.show_humidity_target:
             features &= ~ClimateEntityFeature.TARGET_HUMIDITY
-        # A non-R unit has no fan of its own.
-        if not hub.has_fan:
-            features &= ~ClimateEntityFeature.FAN_MODE
         self._attr_supported_features = features
         self._attr_hvac_modes = self._modes_for(None)
         self._attr_hvac_mode = HVACMode.OFF
@@ -142,9 +113,6 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
         self._attr_target_temperature_step = 0.5
         self._attr_min_humidity = 30
         self._attr_max_humidity = 90
-        if hub.has_fan:
-            self._attr_fan_modes = _FAN_MODES
-            self._attr_fan_mode = _FAN_OFF
 
     def _modes_for(self, current: HVACMode | None) -> list[HVACMode]:
         hub = self._hub
@@ -233,8 +201,6 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
         self._attr_hvac_mode = self._derive_mode(data)
         self._attr_hvac_modes = self._modes_for(self._attr_hvac_mode)
         self._attr_hvac_action = self._derive_action(data)
-        if self._hub.has_fan:
-            self._attr_fan_mode = self._derive_fan_mode(data)
         self.async_write_ha_state()
 
     def _derive_mode(self, data) -> HVACMode:
@@ -254,25 +220,6 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
         # that is off, so the mode never contradicts switch.unit_on_off.
         return HVACMode.FAN_ONLY
 
-    def _derive_fan_mode(self, data) -> str:
-        status = data.get(C_SUPPLY_FAN_STATUS)
-        if status in ("off", "disabled", "wait_off"):
-            return _FAN_OFF
-        # The *actual* output (reg 639), same source as fan.hrds_supply_fan, so
-        # the two entities always agree about what the fan is doing. The
-        # commanded setpoint is on number.fan_manual_speed and on the fan
-        # entity's `commanded_percent` attribute.
-        pct = data.get(C_SUPPLY_FAN_OUTPUT)  # float 0-100
-        if pct is None:
-            return _FAN_OFF
-        if pct < 5.0:
-            return _FAN_OFF
-        if pct < _FAN_LOW_THRESHOLD:
-            return _FAN_LOW
-        if pct < _FAN_MED_THRESHOLD:
-            return _FAN_MEDIUM
-        return _FAN_HIGH
-
     def _derive_action(self, data) -> HVACAction:
         if data.get(C_UNIT_STATUS) != "on":
             return HVACAction.OFF
@@ -284,7 +231,7 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
             return HVACAction.COOLING
         if data.get(C_COMPRESSOR_STATUS) == "on" or data.get(C_DEHUM_REQUEST) == "on":
             return HVACAction.DRYING
-        # No request, but the fan runs (a manual fan speed on an R unit).
+        # No request, but the unit runs its fan (an R unit).
         if self._hub.has_fan and data.get(C_SUPPLY_FAN_STATUS) == "on":
             return HVACAction.FAN
         return HVACAction.IDLE
@@ -294,8 +241,8 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
         hub = self._hub
         if hvac_mode == HVACMode.OFF:
             # Off is the unit off: that alone stops every request source (its
-            # own room logic, digital inputs) and a manually set fan. The
-            # requests are cleared too, so switching on starts nothing.
+            # own room logic, digital inputs). The requests are cleared too, so
+            # switching on starts nothing.
             requests = self._usable([(C_INTEGRATION_REQUEST, 0), (C_DEHUMIDIFY, 0)])
             unit_off = self._usable([(C_UNIT_ON_OFF, 0)])
             for key, raw in requests + unit_off:
@@ -382,14 +329,6 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
     async def async_turn_off(self) -> None:
         """Requests cleared and the unit off (Modbus on/off = off)."""
         await self.async_set_hvac_mode(HVACMode.OFF)
-
-    async def async_set_fan_mode(self, fan_mode: str) -> None:
-        pct = _FAN_MODE_PCT.get(fan_mode)
-        if pct is None:
-            return
-        # No optimistic update: fan_mode reflects actual output, which the unit
-        # decides. Write and let the next poll report it.
-        await self._hub.write_entity_value(C_FAN_MANUAL, pct)
 
     async def async_set_temperature(self, **kwargs) -> None:
         temp = kwargs.get(ATTR_TEMPERATURE)

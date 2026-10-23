@@ -17,7 +17,7 @@ import logging
 import signal
 
 from .control import ControlApi
-from .device import FAN_MODELS, HrdsDevice
+from .device import HrdsDevice
 from .seeds import DEFAULT_SEED, list_overlays, list_seeds
 from .server import HrdsSimServer
 
@@ -29,7 +29,6 @@ def _parse() -> argparse.Namespace:
     parser.add_argument("--control-port", type=int, default=None)
     parser.add_argument("--seed", default=DEFAULT_SEED, help="device dump name")
     parser.add_argument("--overlay", action="append", default=[], help="repeatable")
-    parser.add_argument("--fan-model", choices=FAN_MODELS, default="rescale")
     parser.add_argument("--sequence-delay", type=float, default=0.0)
     parser.add_argument("--list", action="store_true", help="list seeds and overlays")
     parser.add_argument("-v", "--verbose", action="store_true")
@@ -40,7 +39,6 @@ async def _main(args: argparse.Namespace) -> None:
     device = HrdsDevice(
         args.seed,
         tuple(args.overlay),
-        fan_model=args.fan_model,
         sequence_delay=args.sequence_delay,
     )
     sim = HrdsSimServer(device, host=args.host, port=args.port)

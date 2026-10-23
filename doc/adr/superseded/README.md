@@ -8,4 +8,5 @@ superseding or reviving a decision (ADR-0029), and then through
 |---|---|---|---|
 | [0003](0003-integration-asserts-the-modbus-enables.md) | The integration asserts the Modbus enables on every poll | superseded by ADR-0022 | modbus-writes, requests |
 | [0007](0007-fan-entity-reports-the-commanded-speed.md) | The fan entity reports the commanded speed | superseded by ADR-0008 | fan, state |
+| [0008](0008-fan-state-is-the-actual-output.md) | Fan state is the actual output; device limits stay device registers | superseded by ADR-0034 | fan, state, config |
 | [0021](0021-release-a-tagged-zip-with-local-brand-images.md) | Release a tagged zip; brand images ship with the integration | superseded by ADR-0031 | ci |

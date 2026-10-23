@@ -60,9 +60,9 @@ The integration is released and usable, but it is a **beta**.
 * **Not tested on real hardware:** Other versions like the HRDS+ 50, units
   without recirculation (non-`R`), units with a display or external probes
   (automatic setpoint control), winter heating, free cooling.
-  **The fan entity and fan modes cannot set the speed yet:** the unit does not
-  keep the manual fan speed they write (PM20). Raising *Fan min speed* raises a
-  running fan ([Commanded vs actual fan speed](#commanded-vs-actual-fan-speed)).
+  **The fan speed is the unit's:** Home Assistant shows it but cannot set it,
+  because the unit takes no fan-speed request over Modbus. Raising *Fan min
+  speed* raises a running fan ([Fan speed](#fan-speed)).
   The open items are listed in [`plans/todo.md`](plans/todo.md).
 * **Climate *Auto* mode is not tested on a real device.** It only appears
   with a display or room probe. CI tests it against a simulated display unit
@@ -114,12 +114,10 @@ The integration talks to the unit's control board via Modbus TCP and exposes:
   * Target humidity / temperature are only offered when a display or a room
     probe makes the unit act on them; without one Home Assistant does the
     regulating.
-  * Fan mode is selectable: **off** / **low** / **medium** / **high** — writes
-    the manual fan speed register, which the unit does not keep (see
-    [Commanded vs actual fan speed](#commanded-vs-actual-fan-speed)). The shown
-    mode is what the fan is *actually* doing. **"off" does not make Dry/Cool run on passive airflow**: on an `R`
-    unit every dehumidify or cooling request opens the recirculation damper and
-    starts the fan (see [Fan mode and recirculation](#fan-mode-and-recirculation)).
+  * No fan mode: the unit takes no fan-speed request over Modbus (see
+    [Fan speed](#fan-speed)). On an `R` unit every dehumidify or cooling
+    request opens the recirculation damper and starts the fan (see
+    [Fan and recirculation](#fan-and-recirculation)).
 * **Sensors** — see the [entity reference](doc/entity-reference.md), including three computed airflow
   sensors derived from your model's calibration data.
 * **Binary sensors** — dehumidify requested, recirculation active, probe
@@ -441,7 +439,7 @@ the dried air. The external valve and pump (`sensor.water_valve_pump`) connect
 the unit to your water circuit: a heat pump's surface heating/cooling circuit,
 the brine of a ground-source heat pump, or a separate ground loop. `R` units
 add a recirculation fan and damper, which run with **every** request (see
-[Fan mode and recirculation](#fan-mode-and-recirculation)). Details:
+[Fan and recirculation](#fan-and-recirculation)). Details:
 [UNIT_BEHAVIOUR §2](doc/references/UNIT_BEHAVIOUR.md#2-hardware-air-path-water-path-terminals).
 
 ### Two requests
@@ -527,7 +525,7 @@ in winter; see [Water circuit and brine](#water-circuit-and-brine).
    `water_below_compressor_limit`, which here is information, not a fault.
 5. **The fan** starts at the active mode's minimum speed; raise the minimum
    to run it faster (see
-   [Commanded vs actual fan speed](#commanded-vs-actual-fan-speed)).
+   [Fan speed](#fan-speed)).
 
 ## Using the integration
 
@@ -685,7 +683,7 @@ So in short: set **target humidity** in **Dry** or **Cool**; **target
 temperature** matters in **Cool** (summer). Both require a wired display or
 external probes to be present, otherwise the unit ignores them.
 
-### Fan mode and recirculation
+### Fan and recirculation
 
 * **Passive airflow**: the unit's own fan is off and only the MVHR pushes air
   through. On an `R` unit this only happens while the unit is idle (Off or on
@@ -693,15 +691,14 @@ external probes to be present, otherwise the unit ignores them.
 * **Every Dry or Cool request on an `R` unit opens the recirculation damper
   and runs the fan** (damper first, fan after the pre-start time, then the
   compressor). **Recirculation damper** and **Supply fan output %** show it.
-* Fan mode "off" (a write of 0 to PM20) therefore does **not** give
-  dehumidifying on passive airflow on an `R` unit; the fan runs at its band
-  minimum. Only a non-`R` unit (no fan, no damper) dehumidifies on
+* So an `R` unit never dehumidifies on passive airflow: the fan runs at
+  least at its band minimum. Only a non-`R` unit (no fan, no damper) dehumidifies on
   MVHR flow alone. An unofficial I/O reassignment exists for `R` units; it is
   untested here and has a short-circuit risk if the recirculation inlet is
   teed into the extract duct.
 
-Use the per-mode fan minimum/maximum `number` entities to choose how hard the
-fan runs. Sources, vendor statements and the workaround:
+The per-mode fan minimum `number` entities set how hard the fan runs (see
+[Fan speed](#fan-speed)). Sources, vendor statements and the workaround:
 [UNIT_BEHAVIOUR §9](doc/references/UNIT_BEHAVIOUR.md#9-fan).
 
 ### Drying with the fan on, but active cooling off
@@ -744,32 +741,32 @@ The derivation and a two-point calibration recipe are in
 with the underlying spec data in
 [Technical data](doc/references/README.md#technical-data-airflow-capacity-power).
 
-### Commanded vs actual fan speed
+### Fan speed
 
-**The unit does not take a fan speed from Home Assistant.** The fan entity,
-the climate fan mode and `number.hrds_manual_fan_speed` write the manual fan
-setpoint PM20 (1614). The handbook defines PM20 as the **display's** setpoint
-("read only"), and the unit overwrites it: on the reference unit a value
-written during a run read back as the band minimum, and the fan kept running
-there. The unit has no other register for a fan-speed request from Modbus. Its
-fan runs at the highest of its own requests, kept within the active mode's
-band (PF28–PF10 for dehumidify, PF27–PF09 for cooling): the 0–10 V input,
-scaled into the band, and the manual (display) request, which PM20 shows.
-Without a display or 0–10 V signal the manual request starts each run at the
-band **minimum**: 50 % as shipped. Details:
+**The fan speed is the unit's; Home Assistant shows it and cannot set it.**
+The unit has no register for a fan-speed request from Modbus. PM20 (1614), the
+"manual fan speed" of the register list, is the **display's** setpoint
+("read only" in the handbook): the unit sets it itself, acknowledges a written
+value inside the band without keeping it, and refuses one outside the band.
+So the fan entity is read-only, the climate entity has no fan mode, and
+`sensor.hrds_manual_fan_speed` shows PM20 (up to 0.9.4 it was a number).
+
+The fan runs at the highest of the unit's own requests, kept within the active
+mode's band (PF28–PF10 for dehumidify, PF27–PF09 for cooling): the 0–10 V
+input, scaled into the band, and the manual (display) request, which PM20
+shows. Without a display or 0–10 V signal the manual request starts each run
+at the band **minimum**: 50 % as shipped. Details:
 [UNIT_BEHAVIOUR §9.1](doc/references/UNIT_BEHAVIOUR.md#91-bands-and-sources).
 
 What the integration shows:
 
-* **Actual** — `sensor.hrds_supply_fan_output` (%),
-  `sensor.hrds_supply_fan_airflow` (m³/h), `sensor.hrds_supply_fan_rpm` (only
-  when an input is allocated to the fan tachometer, else unknown), and the
-  state of `fan.hrds_supply_fan` and the climate entity's `fan_mode`. This is
-  the speed the fan runs at.
-* **Commanded** — `number.hrds_manual_fan_speed`, and the fan entity's
-  `commanded_percent` attribute. Both show PM20, the unit's manual request,
-  which the unit sets itself; while the fan runs it reads the same as the
-  actual output.
+* `sensor.hrds_supply_fan_output` (%), `sensor.hrds_supply_fan_airflow`
+  (m³/h), and the state of `fan.hrds_supply_fan`: the speed the fan runs at.
+* `sensor.hrds_supply_fan_rpm`: only when an input is allocated to the fan
+  tachometer, else unknown.
+* `sensor.hrds_manual_fan_speed` and the fan entity's `manual_request_percent`
+  attribute: PM20, the unit's manual request. While the fan runs it reads the
+  same as the output.
 
 What works over Modbus is the band. The unit keeps its manual request within
 it, so on the reference unit, during a dehumidify run:
@@ -783,10 +780,8 @@ it, so on the reference unit, during a dehumidify run:
 
 Each change is a write to the unit's EEPROM, so do not drive the band from a
 control loop. The cooling band (`_cooling`) is expected to work the same way
-during an integration request; untested. The tests and the decision on how
-the integration will set the speed:
-[`plans/fan-speed-tests.md`](plans/fan-speed-tests.md),
-[`plans/todo.md`](plans/todo.md).
+during an integration request; untested. The open tests:
+[`plans/fan-speed-tests.md`](plans/fan-speed-tests.md).
 
 ## Entity reference
 

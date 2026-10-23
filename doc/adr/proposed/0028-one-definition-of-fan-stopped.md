@@ -1,10 +1,10 @@
 ---
 status: proposed
-date: 2026-10-21
+date: 2026-10-23
 decision-makers: mikopp
 topics: [fan, state]
 paths:
-  - "custom_components/innova_hrds/{fan,climate,__init__,const}.py"
+  - "custom_components/innova_hrds/{fan,__init__,const}.py"
 ---
 
 # ADR-0028: One definition of "the fan is stopped"
@@ -12,28 +12,27 @@ paths:
 ## Decision
 
 - `const.py` MUST define the `supply_fan_status` values that mean "stopped"
-  once (`FAN_STOPPED_STATUSES`), and `fan.py` (`is_on`), `climate.py`
-  (`_derive_fan_mode`) and `__init__.py` (`_compute_derived`, airflow) MUST
-  all use it.
+  once (`FAN_STOPPED_STATUSES`), and `fan.py` (`is_on`) and `__init__.py`
+  (`_compute_derived`, airflow) MUST both use it.
 - Proposed set: `{"off", "disabled", "alarm"}`. The transitional `wait_on`
   ("Starting") and `wait_off` ("Stopping") MUST NOT be judged stopped by the
-  status; there the actual output (639) decides, as ADR-0008 wants.
+  status; there the actual output (639) decides, as ADR-0034 wants.
 
 ## Context
 
-Three places judge "fan stopped" and disagree today:
+Two places judge "fan stopped" and disagree today (the climate fan mode,
+a third, went with ADR-0034):
 
 | Place | Statuses treated as stopped |
 |---|---|
 | `fan.py` `_FAN_STOPPED` | off, disabled, wait_off, alarm |
-| `climate.py` `_derive_fan_mode` | off, disabled, wait_off |
 | `__init__.py` `_compute_derived` (airflow) | off, disabled, alarm |
 
-With `wait_off` the fan entity and `fan_mode` say off while
-`sensor.supply_fan_airflow` reports m³/h; with `alarm` the fan entity is off
-and the airflow 0, but `fan_mode` is derived from the output. ADR-0008 says
-the fan entity, `fan_mode` and the airflow describe the same fan.
-Whether the fan turns during `wait_off` (the PF03 post-run) is unverified.
+With `wait_off` the fan entity says off while `sensor.supply_fan_airflow`
+reports m³/h. ADR-0034 says the fan entity and the airflow describe the same
+fan. On the reference unit the output read 40 % (`PF26`) during `wait_off`
+after a dehumidify stop (`UNIT_BEHAVIOUR.md` T19), so the fan most likely
+turns then; whether it does was not checked by eye.
 
 ## Considered options
 
@@ -43,21 +42,21 @@ Whether the fan turns during `wait_off` (the PF03 post-run) is unverified.
 
 ## Consequences
 
-- Good: the fan entity, the climate fan mode and the airflow agree.
-- Bad: needs a hardware check of `wait_off` (record 1119 and 639 during a
-  post-run); `plans/todo.md` lists it.
+- Good: the fan entity and the airflow agree.
+- Bad: the fan entity shows on for the post-run, which T19 suggests is right
+  but nobody has watched.
 
 ## Confirmation
 
 To add with the change: a test in `tests/ha/test_fan.py` that puts the
-simulated fan in `wait_off` and in `alarm` and asserts the fan entity,
-`fan_mode` and airflow agree; and
+simulated fan in `wait_off` and in `alarm` and asserts the fan entity and
+the airflow agree; and
 
 ```sh
-test "$(grep -c 'FAN_STOPPED_STATUSES' custom_components/innova_hrds/*.py | awk -F: '{s+=$2} END {print s}')" -ge 4
+test "$(grep -c 'FAN_STOPPED_STATUSES' custom_components/innova_hrds/*.py | awk -F: '{s+=$2} END {print s}')" -ge 3
 ```
 
 ## More information
 
-Found while extracting ADR-0008 from the history. Accepting it means
+Found while extracting ADR-0008 (superseded by ADR-0034) from the history. Accepting it means
 implementing the constant and the test, then setting `status: accepted`.
