@@ -55,9 +55,9 @@ Die Integration ist veröffentlicht und nutzbar, aber eine **Beta**.
   [Getestete Geräte und Installationen](doc/tested-setups.md) (EN).
 * **Auf echter Hardware nicht getestet:** das HRDS+ 50, Geräte ohne Umluft,
   Geräte mit Display oder Fühlern (automatische Sollwertregelung), Winterbetrieb
-  und Freikühlung. **Die Lüfterdrehzahl lässt sich noch nicht einstellen:**
-  Das Gerät übernimmt die manuelle Lüfterstufe (PM20) nicht und lässt den
-  Lüfter am Minimum seines Bands laufen
+  und Freikühlung. **Lüfter-Entität und Lüfterstufen stellen die Drehzahl noch
+  nicht ein:** Das Gerät übernimmt die manuelle Lüfterstufe (PM20) nicht. Ein
+  erhöhtes *Fan min speed* hebt einen laufenden Lüfter an
   ([Commanded vs actual fan speed](README.md#commanded-vs-actual-fan-speed), EN).
   Offene Punkte:
   [`plans/todo.md`](plans/todo.md).

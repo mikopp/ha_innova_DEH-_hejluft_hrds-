@@ -60,9 +60,9 @@ The integration is released and usable, but it is a **beta**.
 * **Not tested on real hardware:** Other versions like the HRDS+ 50, units
   without recirculation (non-`R`), units with a display or external probes
   (automatic setpoint control), winter heating, free cooling.
-  **Setting the fan speed does not work yet:** the unit does not keep the
-  manual fan speed the integration writes (PM20) and runs the fan at its band
-  minimum ([Commanded vs actual fan speed](#commanded-vs-actual-fan-speed)).
+  **The fan entity and fan modes cannot set the speed yet:** the unit does not
+  keep the manual fan speed they write (PM20). Raising *Fan min speed* raises a
+  running fan ([Commanded vs actual fan speed](#commanded-vs-actual-fan-speed)).
   The open items are listed in [`plans/todo.md`](plans/todo.md).
 * **Climate *Auto* mode is not tested on a real device.** It only appears
   with a display or room probe. CI tests it against a simulated display unit
@@ -525,7 +525,8 @@ in winter; see [Water circuit and brine](#water-circuit-and-brine).
    on, `sensor.water_valve_pump` is *On*, `sensor.water_temperature` is below
    PU08, and `sensor.compressor_status` is not *On*. The water check then lists
    `water_below_compressor_limit`, which here is information, not a fault.
-5. **The fan** runs at the active mode's minimum speed (see
+5. **The fan** starts at the active mode's minimum speed; raise the minimum
+   to run it faster (see
    [Commanded vs actual fan speed](#commanded-vs-actual-fan-speed)).
 
 ## Using the integration
@@ -751,10 +752,11 @@ setpoint PM20 (1614). The handbook defines PM20 as the **display's** setpoint
 ("read only"), and the unit overwrites it: on the reference unit a value
 written during a run read back as the band minimum, and the fan kept running
 there. The unit has no other register for a fan-speed request from Modbus. Its
-fan runs at the highest of its own requests (display, 0–10 V input), scaled
-into the active mode's band: PF28–PF10 for dehumidify, PF27–PF09 for cooling.
-Without a display or 0–10 V signal that is the band **minimum**: 50 % as
-shipped. Details:
+fan runs at the highest of its own requests, kept within the active mode's
+band (PF28–PF10 for dehumidify, PF27–PF09 for cooling): the 0–10 V input,
+scaled into the band, and the manual (display) request, which PM20 shows.
+Without a display or 0–10 V signal the manual request starts each run at the
+band **minimum**: 50 % as shipped. Details:
 [UNIT_BEHAVIOUR §9.1](doc/references/UNIT_BEHAVIOUR.md#91-bands-and-sources).
 
 What the integration shows:
@@ -765,15 +767,24 @@ What the integration shows:
   state of `fan.hrds_supply_fan` and the climate entity's `fan_mode`. This is
   the speed the fan runs at.
 * **Commanded** — `number.hrds_manual_fan_speed`, and the fan entity's
-  `commanded_percent` attribute. Both show PM20, the display's request, which
-  the unit sets itself: the band minimum while the fan runs, 0 otherwise.
+  `commanded_percent` attribute. Both show PM20, the unit's manual request,
+  which the unit sets itself; while the fan runs it reads the same as the
+  actual output.
 
-To run the fan faster, raising the active mode's **minimum**
-(`number.hrds_fan_min_speed_dehumidify` / `_cooling`) should work; the Modbus
-manual names the band as the fan setting over Modbus. It is **not yet
-confirmed on hardware**, and each change is a write to the unit's EEPROM, so
-do not drive it from a control loop. The tests and the decision on how the
-integration will set the speed:
+What works over Modbus is the band. The unit keeps its manual request within
+it, so on the reference unit, during a dehumidify run:
+
+* raising `number.hrds_fan_min_speed_dehumidify` above the current speed
+  raised the fan to the new minimum within a minute (50 → 55 %);
+* lowering the minimum again did **not** slow the fan; it stays at its speed
+  until the request ends, and the next run starts at the minimum;
+* lowering the **maximum** below the current speed should slow it, but that
+  is not tested yet.
+
+Each change is a write to the unit's EEPROM, so do not drive the band from a
+control loop. The cooling band (`_cooling`) is expected to work the same way
+during an integration request; untested. The tests and the decision on how
+the integration will set the speed:
 [`plans/fan-speed-tests.md`](plans/fan-speed-tests.md),
 [`plans/todo.md`](plans/todo.md).
 
