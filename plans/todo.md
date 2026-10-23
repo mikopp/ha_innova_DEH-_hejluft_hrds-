@@ -17,12 +17,13 @@ evidence log, replace the `[INFERRED]` tags it settles, and fix the code/docs.
       Verify sign handling on outdoor/water temps below 0 °C.
 - [ ] **Humidity is integer %RH (no scale)** on both the room probe (505) and the
       setpoint (1586). Confirm no ×0.1.
-- [ ] **`recirculation_active` (reg 1112) is a 0/1 flag**, not a 0–100 %
-      value. It sits next to the 0–100 % fan-request registers; if hardware shows
-      a percentage, change it from a binary sensor to a `sensor` with
-      `FAKTOR: 0.01`. (See `const.py` `C_RECIRCULATION_ACTIVE`.)
-      Update 2026-10-23: it stayed 0 through two recirculating DEU runs, so it
-      is neither "fan running" nor "recirculating"; see *First dehumidify run*.
+- [x] **`recirculation_active` (reg 1112) is a 0/1 flag**, not a 0–100 %
+      value. No: the Modbus manual's full map gives `FanIntegration_Request`
+      the range 0.00–100.00 like the fan requests 1113–1116 next to it
+      [MB p.14], so it is a fan request in % (`MODBUS_REGISTERS.md` §6). It
+      stayed 0 through two recirculating DEU runs (T16, T18). The entity PR
+      shows it as a % sensor. Still to see on hardware: a non-zero value during
+      an INT run ([`fan-speed-tests.md`](fan-speed-tests.md) test E).
 - [ ] **Air quality (506)** unit/scale and whether the probe is even fitted.
       The device class is now left unset: `AQI` accepts only a `None` unit in
       Home Assistant, so pairing it with "ppm" was invalid. If the probe turns
@@ -100,8 +101,11 @@ in `doc/references/UNIT_BEHAVIOUR.md` §13. What they left open:
       only when an input is allocated (entity PR).
 - [ ] **What is 1112 (`FanIntegration_Request`)?** It stayed 0 through two
       recirculating DEU runs (T16, T18), so it is neither "fan running" nor
-      "recirculating". Hypothesis: 1 only for an INT request. Read it during the
-      first INT run. Integration side: derive `recirculation_active` from the
+      "recirculating". The Modbus map makes it a 0–100 % fan request (see the
+      scaling item above). Hypothesis: the request of the INT fan control
+      (`PF31`, `PF12`/`PF13`), non-zero only during an INT request. Read it
+      during the first INT run ([`fan-speed-tests.md`](fan-speed-tests.md)
+      test E). Integration side: derive `recirculation_active` from the
       damper (1134) and fan status (1119) and show 1112 under its own name
       (entity PR).
 - [x] **Who wrote `PM20` (1614) and the display request (1114)?** The unit: both
@@ -110,7 +114,10 @@ in `doc/references/UNIT_BEHAVIOUR.md` §13. What they left open:
       `number.manual_fan_speed` show the unit's value, a percentage written while
       idle is overwritten at the next start, and the rescale/clamp sweep below
       has to write `PM20` while a request runs. Open: does a `PM20` written
-      during a request hold until its end?
+      during a request hold until its end? **No** (T23, 2026-10-23): a value
+      inside the band written during a run was acknowledged and read back as
+      50 %. How fast the unit overwrites it: [`fan-speed-tests.md`](fan-speed-tests.md)
+      test C.
 - [ ] **Which timer held the compressor?** It came on 6.5–8 min after the
       request and 5–7 min after the fan; `PE04` ships at 180 s, so something else
       held it. `PE03` (420 s) fits numerically, but it is defined between two
@@ -211,6 +218,14 @@ in `doc/references/UNIT_BEHAVIOUR.md` §13. What they left open:
 
 ## Fan mode — implemented, needs hardware verification
 
+> **2026-10-23: the integration's fan write does not work.** `PM20` (1614) is
+> the display's setpoint ("via Display (read only)", handbook §5.3); the unit
+> overwrites a Modbus write (T22, T23). No register takes a fan-speed request
+> from the BMS; the documented Modbus lever is the band (`PF28`/`PF27`,
+> `UNIT_BEHAVIOUR.md` §9.1). The hardware tests are in
+> [`fan-speed-tests.md`](fan-speed-tests.md); the code change waits for them
+> (item *Fan write target* below).
+
 > The test simulator (`tests/sim/device.py`) models all three hypotheses below
 > as `fan_model` = `rescale` (default) / `clamp` / `direct`. Once the hardware
 > answer is known, make that one the default and drop the others.
@@ -244,7 +259,21 @@ opened to 0/100.
       regardless of PM20 (`doc/references/UNIT_BEHAVIOUR.md` §9.3). A user
       reports the fan would not go below 30 %, and an unofficial I/O
       reassignment as the only way around it.
-- [ ] **Rescale or clamp? (R variant only) — the key fan question.** The technical
+- [ ] **Fan write target (decide after [`fan-speed-tests.md`](fan-speed-tests.md)).**
+      `fan.set_percentage`, `climate.set_fan_mode` and
+      `number.fan_manual_speed` write `PM20`, which does not hold (T23).
+      Options: write the active band's minimum (`PF28` in DEU, `PF27` in INT,
+      capped by `PF10`/`PF09`, write only on change, ADR-0023), or make the
+      fan read-only and leave the band numbers to the user. Either supersedes
+      ADR-0008 (`/adr supersede`). Affected: `fan.py`, `climate.py`
+      (`_FAN_MODE_PCT`, "off" cannot stop the fan), `number.fan_manual_speed`
+      and `OPERATIONAL_KEYS` (`const.py`), the simulator's `fan_model`
+      (`tests/sim/device.py`: `PM20` must become unit-owned), the fan tests,
+      README *Commanded vs actual fan speed*.
+- [x] **Rescale or clamp? (R variant only) — the key fan question.**
+      **Answered (T23): neither.** The unit does not take `PM20` from Modbus
+      at all; the output stays at the band minimum. The question below is
+      kept for the record. The technical
       handbook says manual fan control is *„linear zwischen den jeweiligen
       Minimal- und Maximalwerten (PF28/PF10 bzw. PF27/PF09) skaliert"*, i.e. the
       request is a **position within the band**, not an absolute percentage. If
@@ -304,7 +333,8 @@ option is recommended.
       3. **Start dehumidification:** 1105 ← 1 (on), 1140 ← 1 (dehumidify),
          1139 ← 0 (no active cooling). Turn on the PH02/PH28 enables first (the integration never sets them).
       4. **Pass 1:** write 1614 ← 0 with the factory band (PF28 = 50 %,
-         PF10 = 85 %).
+         PF10 = 85 %). Expected to change nothing: `PM20` does not hold a
+         write (T23).
       5. **Pass 2:** write 1853 (PF28) ← 0, then 1614 ← 0 again.
       6. **In each pass,** wait for the damper pre-start time (PS01, default
          20 s) plus the fan and compressor start delays. Then read:

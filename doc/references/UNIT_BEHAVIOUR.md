@@ -276,10 +276,12 @@ Each request is the **OR** of its sources; any one raises it [HB 6.1]:
 
 ### 3.5 Fan speed
 
-See [§9](#9-fan). In short: display request, 0–10 V and the Modbus manual
-setpoint feed the fan; the **highest** wins; each is scaled into the active
-mode's min–max band [HB 4.5, 6.2]. Whether the Modbus setpoint `PM20` follows
-the same scaling is [INFERRED], not tested.
+See [§9](#9-fan). In short: the display request and 0–10 V feed the fan; the
+**highest** wins; each is scaled into the active mode's min–max band
+[HB 4.5, 6.2]. Modbus has no fan-speed request: `PM20` is the display's
+setpoint, which the unit rewrites [HB 5.3; T22, T23]. Over Modbus the band
+itself is the lever [HB 4.5; MB p.7]; that it moves a running fan is
+[INFERRED] ([`plans/fan-speed-tests.md`](../../plans/fan-speed-tests.md)).
 
 ### 3.6 Persistence across a power cycle
 
@@ -524,25 +526,48 @@ Observations and consequences:
 ### 9.1 Bands and sources
 
 * Active band: DEU `PF28..PF10`, INT `PF27..PF09`; defaults and shipped values in §15 [HB 6.2; MB p.7].
-* Sources: display manual request (fan screen, step `PF11`), 0–10 V
-  potentiometer, Modbus `PM20_SupplyFan_Manual`. The highest request wins; the
-  display and potentiometer requests are scaled linearly into the band
-  [HB 4.5, 6.2]. So request 0 → band minimum, not a stopped fan [INFERRED from
-  HB 6.2].
+* Sources: display manual request (fan screen, step `PF11`) and 0–10 V
+  potentiometer. The highest request wins; both are scaled linearly into the
+  band [HB 4.5, 6.2]. So request 0 → band minimum, not a stopped fan [INFERRED
+  from HB 6.2]; on the headless reference unit the fan ran at exactly `PF28`
+  (50 %) [T16, T18].
+* The Modbus map has one read-only register per request: integration
+  `FanIntegration_Request` (1112), air quality (1113), manual / display
+  (1114), time bands (1115), potentiometer (1116), each 0–100 % [MB p.14–15].
+  [INFERRED] that the output is the highest of them within the band, as
+  HB 6.2 says for manual and potentiometer. The time-band request follows the
+  setpoints `FSC`/`FSE`/`FSN` (1595–1597) only with time programs on (`PH03`)
+  [MB p.18; INFERRED from HB 5.2.4]; `PF23` (1660) is the speed forced by a
+  digital input [MB p.20].
+* **No register takes a fan-speed request from the BMS.** The "by BMS"
+  registers are on/off, DEU, INT and holiday only [MB p.5, p.14–15]. `PM20`
+  (1614) is listed R/W in the raw parameter table [MB p.18], but the
+  handbook defines it as "Einstellung der Zuluftventilator-Geschwindigkeit
+  via Display (read only)" [HB 5.3], and the Modbus fan chapter lists only
+  the bands and the read-only requests [MB p.7]. The unit sets `PM20` itself
+  [T22], and a value written to it inside the band is acknowledged and read
+  back as 50 % [T23].
+* What Modbus can change is the band: "Dieser Arbeitsbereich des Lüfters kann
+  in den Geräte-Einstellungen oder per Modbus individuell … konfiguriert
+  werden" [HB 4.5]. With every request at 0 the output is the band minimum,
+  so writing `PF28` (DEU) or `PF27` (INT) should set the speed [INFERRED].
+  Whether a running fan follows at once, ramps in `PF11` steps or waits for
+  the next start is untested ([`plans/fan-speed-tests.md`](../../plans/fan-speed-tests.md)).
+  `PF28`/`PF27` are EEPROM parameters (§3.6).
 * Display manual control works while no time programs are enabled (`PH03`)
   and a DEU request, or an INT request with `PF31 ≠ 0`, is active [HB 6.2]. `PF31 = 0`: INT fan follows the
   room temperature (`PF12`, `PF13`) [HB 5.3 PF31].
-* Whether `PM20` is scaled into the band (rescale), clipped to it (clamp) or
-  absolute is **open**; to command an absolute value, set the band to 0–100
-  [INFERRED; `plans/todo.md`]. One user could not get the fan below 30 %
-  [F#77].
+* One user could not get the fan below 30 % [F#77].
 * `PF07..PF08` ("VMC" band) bounds the post-run speed `PF26` [HB 5.3 PF26]. The
   HRDS+ has no ventilation-only mode with its fan [HB 2.7]; [INFERRED] that
   `PF07/PF08` matter only for run-on.
 * Read-backs: `outAO_SupplyFan` (actual output), `actRPMsupplyFan`,
   `SupplyFan_ManualRequest` (display's request), `SupplyFan_RemoteRequest`
   (potentiometer) [MB p.7, p.8, p.15]. On the reference unit `outAO_SupplyFan`
-  followed the fan (50 % while it ran) [T16].
+  followed the fan (50 % while it ran) [T16]. Only `outAO_SupplyFan` is the
+  speed the fan gets: the fan screen, and so `PM20`/1114, is not changed by
+  the potentiometer request [HB 6.2]. Whether 1116 holds the raw 0–10 V
+  percentage or the value scaled into the band is open [INFERRED].
 * `actRPMsupplyFan` needs a tachometer signal on an input: input function 45
   ("AI: Return/room temp. / DI: Tachometer signal supply fan") or 46 (return
   fan) [HB 5.3, input functions]. No input of the reference unit is allocated
@@ -552,8 +577,8 @@ Observations and consequences:
 * The unit writes the manual request itself: `PM20` and the display request
   went from 0 to `PF28` (50 %) in the poll in which the fan started and back
   to 0 when the request ended, with no write from the BMS [T16, T22]. A value
-  written to `PM20` therefore does not survive the next request [INFERRED from
-  T22; `plans/todo.md`].
+  written during a run did not hold either [T23]; how fast it is overwritten
+  is open ([`plans/fan-speed-tests.md`](../../plans/fan-speed-tests.md)).
 
 ### 9.2 Timing
 
@@ -762,10 +787,11 @@ probes). "Dump" means
 | T20 | 2026-10-22 | After that stop (valve closed by 07:37:58) the first anti-stagnation pulse came at 09:39:57, then 10:40:53, 11:41:54 (hourly), unit ON throughout | HA history |
 | T21 | 2026-10 | No input allocated to the fan tachometer (functions 45/46): `HA01` = 58, `HA02` = `HA03` = 0, `HA04` = 52, `HA05` = 47, `HA06` = 6, `HA07` = 8, `HA08..HA18` = 0, `HB01` = 27, `HB02` = 26, `HB03` = 2, `HB04` = 4, `HB05..HB07` = 0. Read again on the running unit on 2026-10-23 (fan on at 50 %): the same allocations, 1117 = 0 | dump; `diagnose_hrds.py` 2026-10-23 |
 | T22 | 2026-10-22/23 | `PM20` (1614) and the display request (1114) 0 → 50 % when the fan started (both runs) and 50 → 0 % at the stop (07:37:58), with no write from Home Assistant to 1614 | [run file](../../tests/devices/runs/hrds_30+_dehumidify_run_2026-10-23.json) |
+| T23 | 2026-10-23 | A fan speed inside the band (`PF28..PF10` = 50–85 %) written to `PM20` (1614) during a DEU run: the unit acknowledged the write; the read-back stayed at 50 % (= `PF28`) | owner |
 
 Not yet observed on hardware (everything else in this file): the stop sequence
 of a DEU cycle at better than 1-minute resolution, an INT cycle, the passive cold-water path, winter operation,
-`HB04` season writes, `PM20` vs fan output, any display or probe
+`HB04` season writes, a band (`PF28`) change during a run, any display or probe
 configuration, the HRDS+ 50 and non-`R` units. The test
 plans are in [`plans/todo.md`](../../plans/todo.md). When a test is done, add a
 `T` row here and replace the `[INFERRED]` tag where it applies.
@@ -796,7 +822,7 @@ write recipes are in
 | Cool (summer) / heat (winter) | Automatic from T vs target [HB 5.2.3] | `INT` contact [HB 4.5] | `Status_Integ_byBMS`, needs `PH27 = 1` and `PG02 = 1` | §3.3, §6, §7 |
 | Target humidity | Humidity screen, OK, ↑/↓ [HB 5.2.3] | — | `PU01` | Clamped `PH29..PH30`; only effective with display or probe [MB p.6] |
 | Target temperature | Temperature screen [HB 5.2.3] | — | `SEtC` / `SEtH` | Clamped `PH07..PH08` / `PH09..PH10` (§3.4) |
-| Fan speed | Fan screen, hold ↑/↓ 2 s while the fan runs [HB 5.2.3] | `FAN` 0–10 V [HB 4.5] | `PM20_SupplyFan_Manual`; band `PF27/PF28`–`PF09/PF10` | Highest request wins; scaling of `PM20` open (§9.1) |
+| Fan speed | Fan screen, hold ↑/↓ 2 s while the fan runs [HB 5.2.3] | `FAN` 0–10 V [HB 4.5] | No request register; only the band `PF27/PF28`–`PF09/PF10` [HB 4.5; MB p.7]. `PM20` is the display's setpoint and does not hold [T23] | Highest request wins, scaled into the band (§9.1) |
 | Reset an alarm | Alarm menu, hold OK 3 s [HB 5.2.4] | — | Reset registers (AL11/AL12/AL18) [MB p.10] | Only when the cause is gone [HB 5.2.4] |
 | Reset filter alarm AL22 | Alarm menu or counters menu (fan hours → 0) [HB 7.4] | — | Write 0 to `PM01` [MB p.9] | Fan hours count in h×10 [HB 5.2.4; MB p.9] |
 | Time programs | Time program menu; disabled as delivered [HB 5.2.4] | — | `PH03` | Can hold the unit OFF and block the compressor (§3.1, §10) |
