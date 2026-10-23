@@ -128,7 +128,7 @@ INSTALLER_PARAMS: list[tuple] = [
     ("Pb05", 1687, "n", T, 0.1, 20, "°C", "Pb05 Preheating differential", "Pb05 Differenz Vorwärmung", False),
     ("Pb06", 1688, "n", 1, 0, 60, "min", "Pb06 Preheating maximum time", "Pb06 Maximale Dauer Vorwärmung", False),
     ("Pb07", 1849, "n", 1, 1, 999, "s", "Pb07 Anti-stagnation valve active time", "Pb07 Aktivierungszeit Anti-Blockierung", True),
-    ("Pb08", 1850, "n", 1, 1, 99, "h", "Pb08 Anti-stagnation valve wait time", "Pb08 Wartezeit Anti-Blockierung", True),
+    ("Pb08", 1850, "n", 1, 1, 99, "min", "Pb08 Anti-stagnation valve wait time", "Pb08 Wartezeit Anti-Blockierung", True),
     # --- PU: dehumidification ----------------------------------------------
     ("PU03", 1690, "s", 1, 0, 1, None, "PU03 Dehumidify during high-temperature alarm", "PU03 Entfeuchtung bei Hochtemperaturalarm", True),
     ("PU04", 1691, "s", 1, 0, 1, None, "PU04 Dehumidify during water-flow alarm", "PU04 Entfeuchtung bei Alarm Wasserdurchfluss", True),

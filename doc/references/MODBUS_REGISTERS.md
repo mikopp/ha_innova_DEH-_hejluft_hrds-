@@ -121,7 +121,7 @@ for 40 %). Min/Max apply to the modulation band used in each mode.
 | `0x045A` | 1114 | `SupplyFan_ManualRequest`  | R/O | — | 0–100 | Current manual fan request |
 | `0x045C` | 1116 | `SupplyFan_RemoteRequest`  | R/O | — | 0–100 | Current potentiometer fan request |
 | `0x027F` | 639  | `outAO_SupplyFan`          | R/O | — | 0–100 | Actual supply-fan analog output % |
-| `0x045D` | 1117 | `actRPMsupplyFan`          | R/O | — | 0–65535 | Supply-fan actual RPM |
+| `0x045D` | 1117 | `actRPMsupplyFan`          | R/O | — | 0–65535 | Supply-fan actual RPM. Read 0 with the fan running (unresolved, `plans/todo.md`) |
 
 ### 6.1 How the bands apply
 
@@ -150,7 +150,7 @@ linearly into the active band (handbook §6.2). Whether `PM20_SupplyFan_Manual`
 |----------|----------|-------------------|--------|
 | `0x0450` | 1104 | `sm_UnitStatus`      | `0=OFF by display`, `1=OFF by DI`, `2=OFF by BMS`, `3=OFF by scheduler`, `4=OFF by RTC`, `5=ON` |
 | `0x0456` | 1110 | `ModeStatus`         | `0=Summer manual`, `1=Winter manual`, `2=Summer auto`, `3=Winter auto`, `4=Summer DI`, `5=Winter DI` |
-| `0x0458` | 1112 | `FanIntegration_Request` | `0=No`, `1=Yes` — "Fans integration request". Not the INT request (1139), see §13. Our reading: `1` while the fan runs to blend MVHR air with room air (unverified). |
+| `0x0458` | 1112 | `FanIntegration_Request` | `0=No`, `1=Yes` — "Fans integration request". Not the INT request (1139), see §13. Stayed `0` while the fan ran and the damper was open for a dehumidify request (UNIT_BEHAVIOUR.md §13, T16), so it is not a "fan running" flag; it may be `1` only for an INT request (untested). |
 | `0x045F` | 1119 | `SupplyFan_Status`   | `0=Disable`, `1=OFF`, `2=Wait ON`, `3=ON`, `4=Wait OFF`, `5=Alarm` |
 | `0x0461` | 1121 | `DehumRequest`       | `0=No`, `1=Yes` — dehumidification currently requested |
 | `0x0462` | 1122 | `CmpStatus`          | `0=Disable`, `1=Alarm`, `2=Manual`, `3=Wait ON`, `4=ON`, `5=Wait OFF`, `6=OFF` — compressor (active cooling/dehum) |
@@ -303,8 +303,7 @@ A written request reads back late (several polls on a real unit), see
 
 `Status_Integ_byBMS` (1139) and `FanIntegration_Request` (1112) both contain
 the word *integration* but are unrelated: 1139 is the **INT request**
-(cooling in summer, heating support in winter, written by the BMS); 1112 is a
-read-only status that the **supply fan** is running.
+(cooling in summer, heating support in winter, written by the BMS); 1112 is a read-only "fans integration request" status. It stayed 0 while the supply fan ran for a dehumidify request (UNIT_BEHAVIOUR.md §13, T16), so its exact meaning is unconfirmed.
 
 Airflow behaviour (passive MVHR flow, recirculation coupled to every request,
 the unofficial I/O workaround) used to be described here and is now in
@@ -632,7 +631,7 @@ truth for that: `custom_components/innova_hrds/installer_params.py`).
 | `0x0737` | 1847 | HD10 | DO4 expansion allocation | x1 | 0…30  | shown R/O, disabled by default |
 | `0x0738` | 1848 | HD11 | Open-collector expansion allocation | x1 | 0…30  | shown R/O, disabled by default |
 | `0x0739` | 1849 | Pb07 | Anti-stagnation valve active time | x1 | 1…999 s | R/W |
-| `0x073A` | 1850 | Pb08 | Anti-stagnation valve wait time | x1 | 1…99 h | R/W |
+| `0x073A` | 1850 | Pb08 | Anti-stagnation valve wait time | x1 | 1…99 min | R/W |
 | `0x073B` | 1851 | PE21 | Compressor min output (integration) | x0.01 | 0…100 % | R/W |
 | `0x073E` | 1854 | PF29 | Return fan min speed | x0.01 | 0…100 % | R/W, disabled by default |
 | `0x073F` | 1855 | PF30 | Return fan max speed | x0.01 | 0…100 % | R/W, disabled by default |

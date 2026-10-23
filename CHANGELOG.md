@@ -11,6 +11,20 @@ in this order, empty ones left out: `### ⚠️ Breaking changes`,
 
 ---
 
+## Unreleased
+
+### 🛠️ Fixes and other changes
+
+- **The installer parameter Pb08 (anti-stagnation wait) now shows minutes, not hours.**
+  The handbook gives minutes; on a real unit the valve and pump open for about a minute every hour while the unit is on.
+- **Register 1112 is no longer described as "supply fan running".** It stayed 0 while the fan ran.
+
+### 📚 Documentation
+
+- **Unit behaviour cites parameters by code, with a lookup of handbook default and shipped value** (`UNIT_BEHAVIOUR.md` §15), plus evidence rows T11 to T17 from the first dehumidify run and new open points in `plans/todo.md`.
+
+---
+
 ## 0.9.4 (2026-10-23): New repository name, German README, entity reference by device
 
 ### ✨ Highlights
