@@ -17,7 +17,8 @@ paths:
 ## Decision
 
 - `fan.hrds_supply_fan` MUST be read-only (`FanEntityFeature(0)`): its
-  `percentage` is the actual output `outAO_SupplyFan` (639), `is_on` follows
+  `output_percent` attribute is the actual output `outAO_SupplyFan` (639)
+  (Home Assistant shows `percentage` only with `SET_SPEED`), `is_on` follows
   `supply_fan_status`. The climate entity MUST NOT offer `FAN_MODE`.
 - MUST NOT write `PM20_SupplyFan_Manual` (1614) from any path.
   `fan_manual_speed` MUST be a read-only sensor (`RW: 0`) showing it, also as

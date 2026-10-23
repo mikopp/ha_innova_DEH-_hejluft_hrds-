@@ -18,7 +18,7 @@ in this order, empty ones left out: `### ⚠️ Breaking changes`,
 - **The fan speed can no longer be set from Home Assistant; it is shown only.** The unit does not take a fan speed over Modbus: it acknowledged the values written and ignored them, and refused those below its band. So the fan entity has no speed or on/off control, the climate entity has no fan mode, and *Manual fan speed* is a sensor that shows the unit's own manual request.
   * Remove `fan.set_percentage`, `fan.turn_on`/`turn_off`, `climate.set_fan_mode` and `number.set_value` on the manual fan speed from automations and scripts; they now fail.
   * To run the fan faster, raise *Fan min speed (dehumidify)* or *(cooling)*. Lowering it does not slow a running fan.
-  * The fan entity's attribute `commanded_percent` is now `manual_request_percent`.
+  * The fan entity's attribute `commanded_percent` is now `manual_request_percent`, and its speed is the attribute `output_percent`: Home Assistant shows a fan's `percentage` only when the fan can set its speed.
 
   | Old | New |
   |-----|-----|

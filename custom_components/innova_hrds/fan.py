@@ -3,8 +3,10 @@
 The unit's own supply fan draws room air across the dehumidifier coil *in
 addition* to whatever the central MVHR is already pushing through the duct.
 
-The entity is read-only: ``percentage`` is what the fan is *actually* doing
-(``outAO_SupplyFan``, reg 639) and ``is_on`` follows the unit's fan status. The
+The entity is read-only: ``output_percent`` is what the fan is *actually* doing
+(``outAO_SupplyFan``, reg 639) and ``is_on`` follows the unit's fan status. Home
+Assistant shows ``percentage`` only on a fan that can set its speed, so the
+output is an attribute of its own. The
 unit takes no fan-speed request over Modbus: ``PM20`` (1614) is its own manual
 request and does not hold a written value (``UNIT_BEHAVIOUR.md`` 9.1, T23). The
 speed follows the active band (``PF28``/``PF10`` dehumidify, ``PF27``/``PF09``
@@ -52,7 +54,7 @@ class HrdsFan(HubBackedEntity, FanEntity):
     def __init__(self, platform_name, hub, device_info, description):
         super().__init__(platform_name, hub, device_info, description)
         self._attr_supported_features = FanEntityFeature(0)
-        self._attr_percentage = 0
+        self._output: int | None = None
         self._attr_is_on = False
 
     @callback
@@ -61,21 +63,22 @@ class HrdsFan(HubBackedEntity, FanEntity):
 
         actual = data.get(C_SUPPLY_FAN_OUTPUT)
         if actual is not None:
-            self._attr_percentage = int(round(float(actual)))
+            self._output = int(round(float(actual)))
 
         status = data.get(C_SUPPLY_FAN_STATUS)
         if status is not None:
             self._attr_is_on = status not in _FAN_STOPPED
-        elif self._attr_percentage is not None:
-            self._attr_is_on = self._attr_percentage > 0
+        elif self._output is not None:
+            self._attr_is_on = self._output > 0
 
         self.async_write_ha_state()
 
     @property
     def extra_state_attributes(self) -> dict:
-        """The unit's manual request, RPM and fan status next to the output."""
+        """The actual output, the unit's manual request, RPM and fan status."""
         data = self._hub.data
         return {
+            "output_percent": self._output,
             "manual_request_percent": data.get(C_FAN_MANUAL),
             "actual_rpm": data.get(C_SUPPLY_FAN_RPM),
             "supply_fan_status": data.get(C_SUPPLY_FAN_STATUS),

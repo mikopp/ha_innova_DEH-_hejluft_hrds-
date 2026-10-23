@@ -22,7 +22,7 @@ async def test_fan_follows_the_band_during_dehumidify(setup, clock):
     await allow_operation(s)
     await set_hvac_mode(s, clock, "dry")
     fan = s.state("fan", FAN)
-    assert fan.attributes["percentage"] == 50
+    assert fan.attributes["output_percent"] == 50
     assert fan.attributes["manual_request_percent"] == pytest.approx(50)
     assert float(s.state("sensor", "fan_manual_speed").state) == pytest.approx(50)
     assert float(s.state("sensor", "supply_fan_airflow").state) == pytest.approx(150)
@@ -30,13 +30,13 @@ async def test_fan_follows_the_band_during_dehumidify(setup, clock):
     # A raised minimum raises the running fan (T25) ...
     await s.service("number", "set_value", "fan_min_speed_dehumidify", value=55)
     await clock.settle()
-    assert s.state("fan", FAN).attributes["percentage"] == 55
+    assert s.state("fan", FAN).attributes["output_percent"] == 55
     assert float(s.state("sensor", "supply_fan_output").state) == pytest.approx(55)
     assert float(s.state("sensor", "fan_manual_speed").state) == pytest.approx(55)
     # ... a lowered one leaves it (T24, T26).
     await s.service("number", "set_value", "fan_min_speed_dehumidify", value=50)
     await clock.settle()
-    assert s.state("fan", FAN).attributes["percentage"] == 55
+    assert s.state("fan", FAN).attributes["output_percent"] == 55
 
 
 async def test_no_speed_control_and_nothing_written_to_pm20(setup, clock):
@@ -61,10 +61,10 @@ async def test_no_optimistic_update_before_poll(setup, clock):
     await set_hvac_mode(s, clock, "dry")
     await s.service("number", "set_value", "fan_min_speed_dehumidify", value=60)
     # Before the debounced refresh the state still shows the old values.
-    assert s.state("fan", FAN).attributes["percentage"] == 50
+    assert s.state("fan", FAN).attributes["output_percent"] == 50
     assert float(s.state("number", "fan_min_speed_dehumidify").state) == 50
     await clock.settle()
-    assert s.state("fan", FAN).attributes["percentage"] == 60
+    assert s.state("fan", FAN).attributes["output_percent"] == 60
 
 
 async def test_airflow_zero_when_fan_off(setup, clock):

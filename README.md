@@ -130,7 +130,8 @@ The integration talks to the unit's control board via Modbus TCP and exposes:
   per-mode fan speed bands.
 * **Select** — season (summer/winter), T/H probe source (HA00), winter
   dehumidification mode (PU02).
-* **Fan** — the supply/recirculation fan as a settable percentage.
+* **Fan** — the supply/recirculation fan, read-only: on/off, actual output %
+  and the unit's manual request.
 * **Water-circuit diagnostics** — valve/pump output, condenser valve, water
   alarms and a *Water circuit check* summary. Read-only: the unit runs its own
   water valve and pump.

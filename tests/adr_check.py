@@ -388,7 +388,7 @@ def index_text(adrs: dict[str, Adr]) -> str:
         if adr.status != "accepted":
             continue
         scope = ", ".join(f"`{p.removeprefix(COMPONENT)}`" for p in adr.paths)
-        link = os.path.relpath(adr.path, INDEX.parent)
+        link = pathlib.Path(os.path.relpath(adr.path, INDEX.parent)).as_posix()
         rows.append(f"| [{adr.number}]({link}) | {adr.short_title} | {scope} |")
     history = [
         f"[{label} ({count})]({folder.name}/README.md)"
