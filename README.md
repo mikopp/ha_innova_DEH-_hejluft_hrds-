@@ -60,8 +60,10 @@ The integration is released and usable, but it is a **beta**.
 * **Not tested on real hardware:** Other versions like the HRDS+ 50, units
   without recirculation (non-`R`), units with a display or external probes
   (automatic setpoint control), winter heating, free cooling.
-  How the manual fan speed maps to the actual fan output is also not tested
-  yet. The open items are listed in [`plans/todo.md`](plans/todo.md).
+  **The fan entity and fan modes cannot set the speed yet:** the unit does not
+  keep the manual fan speed they write (PM20). Raising *Fan min speed* raises a
+  running fan ([Commanded vs actual fan speed](#commanded-vs-actual-fan-speed)).
+  The open items are listed in [`plans/todo.md`](plans/todo.md).
 * **Climate *Auto* mode is not tested on a real device.** It only appears
   with a display or room probe. CI tests it against a simulated display unit
   derived from the headless dump, not against a real display unit.
@@ -98,8 +100,9 @@ The integration talks to the unit's control board via Modbus TCP and exposes:
     `switch.unit_on_off`
   * **Standby** (Home Assistant's *fan only* mode, renamed) — the unit is on
     with nothing requested and nothing on the unit that could start a request
-    (no display, no room probe): it waits. On an `R` unit a manual fan speed
-    runs the fan (action *Fan*); otherwise the action is *Idle*. Offered
+    (no display, no room probe): it waits. While the fan of an `R` unit runs
+    without a request (for example its run-on) the action is *Fan*;
+    otherwise it is *Idle*. Offered
     instead of Auto; climate *turn on* goes here
   * **Dry** — dehumidification; supply air leaves at about room temperature
   * **Cool** — the "integration" request in **summer**: dehumidifies *and* cools
@@ -112,8 +115,9 @@ The integration talks to the unit's control board via Modbus TCP and exposes:
     probe makes the unit act on them; without one Home Assistant does the
     regulating.
   * Fan mode is selectable: **off** / **low** / **medium** / **high** — writes
-    the manual fan speed register. The shown mode is what the fan is *actually*
-    doing. **"off" does not make Dry/Cool run on passive airflow**: on an `R`
+    the manual fan speed register, which the unit does not keep (see
+    [Commanded vs actual fan speed](#commanded-vs-actual-fan-speed)). The shown
+    mode is what the fan is *actually* doing. **"off" does not make Dry/Cool run on passive airflow**: on an `R`
     unit every dehumidify or cooling request opens the recirculation damper and
     starts the fan (see [Fan mode and recirculation](#fan-mode-and-recirculation)).
 * **Sensors** — see the [entity reference](doc/entity-reference.md), including three computed airflow
@@ -521,7 +525,8 @@ in winter; see [Water circuit and brine](#water-circuit-and-brine).
    on, `sensor.water_valve_pump` is *On*, `sensor.water_temperature` is below
    PU08, and `sensor.compressor_status` is not *On*. The water check then lists
    `water_below_compressor_limit`, which here is information, not a fault.
-5. **Set the fan** with the climate fan mode or `fan.hrds_supply_fan` (see
+5. **The fan** starts at the active mode's minimum speed; raise the minimum
+   to run it faster (see
    [Commanded vs actual fan speed](#commanded-vs-actual-fan-speed)).
 
 ## Using the integration
@@ -689,8 +694,8 @@ external probes to be present, otherwise the unit ignores them.
   and runs the fan** (damper first, fan after the pre-start time, then the
   compressor). **Recirculation damper** and **Supply fan output %** show it.
 * Fan mode "off" (a write of 0 to PM20) therefore does **not** give
-  dehumidifying on passive airflow on an `R` unit; the unit may floor the fan
-  at its band minimum. Only a non-`R` unit (no fan, no damper) dehumidifies on
+  dehumidifying on passive airflow on an `R` unit; the fan runs at its band
+  minimum. Only a non-`R` unit (no fan, no damper) dehumidifies on
   MVHR flow alone. An unofficial I/O reassignment exists for `R` units; it is
   untested here and has a short-circuit risk if the recirculation inlet is
   teed into the extract duct.
@@ -741,25 +746,47 @@ with the underlying spec data in
 
 ### Commanded vs actual fan speed
 
-The device does not necessarily run the fan at the percentage you ask for. The
-technical handbook says the manual request is **scaled linearly between the
-active mode's minimum and maximum** (PF28/PF10 for dehumidify, PF27/PF09 for
-cooling, PF07 for VMC), so at the factory 50–85 % band a request of 30 % could
-produce roughly 60 % output, and a request of 0 % would not stop the fan.
+**The unit does not take a fan speed from Home Assistant.** The fan entity,
+the climate fan mode and `number.hrds_manual_fan_speed` write the manual fan
+setpoint PM20 (1614). The handbook defines PM20 as the **display's** setpoint
+("read only"), and the unit overwrites it: on the reference unit a value
+written during a run read back as the band minimum, and the fan kept running
+there. The unit has no other register for a fan-speed request from Modbus. Its
+fan runs at the highest of its own requests, kept within the active mode's
+band (PF28–PF10 for dehumidify, PF27–PF09 for cooling): the 0–10 V input,
+scaled into the band, and the manual (display) request, which PM20 shows.
+Without a display or 0–10 V signal the manual request starts each run at the
+band **minimum**: 50 % as shipped. Details:
+[UNIT_BEHAVIOUR §9.1](doc/references/UNIT_BEHAVIOUR.md#91-bands-and-sources).
 
-The integration therefore keeps the two apart:
+What the integration shows:
 
 * **Actual** — `sensor.hrds_supply_fan_output` (%),
-  `sensor.hrds_supply_fan_airflow` (m³/h), `sensor.hrds_supply_fan_rpm`, and the
-  state of `fan.hrds_supply_fan` and the climate entity's `fan_mode`.
+  `sensor.hrds_supply_fan_airflow` (m³/h), `sensor.hrds_supply_fan_rpm` (only
+  when an input is allocated to the fan tachometer, else unknown), and the
+  state of `fan.hrds_supply_fan` and the climate entity's `fan_mode`. This is
+  the speed the fan runs at.
 * **Commanded** — `number.hrds_manual_fan_speed`, and the fan entity's
-  `commanded_percent` attribute.
+  `commanded_percent` attribute. Both show PM20, the unit's manual request,
+  which the unit sets itself; while the fan runs it reads the same as the
+  actual output.
 
-If you want a commanded percentage to mean an absolute percentage, set the
-active mode's minimum to `0` and its maximum to `100` — both are writable
-numbers. Whether PM20 really follows the band is **not yet confirmed on
-hardware**; see [UNIT_BEHAVIOUR §9.1](doc/references/UNIT_BEHAVIOUR.md#91-bands-and-sources)
-and [`plans/todo.md`](plans/todo.md).
+What works over Modbus is the band. The unit keeps its manual request within
+it, so on the reference unit, during a dehumidify run:
+
+* raising `number.hrds_fan_min_speed_dehumidify` above the current speed
+  raised the fan to the new minimum within a minute (50 → 55 %);
+* lowering the minimum again did **not** slow the fan; it stays at its speed
+  until the request ends, and the next run starts at the minimum;
+* lowering the **maximum** below the current speed should slow it, but that
+  is not tested yet.
+
+Each change is a write to the unit's EEPROM, so do not drive the band from a
+control loop. The cooling band (`_cooling`) is expected to work the same way
+during an integration request; untested. The tests and the decision on how
+the integration will set the speed:
+[`plans/fan-speed-tests.md`](plans/fan-speed-tests.md),
+[`plans/todo.md`](plans/todo.md).
 
 ## Entity reference
 
@@ -795,9 +822,9 @@ triggers are inactive. Probe inputs that are not wired report no value: room
 temperature, room humidity, outdoor, exhaust, supply air temperature and air
 quality show **unknown**, and the climate entity shows no current temperature or
 humidity. That is expected, not an error. The factory-wired water and evaporator
-temperatures keep working. (The `temp_probe_ok` / `humidity_probe_ok` sensors
-follow alarms AL28/AL34, which a headless unit did not necessarily raise, so
-judge by the sensors above rather than by those two.)
+temperatures keep working. The `temp_probe_ok` / `humidity_probe_ok` sensors
+show **unknown** too: with no probe allocated there is nothing for alarms
+AL28/AL34 to check.
 
 See [UNIT_BEHAVIOUR §8](doc/references/UNIT_BEHAVIOUR.md#8-display-and-probe-configurations)
 for what each display/probe configuration does, and

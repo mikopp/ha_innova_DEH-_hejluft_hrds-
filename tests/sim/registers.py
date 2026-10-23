@@ -22,9 +22,9 @@ ANY_ALARM = 1103
 UNIT_STATUS = 1104
 MODE_STATUS = 1110
 ACTUAL_SETPOINT = 1111
-RECIRCULATION = 1112
+FAN_INTEGRATION_REQUEST = 1112  # INT fan request, x0.01 %; 0 through DEU (T16, T18)
 FAN_MANUAL_REQUEST = 1114  # mirror of PM20, x0.01 %
-FAN_RPM = 1117
+FAN_RPM = 1117  # 0 unless an input is allocated to the tachometer
 FAN_STATUS = 1119
 DEHUM_REQUEST = 1121
 COMPRESSOR_STATUS = 1122
@@ -82,6 +82,13 @@ ENABLE_FOR = {
 
 # Unwired analog input (MODBUS_REGISTERS.md section 14.7).
 PROBE_SENTINEL = 0x8004
+
+# Input allocations that can carry the fan tachometer (input function 45 / 46
+# on a digital input; MODBUS_REGISTERS.md section 16, UNIT_BEHAVIOUR.md 9.1):
+# HA01, HA04-HA18 (1804, 1807-1821), HB01, HB02, HB05-HB07 (1822, 1823,
+# 1826-1828). AI2/AI3 are not among them: there 45/46 are the room probes.
+TACHOMETER_ALLOCATIONS = (1804, *range(1807, 1824), *range(1826, 1829))
+TACHOMETER_CODES = (45, 46)
 
 ROOM_TEMP_PROBE_CODES = (45,)
 ROOM_HUMIDITY_PROBE_CODES = (53, 54)

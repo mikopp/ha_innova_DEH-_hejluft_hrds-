@@ -79,7 +79,7 @@ EXTRA_REGISTERS: list[tuple[str, int, int, str]] = [
     ("PackedAlarm_1", IN, 768, "AL01..AL16"),
     ("PackedAlarm_2", IN, 769, "AL17..AL32"),
     ("PackedAlarm_3", IN, 770, "AL33.."),
-    ("FanIntegration_Request", IN, 1112, "fan-integration function active"),
+    ("FanIntegration_Request", IN, 1112, "INT fan request, x0.01 %"),
     ("Packed_DO1", IN, 384, "compressor / damper / valve outputs"),
     ("Packed_DO2", IN, 385, "on/off, alarms outputs"),
     ("Packed_logicDI1", IN, 257, "digital inputs"),

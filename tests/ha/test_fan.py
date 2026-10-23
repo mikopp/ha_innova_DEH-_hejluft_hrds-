@@ -9,10 +9,11 @@ and derive airflow from the actual output.
 from __future__ import annotations
 
 import pytest
+from homeassistant.const import STATE_UNKNOWN
 
 from tests.sim import registers as R
 
-from .conftest import CLIMATE, FAN, allow_operation, set_hvac_mode
+from .conftest import CLIMATE, FAN, add_entry, allow_operation, set_hvac_mode
 
 # Factory band during dehumidify: PF28 = 50 %, PF10 = 85 %.
 EXPECTED_ACTUAL = {
@@ -99,3 +100,43 @@ async def test_airflow_zero_when_fan_off(setup, clock):
     assert s.state("sensor", "supply_fan_status").state == "off"
     assert float(s.state("sensor", "supply_fan_airflow").state) == 0.0
     assert s.state("fan", FAN).state == "off"
+
+
+async def test_recirculation_is_damper_open_and_fan_running(setup, clock):
+    s = setup
+    assert s.state("binary_sensor", "recirculation_active").state == "off"
+    await allow_operation(s)
+    # The damper opens with the request; the fan waits out the pre-start.
+    s.device.sequence_delay = 3600
+    await set_hvac_mode(s, clock, "dry")
+    assert s.state("sensor", "recirculation_damper").state == "on"
+    assert s.state("sensor", "supply_fan_status").state == "wait_on"
+    assert s.state("binary_sensor", "recirculation_active").state == "off"
+
+    s.device.sequence_delay = 0
+    await clock.poll()
+    assert s.state("sensor", "supply_fan_status").state == "on"
+    assert s.state("binary_sensor", "recirculation_active").state == "on"
+    # 1112 is a fan request in %; it stays 0 while the unit recirculates for
+    # a dehumidify request (UNIT_BEHAVIOUR.md T16, T18).
+    assert float(s.state("sensor", "fan_integration_request").state) == 0
+
+    await set_hvac_mode(s, clock, "fan_only")
+    assert s.state("binary_sensor", "recirculation_active").state == "off"
+
+
+async def test_fan_speed_unknown_without_a_tachometer_input(setup, clock):
+    s = setup
+    await allow_operation(s)
+    await set_hvac_mode(s, clock, "dry")
+    assert float(s.state("sensor", "supply_fan_output").state) > 0
+    assert s.device.input[R.FAN_RPM] == 0
+    assert s.state("sensor", "supply_fan_rpm").state == STATE_UNKNOWN
+
+
+async def test_fan_speed_shown_with_a_tachometer_input(hass, sim, clock):
+    sim.device.holding[R.TACHOMETER_ALLOCATIONS[-1]] = 45  # HB07: DI3 expansion
+    s = await add_entry(hass, sim)
+    await allow_operation(s)
+    await set_hvac_mode(s, clock, "dry")
+    assert float(s.state("sensor", "supply_fan_rpm").state) > 0

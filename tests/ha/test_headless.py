@@ -89,6 +89,14 @@ async def test_setpoints_hidden_without_room_probe(setup):
     assert s.state("climate", CLIMATE).attributes["current_temperature"] is None
 
 
+async def test_probe_ok_is_unknown_without_a_probe(setup):
+    # No display, HA02 = HA03 = 0: AL28/AL34 have nothing to check, so "OK"
+    # would claim a probe that is not there.
+    s = setup
+    assert s.state("binary_sensor", "temp_probe_ok").state == "unknown"
+    assert s.state("binary_sensor", "humidity_probe_ok").state == "unknown"
+
+
 async def test_power_cycle_loses_nothing_and_writes_nothing(setup, clock):
     s = setup
     await allow_operation(s)

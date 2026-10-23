@@ -59,6 +59,7 @@ describes the format and how agents use it. In short:
 | [0030](../../.claude/rules/adr/0030-entity-reference-is-the-source-of-truth-and-mirrors-the-devices.md) | The entity reference is the one source of truth and mirrors the devices | `const.py`, `entity_common.py`, `installer_params.py`, `translations/*.json`, `doc/entity-reference.md` |
 | [0031](../../.claude/rules/adr/0031-release-from-a-prepared-commit.md) | Release from a prepared commit: one script prepares, CI verifies, the owner publishes a draft | `scripts/release.py`, `.github/workflows/release.yaml`, `.github/workflows/release-draft.yaml`, `.claude/skills/release-prep/**`, `hacs.json`, `manifest.json`, `brand/**` |
 | [0032](../../.claude/rules/adr/0032-prs-record-changes-under-unreleased-and-never-set-a-version.md) | PRs record changes under Unreleased in release-notes shape and never set a version | `CHANGELOG.md`, `.claude/rules/changelog.md` |
+| [0033](../../.claude/rules/adr/0033-what-the-unit-cannot-report-is-derived-or-unknown.md) | What the unit cannot report is derived or unknown, never a stand-in register | `__init__.py`, `const.py` |
 
 Not in force and not loaded; read only when recording an ADR (ADR-0029): [proposed (1)](proposed/README.md), [superseded (3)](superseded/README.md).
 <!-- adr-index:end -->
