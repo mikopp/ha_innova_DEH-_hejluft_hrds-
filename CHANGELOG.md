@@ -13,6 +13,22 @@ in this order, empty ones left out: `### ⚠️ Breaking changes`,
 
 ## Unreleased
 
+### ⚠️ Breaking changes
+
+- **The fan is no longer a fan entity; it is shown by sensors only.** Modbus can neither switch the unit's fan nor set its speed: the unit runs it with every request and stops it after a run-on, acknowledged the speeds written and ignored them, and refused those below its band. So `fan.hrds_supply_fan` is gone, the climate entity has no fan mode, and *Manual fan speed* is a sensor that shows the unit's own manual request. The new *Supply fan running* is on while the unit's fan status says *On* or *Stopping* (the run-on).
+  * Remove `fan.*` service calls, `climate.set_fan_mode` and `number.set_value` on the manual fan speed from automations and scripts; they now fail.
+  * Use *Supply fan running* for on/off and *Supply fan output* for the speed instead of the fan entity's state and attributes.
+  * To run the fan faster, raise *Fan min speed (dehumidify)* or *(cooling)*. Lowering it does not slow a running fan.
+
+  | Old | New |
+  |-----|-----|
+  | `fan.hrds_supply_fan` (state) | `binary_sensor.hrds_supply_fan_running` |
+  | `fan.hrds_supply_fan` (`percentage`) | `sensor.hrds_supply_fan_output` |
+  | `fan.hrds_supply_fan` (`commanded_percent`) | `sensor.hrds_manual_fan_speed` |
+  | `number.hrds_manual_fan_speed` | `sensor.hrds_manual_fan_speed` |
+
+  Update automations, scripts and dashboards.
+
 ### 🛠️ Fixes and other changes
 
 - **The installer parameter Pb08 (anti-stagnation wait) now shows minutes, not hours.**
@@ -21,7 +37,6 @@ in this order, empty ones left out: `### ⚠️ Breaking changes`,
 - **Recirculation active now shows when the unit recirculates.** It is on while the damper is open and the fan runs; before, it read a register that stayed off. That register is now its own diagnostic sensor, *Fan integration request*, in percent: the Modbus manual lists it as a 0–100 % fan request, not an on/off flag.
 - **Supply fan speed shows unknown when the unit cannot measure it.** It needs an input allocated to the fan tachometer; without one the unit reports 0 rpm with the fan running.
 - **The room probe OK sensors show unknown when no room probe is set up.** They used to say OK for a probe that is not there.
-- **The fan speed set through the fan entity or fan mode is not kept by the unit, and the docs now say so.** The unit treats the manual fan speed (PM20) as its own and overwrites it. To run the fan faster, raise *Fan min speed*; lowering it does not slow a running fan. How the integration will set the speed is decided after more hardware tests.
 
 ### 📚 Documentation
 
@@ -33,6 +48,7 @@ in this order, empty ones left out: `### ⚠️ Breaking changes`,
 
 ### 🧪 Tests and CI
 
+- **The simulator runs the fan as the real unit does:** it owns PM20 (1614), clamps it into the band and drives the fan at it; a PM20 write is not kept, one outside the band answers exception 04. The three fan hypotheses (`fan_model`) are gone. It can also run the fan on at PF26 after a request (`run_on`) and raise a fan alarm (`set_fan_fault`). Decisions: ADR-0034, which supersedes ADR-0008, and ADR-0028 (when the fan runs).
 - **The bring-up diagnostic's watch (`--watch`) also reads PM20 and the fan band registers.**
 - **The bring-up diagnostic reports whether an input is allocated to the fan tachometer.** Run observations moved to `tests/devices/runs/`, so the seed tests no longer load them as register dumps.
 

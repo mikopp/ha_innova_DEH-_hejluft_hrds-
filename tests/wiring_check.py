@@ -90,11 +90,6 @@ class ClimateEntityDescription(EntityDescription):
 
 
 @dataclass
-class FanEntityDescription(EntityDescription):
-    pass
-
-
-@dataclass
 class ButtonEntityDescription(EntityDescription):
     pass
 
@@ -133,7 +128,6 @@ class Platform(enum.StrEnum):
     NUMBER = "number"
     SELECT = "select"
     CLIMATE = "climate"
-    FAN = "fan"
 
 
 class UnitOfTemperature(enum.StrEnum):
@@ -165,7 +159,9 @@ def install_stubs() -> None:
     _stub("homeassistant.components", is_package=True)
     _stub(
         "homeassistant.components.binary_sensor",
-        BinarySensorDeviceClass=types.SimpleNamespace(PROBLEM="problem"),
+        BinarySensorDeviceClass=types.SimpleNamespace(
+            PROBLEM="problem", RUNNING="running"
+        ),
         BinarySensorEntityDescription=BinarySensorEntityDescription,
     )
     _stub(
@@ -176,10 +172,6 @@ def install_stubs() -> None:
         "homeassistant.components.climate",
         ClimateEntityDescription=ClimateEntityDescription,
         ClimateEntityFeature=ClimateEntityFeature,
-    )
-    _stub(
-        "homeassistant.components.fan",
-        FanEntityDescription=FanEntityDescription,
     )
     _stub(
         "homeassistant.components.number",
@@ -255,7 +247,6 @@ def check(condition: bool, message: str) -> None:
 REFERENCE_PLATFORMS = {
     **TYPED_DICT_PLATFORM,
     "CLIMATE_TYPES": "climate",
-    "FAN_TYPES": "fan",
     "OPERATION_TYPES": "switch",
 }
 # `| `platform.key` | ...` : the first cell of a row in an entity table.
@@ -369,7 +360,7 @@ def main() -> int:
     const = load_const()
 
     print("== typed dicts populated ==")
-    for name in [*TYPED_DICT_PLATFORM, "CLIMATE_TYPES", "FAN_TYPES"]:
+    for name in [*TYPED_DICT_PLATFORM, "CLIMATE_TYPES"]:
         entries = getattr(const, name)
         check(len(entries) > 0, f"{name} has {len(entries)} entries")
     check("probe_source" in const.SELECT_TYPES, "probe_source classified as a select")
@@ -448,7 +439,7 @@ def main() -> int:
         "if key not in ENTITIES_DICT:" in common,
         "available() special-cases keys that are not register-backed",
     )
-    for dict_name in ("CLIMATE_TYPES", "FAN_TYPES"):
+    for dict_name in ("CLIMATE_TYPES",):
         for key in getattr(const, dict_name):
             check(
                 key not in const.ENTITIES_DICT,

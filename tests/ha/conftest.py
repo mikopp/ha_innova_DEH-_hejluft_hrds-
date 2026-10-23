@@ -225,7 +225,7 @@ async def allow_operation(s: Setup) -> None:
 
 
 CLIMATE = "hrds_climate"
-FAN = "hrds_supply_fan"
+FAN_RUNNING = "supply_fan_running"
 
 
 async def set_hvac_mode(s: Setup, clock: Clock, mode: str) -> None:

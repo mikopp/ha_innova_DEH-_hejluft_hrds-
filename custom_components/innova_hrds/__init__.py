@@ -55,6 +55,8 @@ from .const import (
     C_DT_INT16,
     C_ENABLE_FREE_COOLING,
     C_ENABLE_INT_BMS,
+    C_FAN_ENTITY,
+    C_FAN_MANUAL,
     C_HUMIDITY_PROBE_OK,
     C_INSTALLER_LAST_READ,
     C_INTEGRATION_AVAILABLE,
@@ -77,6 +79,7 @@ from .const import (
     C_SUPPLY_FAN_MAX_AIRFLOW,
     C_SUPPLY_FAN_OUTPUT,
     C_SUPPLY_FAN_RPM,
+    C_SUPPLY_FAN_RUNNING,
     C_SUPPLY_FAN_STATUS,
     C_TEMP_PROBE_OK,
     C_TEMPERATURE_UNIT,
@@ -109,6 +112,7 @@ from .const import (
     DOMAIN,
     ENTITIES_DICT,
     FAN_KEYS,
+    FAN_RUNNING_STATUSES,
     HEADLESS_SETTINGS,
     HUMIDITY_TARGET_KEYS,
     INSTALLER_DEVICE_EXTRA_KEYS,
@@ -157,7 +161,6 @@ PLATFORMS = [
     Platform.NUMBER,
     Platform.SELECT,
     Platform.CLIMATE,
-    Platform.FAN,
     Platform.BUTTON,
 ]
 
@@ -299,14 +302,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _migrate_setup_entities(hass, entry)
     _migrate_renamed_keys(hass, entry)
 
-    # HA02/HA03 were numbers up to 0.9.1 and are selects now, with the same
-    # unique id: drop the orphaned number entities.
+    # Same unique id on another platform: HA02/HA03 were numbers up to 0.9.1
+    # and are selects now, PM20 was a number up to 0.9.4 and is a sensor now.
+    # Drop the orphaned number entities.
     ent_registry = er.async_get(hass)
-    for key in (C_AI2_ALLOCATION, C_AI3_ALLOCATION):
+    for key in (C_AI2_ALLOCATION, C_AI3_ALLOCATION, C_FAN_MANUAL):
         if old_id := ent_registry.async_get_entity_id(
             Platform.NUMBER, DOMAIN, f"{entry.entry_id}-{key}"
         ):
             ent_registry.async_remove(old_id)
+    # The fan entity up to 0.9.4: Modbus can neither switch the fan nor set its
+    # speed, so it is shown by sensors now (ADR-0034).
+    if old_id := ent_registry.async_get_entity_id(
+        Platform.FAN, DOMAIN, f"{entry.entry_id}-{C_FAN_ENTITY}"
+    ):
+        ent_registry.async_remove(old_id)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
@@ -1542,6 +1552,11 @@ class HrdsModbusHub:
             if damper == "on" and fan == "on"
             else "off"
         )
+        # The status is the unit's own word on whether the fan turns (ADR-0028).
+        running = None if fan is None else fan in FAN_RUNNING_STATUSES
+        self.data[C_SUPPLY_FAN_RUNNING] = (
+            None if running is None else "on" if running else "off"
+        )
         self.setup_issues = self._compute_setup_issues()
         self.data[C_SETUP_CHECK] = "attention" if self.setup_issues else "ok"
         self.water_issues = self._compute_water_issues()
@@ -1550,15 +1565,15 @@ class HrdsModbusHub:
         self.data[C_MAX_TOTAL_AIRFLOW] = self._airflow_max
         self.data[C_SUPPLY_FAN_MAX_AIRFLOW] = self._airflow_max
         out = self.data.get(C_SUPPLY_FAN_OUTPUT)
-        if out is None:
-            self.data.setdefault(C_SUPPLY_FAN_AIRFLOW, None)
+        if out is None or running is None:
+            self.data[C_SUPPLY_FAN_AIRFLOW] = None
             return
         # "Fan is not moving air" is the device's own judgement, not a
         # percentage threshold of ours. The per-mode minimum speed lives in
         # PF28/PF27/PF07 and is exposed as writable numbers; duplicating it as
         # a config option here would shadow the registers and silently report
         # 0 m3/h while the fan was actually running below that figure.
-        if self.data.get(C_SUPPLY_FAN_STATUS) in ("off", "disabled", "alarm"):
+        if not running:
             self.data[C_SUPPLY_FAN_AIRFLOW] = 0.0
             return
         self.data[C_SUPPLY_FAN_AIRFLOW] = min(

@@ -21,7 +21,7 @@ from pymodbus.pdu.device import ModbusControlBlock
 from pymodbus.server import ModbusTcpServer
 from pymodbus.simulator import DataType, SimData, SimDevice
 
-from .device import HrdsDevice, IllegalAddress
+from .device import DeviceFailure, HrdsDevice, IllegalAddress
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -161,6 +161,8 @@ class HrdsSimServer:
                 values[offset] = self.device.write(address + offset, int(value))
         except IllegalAddress:
             return ExcCodes.ILLEGAL_ADDRESS
+        except DeviceFailure:
+            return ExcCodes.DEVICE_FAILURE
         return None
 
     async def _stall(self, seconds: float) -> None:

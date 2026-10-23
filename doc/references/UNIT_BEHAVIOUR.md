@@ -613,6 +613,12 @@ Observations and consequences:
 * AL16 (water antifreeze) stops the fan [HB 7.3].
 * States Disabled / OFF / Wait ON / ON / Wait OFF (run-on) / Alarm
   (overheating or speed sensing) [HB 6.2].
+* The fan turns in ON and in Wait OFF, the run-on at `PF26` (40 % seen,
+  [T19]). Wait ON is the `PS01` delay before the start [HB 6.2]; that the
+  output reads 0 then is [INFERRED], not logged.
+* Nothing over Modbus switches the fan by itself: it starts and stops with
+  the DEU / INT requests (§9.3), and `PM20` does not hold a speed [T23, T27,
+  T28] [INFERRED from the register map: no other fan command exists].
 
 ### 9.3 Recirculation is coupled to every request (`R` variant)
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from tests.sim import registers as R
-from tests.sim.device import HrdsDevice, IllegalAddress
+from tests.sim.device import DeviceFailure, HrdsDevice, IllegalAddress
 from tests.sim.seeds import list_seeds, load_seed
 
 
@@ -102,25 +102,54 @@ def test_humidity_setpoint_clamped():
     assert dev.write(R.HUMIDITY_SETPOINT, 10) == dev.holding[R.PH29_HUM_MIN]
 
 
-@pytest.mark.parametrize(
-    ("model", "request_pct", "expected"),
-    [
-        ("rescale", 0, 5000),
-        ("rescale", 3000, 6050),
-        ("rescale", 10000, 8500),
-        ("clamp", 3000, 5000),
-        ("clamp", 6000, 6000),
-        ("clamp", 10000, 8500),
-        ("direct", 3000, 3000),
-    ],
-)
-def test_fan_models_during_dehumidify(model, request_pct, expected):
-    dev = HrdsDevice(fan_model=model)
+def _dehumidify(dev: HrdsDevice) -> None:
     _enable_and_wake(dev)
-    dev.write(R.FAN_MANUAL, request_pct)
     dev.write(R.DEU_REQUEST, 1)
     dev.write(R.BMS_ON, 1)
-    assert dev.input[R.FAN_OUTPUT] == expected
+
+
+def test_fan_starts_at_the_band_minimum_and_follows_a_raised_one():
+    """T22, T24-T26: the unit's manual request is clamped into the band."""
+    dev = HrdsDevice()
+    assert dev.holding[R.FAN_MANUAL] == 0
+    _dehumidify(dev)
+    assert dev.input[R.FAN_OUTPUT] == dev.holding[R.FAN_MANUAL] == 5000
+    dev.write(R.PF28_FAN_MIN_DEU, 4500)
+    assert dev.input[R.FAN_OUTPUT] == 5000
+    dev.write(R.PF28_FAN_MIN_DEU, 5500)
+    assert dev.input[R.FAN_OUTPUT] == dev.input[R.FAN_MANUAL_REQUEST] == 5500
+    dev.write(R.PF28_FAN_MIN_DEU, 5000)
+    assert dev.input[R.FAN_OUTPUT] == 5500
+    dev.write(R.DEU_REQUEST, 0)
+    assert dev.input[R.FAN_OUTPUT] == dev.holding[R.FAN_MANUAL] == 0
+
+
+def test_fan_runs_on_at_pf26_after_the_request():
+    """HB 6.2, T19: Wait OFF at PF26 after the request; 0 run-on stops at once."""
+    dev = HrdsDevice()
+    dev.holding[R.PF26_FAN_POST_RUN] = 4000
+    _dehumidify(dev)
+    dev.run_on = 3600
+    dev.write(R.DEU_REQUEST, 0)
+    assert dev.input[R.FAN_STATUS] == 4
+    assert dev.input[R.FAN_OUTPUT] == 4000
+    dev.run_on = 0
+    dev.read("input", R.FAN_STATUS, 1)
+    assert dev.input[R.FAN_STATUS] == 1
+    assert dev.input[R.FAN_OUTPUT] == 0
+    dev.set_fan_fault()
+    assert dev.input[R.FAN_STATUS] == 5
+
+
+def test_pm20_write_is_not_kept_and_outside_the_band_refused():
+    """T23, T27, T28."""
+    dev = HrdsDevice()
+    _dehumidify(dev)
+    assert dev.write(R.FAN_MANUAL, 6000) == 5000
+    assert not dev.write_log[-1].accepted
+    with pytest.raises(DeviceFailure):
+        dev.write(R.FAN_MANUAL, 4000)
+    assert dev.input[R.FAN_OUTPUT] == 5000
 
 
 def test_compressor_alarm_and_reset_register():

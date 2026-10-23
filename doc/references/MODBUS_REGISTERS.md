@@ -317,7 +317,7 @@ the word *integration* but are unrelated: 1139 is the **INT request**
 (cooling in summer, heating support in winter, written by the BMS); 1112 is a read-only "fans integration request", a fan request in % of the INT fan control (§6). It read 0 while the supply fan ran for a dehumidify request (UNIT_BEHAVIOUR.md §13, T16).
 
 Airflow behaviour (passive MVHR flow, recirculation coupled to every request,
-the unofficial I/O workaround) used to be described here and is now in
+the unofficial I/O workaround) is in
 [UNIT_BEHAVIOUR §9](UNIT_BEHAVIOUR.md#9-fan), in particular
 [§9.3 Recirculation is coupled to every request](UNIT_BEHAVIOUR.md#93-recirculation-is-coupled-to-every-request-r-variant).
 

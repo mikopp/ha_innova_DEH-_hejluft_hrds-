@@ -1,105 +1,137 @@
-"""Fan speeds: commanded (PM20) vs actual (639) under each firmware hypothesis.
+"""The fan is the unit's: Home Assistant shows it and can neither switch it nor
+set its speed.
 
-The real mapping from PM20 to fan output is not confirmed yet (plans/todo.md),
-so the simulator offers three models. Whichever applies, the integration must
-report the actual output as state, the commanded value as attribute / number,
-and derive airflow from the actual output.
+The unit runs the fan with every request and stops it after a run-on. It runs
+it at its own manual request (PM20, 1614), clamped into the active band, and
+keeps it there (UNIT_BEHAVIOUR.md 9.1-9.3, T19, T22-T28). The band numbers are
+the only lever. Whether the fan turns is its status (1119): On or the run-on
+Wait OFF (ADR-0028).
 """
 
 from __future__ import annotations
 
 import pytest
+from homeassistant.components.climate import ClimateEntityFeature
 from homeassistant.const import STATE_UNKNOWN
+from homeassistant.helpers import entity_registry as er
 
+from custom_components.innova_hrds.const import DOMAIN
 from tests.sim import registers as R
 
-from .conftest import CLIMATE, FAN, add_entry, allow_operation, set_hvac_mode
-
-# Factory band during dehumidify: PF28 = 50 %, PF10 = 85 %.
-EXPECTED_ACTUAL = {
-    "rescale": {0: 50.0, 30: 60.5, 55: 69.25, 85: 79.75, 100: 85.0},
-    "clamp": {0: 50.0, 30: 50.0, 55: 55.0, 85: 85.0, 100: 85.0},
-    "direct": {0: 0.0, 30: 30.0, 55: 55.0, 85: 85.0, 100: 100.0},
-}
+from .conftest import CLIMATE, FAN_RUNNING, add_entry, allow_operation, set_hvac_mode
 
 
-def _fan_mode(actual: float) -> str:
-    if actual < 5:
-        return "off"
-    if actual < 42.5:
-        return "low"
-    if actual < 70:
-        return "medium"
-    return "high"
-
-
-@pytest.mark.parametrize("model", list(EXPECTED_ACTUAL))
-async def test_fan_percentage_during_dehumidify(setup, clock, model):
+async def test_fan_follows_the_band_during_dehumidify(setup, clock):
     s = setup
-    s.device.set_fan_model(model)
     await allow_operation(s)
     await set_hvac_mode(s, clock, "dry")
+    assert s.state("binary_sensor", FAN_RUNNING).state == "on"
+    assert float(s.state("sensor", "supply_fan_output").state) == pytest.approx(50)
+    assert float(s.state("sensor", "fan_manual_speed").state) == pytest.approx(50)
+    assert float(s.state("sensor", "supply_fan_airflow").state) == pytest.approx(150)
 
-    for commanded, actual in EXPECTED_ACTUAL[model].items():
-        await s.service("fan", "set_percentage", FAN, percentage=commanded)
-        await clock.settle()
-        assert s.device.holding[R.FAN_MANUAL] == commanded * 100
-
-        fan = s.state("fan", FAN)
-        assert fan.attributes["commanded_percent"] == pytest.approx(commanded)
-        assert fan.attributes["percentage"] == round(actual)
-        assert float(s.state("sensor", "supply_fan_output").state) == pytest.approx(
-            actual
-        )
-        assert float(s.state("number", "fan_manual_speed").state) == pytest.approx(
-            commanded
-        )
-        airflow = float(s.state("sensor", "supply_fan_airflow").state)
-        assert airflow == pytest.approx(min(300.0, actual / 100 * 300.0))
-        assert s.state("climate", CLIMATE).attributes["fan_mode"] == _fan_mode(actual)
+    # A raised minimum raises the running fan (T25) ...
+    await s.service("number", "set_value", "fan_min_speed_dehumidify", value=55)
+    await clock.settle()
+    assert float(s.state("sensor", "supply_fan_output").state) == pytest.approx(55)
+    assert float(s.state("sensor", "fan_manual_speed").state) == pytest.approx(55)
+    # ... a lowered one leaves it (T24, T26).
+    await s.service("number", "set_value", "fan_min_speed_dehumidify", value=50)
+    await clock.settle()
+    assert float(s.state("sensor", "supply_fan_output").state) == pytest.approx(55)
 
 
-@pytest.mark.parametrize(
-    ("fan_mode", "commanded"), [("low", 30), ("medium", 55), ("high", 85)]
-)
-async def test_climate_fan_modes_write_pm20(setup, clock, fan_mode, commanded):
+async def test_no_fan_control_and_nothing_written_to_pm20(setup, clock):
     s = setup
     await allow_operation(s)
-    await s.service("climate", "set_fan_mode", CLIMATE, fan_mode=fan_mode)
-    await clock.settle()
-    assert s.device.holding[R.FAN_MANUAL] == commanded * 100
+    await set_hvac_mode(s, clock, "dry")
+    s.device.clear_write_log()
+    assert s.entity_id("fan", "hrds_supply_fan") is None
+    assert s.entity_id("number", "fan_manual_speed") is None
+    climate = s.state("climate", CLIMATE).attributes
+    assert not climate["supported_features"] & ClimateEntityFeature.FAN_MODE
+    assert "fan_modes" not in climate
+    await clock.poll()
+    assert s.device.writes_to(R.FAN_MANUAL) == []
 
 
 async def test_no_optimistic_update_before_poll(setup, clock):
     s = setup
-    s.device.set_fan_model("direct")
     await allow_operation(s)
     await set_hvac_mode(s, clock, "dry")
-    await s.service("fan", "set_percentage", FAN, percentage=30)
-    # Before the debounced refresh the state still shows the old actual value.
-    assert s.state("fan", FAN).attributes["percentage"] == 0
+    await s.service("number", "set_value", "fan_min_speed_dehumidify", value=60)
+    # Before the debounced refresh the state still shows the old values.
+    assert float(s.state("sensor", "supply_fan_output").state) == pytest.approx(50)
+    assert float(s.state("number", "fan_min_speed_dehumidify").state) == 50
     await clock.settle()
-    assert s.state("fan", FAN).attributes["percentage"] == 30
-
-
-async def test_per_mode_minimum_moves_output(setup, clock):
-    s = setup
-    s.device.set_fan_model("clamp")
-    await allow_operation(s)
-    await set_hvac_mode(s, clock, "dry")
-    await s.service("fan", "set_percentage", FAN, percentage=20)
-    await clock.settle()
-    assert float(s.state("sensor", "supply_fan_output").state) == 50.0
-    await s.service("number", "set_value", "fan_min_speed_dehumidify", value=20)
-    await clock.settle()
-    assert float(s.state("sensor", "supply_fan_output").state) == 20.0
+    assert float(s.state("sensor", "supply_fan_output").state) == pytest.approx(60)
 
 
 async def test_airflow_zero_when_fan_off(setup, clock):
     s = setup
     assert s.state("sensor", "supply_fan_status").state == "off"
+    assert s.state("binary_sensor", FAN_RUNNING).state == "off"
     assert float(s.state("sensor", "supply_fan_airflow").state) == 0.0
-    assert s.state("fan", FAN).state == "off"
+
+
+async def test_running_follows_the_status_through_start_and_run_on(setup, clock):
+    s = setup
+    await allow_operation(s)
+    # Wait ON: the damper is open, the fan waits out PS01 and does not turn.
+    s.device.sequence_delay = 3600
+    await set_hvac_mode(s, clock, "dry")
+    assert s.state("sensor", "supply_fan_status").state == "wait_on"
+    assert s.state("binary_sensor", FAN_RUNNING).state == "off"
+    assert float(s.state("sensor", "supply_fan_airflow").state) == 0.0
+
+    s.device.sequence_delay = 0
+    await clock.poll()
+    assert s.state("binary_sensor", FAN_RUNNING).state == "on"
+
+    # Wait OFF: the request ended, the fan runs on at PF26 (T19).
+    s.device.holding[R.PF26_FAN_POST_RUN] = 4000
+    s.device.run_on = 3600
+    await set_hvac_mode(s, clock, "fan_only")
+    assert s.state("sensor", "supply_fan_status").state == "wait_off"
+    assert s.state("binary_sensor", FAN_RUNNING).state == "on"
+    assert float(s.state("sensor", "supply_fan_airflow").state) == pytest.approx(120)
+    assert s.state("climate", CLIMATE).attributes["hvac_action"] == "fan"
+    assert s.state("binary_sensor", "recirculation_active").state == "off"
+
+    s.device.run_on = 0
+    await clock.poll()
+    assert s.state("binary_sensor", FAN_RUNNING).state == "off"
+    assert float(s.state("sensor", "supply_fan_airflow").state) == 0.0
+    assert s.state("climate", CLIMATE).attributes["hvac_action"] == "idle"
+
+
+async def test_alarm_stops_the_fan(setup, clock):
+    s = setup
+    await allow_operation(s)
+    await set_hvac_mode(s, clock, "dry")
+    s.device.set_fan_fault()
+    await clock.poll()
+    assert s.state("sensor", "supply_fan_status").state == "alarm"
+    assert s.state("binary_sensor", FAN_RUNNING).state == "off"
+    assert float(s.state("sensor", "supply_fan_airflow").state) == 0.0
+
+
+async def test_old_fan_entity_and_manual_speed_number_are_removed(hass, sim):
+    # Up to 0.9.4 the fan was a fan entity and PM20 a number.
+    s = await add_entry(hass, sim)
+    registry = er.async_get(hass)
+    prefix = f"{s.entry.entry_id}-"
+    registry.async_get_or_create(
+        "fan", DOMAIN, prefix + "hrds_supply_fan", config_entry=s.entry
+    )
+    registry.async_get_or_create(
+        "number", DOMAIN, prefix + "fan_manual_speed", config_entry=s.entry
+    )
+    await hass.config_entries.async_reload(s.entry.entry_id)
+    await hass.async_block_till_done()
+    assert s.entity_id("fan", "hrds_supply_fan") is None
+    assert s.entity_id("number", "fan_manual_speed") is None
+    assert s.state("binary_sensor", FAN_RUNNING) is not None
 
 
 async def test_recirculation_is_damper_open_and_fan_running(setup, clock):

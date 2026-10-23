@@ -1,6 +1,6 @@
 ---
 status: accepted
-date: 2026-09-10
+date: 2026-10-23
 decision-makers: mikopp
 topics: [entities]
 paths:
@@ -23,8 +23,8 @@ paths:
 - MUST use only `C_REG_TYPE_INPUT_REGISTERS` (FC 04) and
   `C_REG_TYPE_HOLDING_REGISTERS` (FC 03/06/16): the unit has no coils or
   discrete inputs, even 0/1 flags are analog registers.
-- Composite entities (climate, fan) are declared in `init()`
-  (`CLIMATE_TYPES` / `FAN_TYPES`); values not backed by a register go in
+- The composite climate entity is declared in `init()`
+  (`CLIMATE_TYPES`); values not backed by a register go in
   `COMPUTED_SENSORS` / `COMPUTED_BINARY_SENSORS` and are written by the hub
   in `_compute_derived()`.
 - A new platform MUST have both a module and an entry in `PLATFORMS`.
