@@ -1,0 +1,44 @@
+{
+  "_about": "Second Modbus dehumidify (DEU) run on the reference unit, plus the stop of the first run (2026-10-22), read from Home Assistant history via ha-mcp. Read only: nothing was written to the unit for this analysis. Poll interval ~60 s. Times Europe/Vienna (UTC+2).",
+  "unit": "HRDS+ 30 R DC, headless, brine circuit, behind a ComfoAir Q350 (see hrds_30+_first_dehumidify_run_2026-10-22.json)",
+  "timeline_2026_10_23": [
+    {"t": "10:32:16", "event": "ComfoAir temperature profile cool -> warm: its bypass closes, ComfoAir supply 14.6 -> 20.6 C, ComfoAir exhaust 19.7 -> 14.0 C (heat recovery on). Not an HRDS event"},
+    {"t": "10:33..10:42", "event": "HRDS in ON-standby (no flow): evaporator probe 15.3 -> 19.0 C and water probe 16.6 -> 18.1 C follow the warmer MVHR air through the unit"},
+    {"t": "<=10:42:48", "event": "DehumRequest 1121 = 1, damper 1134 on, V3V/PM 1126 on (switch written by the owner)"},
+    {"t": "(10:43:17, 10:44:17]", "event": "SupplyFan_Status on, outAO_SupplyFan 639 = 50 %, 1114 and PM20 1614 0 -> 50 %. In the same minute the ComfoAir supply flow dropped 163 -> 115 m3/h and its constant-flow control recovered to 141 (10:45) and 157 (10:51)"},
+    {"t": "(10:49:12, 10:50:13]", "event": "CmpStatus on; 641 = 31.96 % at 10:51"},
+    {"t": "10:51..10:56", "event": "compressor 32 -> 44 -> 38 -> 32 -> 27 %, evaporator 6.2, -9.6, -6.7, 1.2, 4.7, 6.5 C, then 6.3..6.7 C at 27 % (PU11 = 6.0)"},
+    {"t": "10:53..11:11", "event": "water probe 17.9 -> 16.4..16.6 C after the compressor started (no rise)"}
+  ],
+  "measured_delays_s": {
+    "request_to_fan_on": "29..89",
+    "fan_on_to_compressor_on": "295..356",
+    "request_to_compressor_on": "384..445 (again about PE03 = 420 s)"
+  },
+  "values_during_run": {
+    "actRPMsupplyFan_1117": 0,
+    "FanIntegration_Request_1112": 0,
+    "outDO_WaterCond_K4_1124": "on (unchanged since standby)",
+    "AI_Texhaust_502": "unknown (no probe)",
+    "AI_Tdischarge_503": "unknown (no probe)",
+    "room_probe_ok_binary_sensors": "both on although no room probe is allocated (HA02 = HA03 = 0); they only mean 'AL28 / AL34 not set'",
+    "comfoair_during_run": {"supply_C": "20.4..20.7", "extract_C": "21.6..21.7", "outdoor_C": "11.9..12.0", "supply_flow_m3h": "140..163", "supply_abs_humidity_g_m3": "9.0..9.4", "supply_dew_point_C": 9.7, "extract_abs_humidity_g_m3": "10.1 -> 9.9 (10:42 -> 11:11)"},
+    "rooms_during_run": "five room sensors flat within 0.1 K from 10:30 to 11:11"
+  },
+  "stop_2026_10_22": [
+    {"t": "07:36:57", "event": "switch.dehumidify_modbus written off"},
+    {"t": "07:37:26", "event": "DehumRequest 0, CmpStatus wait_off at 24.2 %"},
+    {"t": "07:37:58", "event": "CmpStatus off (0 %), V3V/PM 1126 off, damper 1134 off, fan wait_off at 40 %, PM20 1614 and 1114 50 -> 0 (no write by Home Assistant)"},
+    {"t": "07:38:53", "event": "fan off, 639 = 0; evaporator 6.0 -> 11.9 C"}
+  ],
+  "findings": {
+    "fan_rpm_1117": "No input is allocated to a fan tachometer. The tachometer is input function 45 (supply) / 46 (return) [HB 6, input table: '45 AI: Return/room temp. / DI: Tachometer signal supply fan']; the dump has HA01 = 58 (fan potentiometer 0-10 V), HA02 = HA03 = 0, HA04 = 52, HA05 = 47, HA06 = 6, HA07 = 8, HA08..HA18 = 0, HB01 = 27, HB02 = 26, HB03 = 2, HB04 = 4, HB05..HB07 = 0. So 1117 = 0 is the unit's true value, not a wrong read. The fan running is also shown by the ComfoAir flow dip when it started.",
+    "recirculation_1112": "1112 is 'FanIntegration_Request' [MB]; it is not a recirculation flag. On an R unit recirculation is damper 1134 open with the fan on; the unit has no single register for it.",
+    "pm20_owned_by_unit": "PM20 1614 went 0 -> 50 at fan start (2026-10-22 07:05, 2026-10-23 10:44) and 50 -> 0 at the stop (2026-10-22 07:37:58) with no write from Home Assistant: the unit writes it. 50 is PF28, the band minimum.",
+    "reheat": "Not measurable on this unit: no supply (503) or exhaust (502) probe, and the ComfoAir supply sensor is upstream of the HRDS. K4 = 1 (the dehumidify / register position) is the only unit-side sign. The water probe does not rise when the compressor starts, so it reads the inlet, not the condenser outlet. The flat room temperatures over 30 min do not prove it either way.",
+    "stop_sequence": "compressor off and V3V/PM off and damper closed within 61 s of the request ending; the fan runs on (wait_off) at 40 % = PF26 (1637 = 4000 in the dump) after the damper is closed and stops within the next minute (PF03 = 30 s)"
+  },
+  "open": {
+    "supply_air_temperature_after_hrds": "needs a temperature sensor in the supply duct after the HRDS, or at a supply valve"
+  }
+}

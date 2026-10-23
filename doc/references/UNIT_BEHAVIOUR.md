@@ -17,6 +17,11 @@ Scope rules:
   *does* with them.
 * **Every statement carries its evidence.** If a statement has no tag, treat it
   as a bug in this file.
+* **Parameters are cited by code, not by value.** The behaviour sections say
+  `PS01`, never "90 s". What a parameter is, where it is defined, the
+  handbook default and the value the reference unit shipped with are in
+  [§15](#15-parameters-source-default-and-shipped-value). A shipped value that differs from the handbook
+  default is how that unit was configured, not an error in the handbook.
 
 ## 0. Evidence tags and sources
 
@@ -47,7 +52,7 @@ When two sources disagree, both are given and the conflict is marked.
 | Alarms and what they stop | [12](#12-alarms-and-what-they-do-to-the-flow) |
 | What was tested on real hardware | [13](#13-evidence-log-what-was-seen-on-real-hardware) |
 | How to do X at the display / terminals / Modbus; settings | [14](#14-actions-and-settings-display-terminals-modbus) |
-| As-delivered settings vs handbook defaults | [15](#15-as-delivered-settings-vs-handbook-defaults) |
+| Parameters: source, handbook default, shipped value | [15](#15-parameters-source-default-and-shipped-value) |
 
 ---
 
@@ -87,8 +92,8 @@ heating ("integration") [HB 6.1.3], which gives the same function set
 How to tell them apart from the controller: no register states size or `R`
 [MB, whole register list; INFERRED that none exists beyond what is listed].
 
-* **`R` vs non-`R`:** the damper output `outDO_RecircDamper` (1134). On the
-  reference `R` unit it reads `0` (off) in standby [T5]. That a non-`R` unit
+* **`R` vs non-`R`:** the damper output `outDO_RecircDamper` (1134). On the reference `R` unit it reads `0` (off) in standby [T5] and on while a
+  request runs [T11]. That a non-`R` unit
   reads `2` (disabled, output not allocated) is [INFERRED] from the enum; no
   non-`R` unit has been read.
 * **`PG01` is not the `R` flag.** It selects the fan arrangement ("only supply
@@ -121,8 +126,8 @@ integration has been used in are in [`doc/tested-setups.md`](../tested-setups.md
    point so moisture condenses [HB 2.6].
 2. Directly behind it sits the **water register** ("Nachheizregister"), a water
    coil [HB 2.6, 2.6.3].
-3. The compressor modulates to hold the evaporator at **PU11 (6.0 °C)**,
-   independent of the airflow [HB 2.6, 6.3].
+3. The compressor modulates to hold the evaporator at its setpoint `PU11`,
+   independent of the airflow [HB 2.6, 6.3]; seen settling on it [T12].
 4. Refrigerant: R410A, hermetically sealed [HB 2.6.3].
 
 ### 2.2 Water path
@@ -161,7 +166,7 @@ Hydraulic installations [HB 3.8.6–3.8.8]:
 | `E/I` | input | Open = summer, closed = winter (NO). Display has priority unless `PC11 = 1`. NO/NC set by `HB04`. | [HB 4.4, 4.5, 6.6] |
 | `DEU` | input | Closed forces a dehumidify request; stays active even with a display. NO/NC by `HA06`. | [HB 4.5, 6.6] |
 | `INT` | input | Closed forces an integration request (cool in summer, heat in winter). NO/NC by `HA07`. | [HB 4.5, 6.6] |
-| `FAN+`/`FAN−` | input 0–10 V | Fan speed request, linear across the active mode's band (factory 0 V = 50 %, 10 V = 85 %); the higher of 0–10 V and display wins; > 10 V disables the signal. | [HB 4.5] |
+| `FAN+`/`FAN−` | input 0–10 V | Fan speed request, linear across the active mode's band (0 V = band minimum, 10 V = band maximum); the higher of 0–10 V and display wins; > 10 V disables the signal. | [HB 4.5] |
 | `V3V` | output 230 V | External 2-point valve; opens on a request; anti-stagnation pulses. | [HB 4.5, 6.4] |
 | `PM` | output 230 V | Pump; **always switched together with V3V**. | [HB 4.5] |
 | `VMC` | potential-free | Closed on every DEU or INT request, opens when the request ends. For the MVHR speed or the heat pump's cooling mode. | [HB 2.7, 4.5] |
@@ -193,9 +198,9 @@ terminals and Modbus [HB 2.2, 5.1]. How they combine:
   [HB 5.1; T2].
 * Setting `PH01 = 0` alone does **not** leave "OFF by display": after
   `PH01 = 0`, `HA00 = 0`, `PH02 = 1` and a power cycle the unit still read
-  `off_by_display`; the first Modbus ON switched it on at once [T7]. Whether a
-  later Modbus OFF reads "OFF by BMS" and survives a power cycle is open
-  [`plans/todo.md`].
+  `off_by_display`; the first Modbus ON switched it on at once [T7]. A later
+  Modbus OFF reads `off_by_bms` [T14]; whether that survives a power cycle is
+  open [`plans/todo.md`].
 * OFF: the unit reacts to no request; Modbus and monitoring stay active
   [HB 2.7].
 
@@ -216,8 +221,9 @@ terminals and Modbus [HB 2.2, 5.1]. How they combine:
   switches to summer above `PC09` and to winter below `PC10` [HB 5.3]. How the
   water-probe variant decides is not described [INFERRED: unknown].
 * Read back the season in force with `ModeStatus` (1110: summer/winter ×
-  manual/auto/DI) and `Mode_OperatingMode` (1583) [MB p.6, p.9]. As delivered:
-  `HB04 = 4`, `ModeStatus` = "Summer DI", `PC05 = 0` [T6].
+  manual/auto/DI) and `Mode_OperatingMode` (1583) [MB p.6, p.9]. As delivered
+  the season followed the `E/I` contact through `HB04`, read as summer
+  (`ModeStatus` = "Summer DI"; §15) [T6].
 
 ### 3.3 Requests: DEU and INT
 
@@ -245,12 +251,14 @@ Each request is the **OR** of its sources; any one raises it [HB 6.1]:
 * A Modbus request is mirrored back late: on the reference unit an OFF written
   to `Status_OnOff_byBMS` read back as ON for several polls, and the register
   and `sm_UnitStatus` changed together at one later poll [T8]. The length of
-  the lag is open [`plans/todo.md`].
-* Winter automatic heating: `SEtH` is clamped to `PH09..PH10`, factory
-  14.0 °C both [HB 5.3]. The handbook says this "prevents" automatic heating
-  [HB 5.2.3, 6.1.2]. With `PF12 = 0.5 K` the unit still heats whenever the
-  room is below 13.5 °C [INFERRED from HB 6.1.2]. To keep it from heating,
-  lower `PH09` first, then `SEtH` [INFERRED].
+  the lag is open [`plans/todo.md`]. A dehumidify request written to
+  `Status_Dehum_byBMS` showed in `DehumRequest` within 28 s [T11], so the lag
+  differs between registers.
+* Winter automatic heating: `SEtH` is clamped to `PH09..PH10`, which ship
+  pinned to the same low value (§15) [HB 5.3]. The handbook says this "prevents"
+  automatic heating [HB 5.2.3, 6.1.2]. With `PF12` as it is, the unit still
+  heats whenever the room is below `SEtH − PF12` [INFERRED from HB 6.1.2]. To
+  keep it from heating, lower `PH09` first, then `SEtH` [INFERRED].
 * Writes to the "by BMS" registers are ignored while the matching enable
   (`PH02`/`PH27`/`PH28`) is 0 [MB p.5].
 * A request written while its enable is 0 is probably kept by the unit and
@@ -261,17 +269,22 @@ Each request is the **OR** of its sources; any one raises it [HB 6.1]:
 * `SEtC`, `SEtH` and `PU01` are only effective when a display is present or
   external probes are connected [MB p.6].
 * `SEtC` is clamped to `PH07..PH08`, `SEtH` to `PH09..PH10`, `PU01` to
-  `PH29..PH30` [HB 5.3]. As delivered: `PH07 = PH08 = 28.0 °C`,
-  `PH09 = PH10 = 14.0 °C`, `PH29 = 55 %`, `PH30 = 65 %`, `Actual_Setpoint` read
-  28.0 °C [T2].
+  `PH29..PH30` [HB 5.3]. The reference unit shipped with limits that pin both temperature
+  setpoints and narrow the humidity setpoint (§15); `Actual_Setpoint` read the
+  pinned summer value [T2].
 * Default `SEtH`: 14.0 °C [HB 5.3] vs 20.0 °C [MB p.6] — **sources disagree**.
 
 ### 3.5 Fan speed
 
-See [§9](#9-fan). In short: display request, 0–10 V and the Modbus manual
-setpoint feed the fan; the **highest** wins; each is scaled into the active
-mode's min–max band [HB 4.5, 6.2]. Whether the Modbus setpoint `PM20` follows
-the same scaling is [INFERRED], not tested.
+See [§9](#9-fan). In short: the display (manual) request and 0–10 V feed the
+fan; the **highest** wins [HB 4.5, 6.2]. 0–10 V is scaled linearly into the
+active mode's min–max band [HB 4.5, 6.2]. The manual request behaves as an
+absolute percentage that the band clamps [T22, T24–T26], against the
+handbook's "linear skaliert" [HB 6.2]. Modbus has no fan-speed request:
+`PM20` mirrors the manual request, and a value written to it has no effect
+[HB 5.3; T23]. Over Modbus only the band acts: raising the minimum above the
+running speed raises it, lowering the minimum does not lower it
+[T24–T26].
 
 ### 3.6 Persistence across a power cycle
 
@@ -326,7 +339,7 @@ Sources: HB 2.7 (OFF, ON-standby, DEU, INT), HB 6.2–6.5 (sequences), HB 7.3
 |-------|--------------|------------|----------------|----------|-------|------------|--------|
 | OFF | closed / off | off | open | closed | open | untreated | [HB 2.7] |
 | ON-standby | closed / off | off | open | closed, except anti-stagnation pulses | open | untreated; warmed or cooled if water flows through condenser and register without an external valve | [HB 2.7] |
-| DEU (summer) | open / on, band `PF28..PF10` | on | open (heat to register) | open | closed | dry, about room temperature | [HB 2.6.1, 2.7, 6.2] |
+| DEU (summer) | open / on, band `PF28..PF10` | on | open (heat to register) | open | closed | dry, about room temperature (supply-air temperature not recorded) | [HB 2.6.1, 2.7, 6.2]; damper, fan, compressor, K4 and V3V + PM seen [T11, T12] |
 | INT summer, `PU05 = 1` | open / on, band `PF27..PF09` | on | **closed** (heat to water) | open | closed | dry and cold | [HB 2.6.1, 2.7, 6.2, 6.4] |
 | Summer DEU/INT, water < `PU08` | open / on | **off** (second step after `PU10` if `PU09 = 1`) | open | open | closed | cooled and dried by the cold water | [HB 6.3]; internal valve [INFERRED from HB 6.4: only activated with the compressor on] |
 | INT winter | open / on | **off** | open | open | closed | warmed only if the water is warm | [HB 2.6.2, 2.7, 4.5, 6.4] |
@@ -337,14 +350,19 @@ Sources: HB 2.7 (OFF, ON-standby, DEU, INT), HB 6.2–6.5 (sequences), HB 7.3
 1. Request raised (any source) [HB 6.1].
 2. External water valve V3V + pump PM open, damper opens, `VMC` closes
    [HB 6.4, 6.5, 4.5; V#76 gives this order].
-3. Fan starts after the damper pre-start time `PS01` (handbook 20 s; reference
-   unit 90 s) [HB 6.2, 6.5; T2].
-4. Compressor starts `PE04` after the fan (dehumidify; handbook 120 s,
-   reference unit 180 s) and only when the safety times allow: min off time
-   `PE01`, min time between starts `PE03` [HB 6.3; T2]. It first runs at the
+3. Fan starts after the damper pre-start time `PS01` (§15) [HB 6.2, 6.5]. Seen:
+   the fan came on 32 to 120 s after the damper opened, `PS01` shipped at 90 s
+   [T11].
+4. Compressor starts `PE04` (dehumidify) after the fan and only when the safety
+   times allow: min off time `PE01`, min time between starts `PE03` [HB 6.3]. It first runs at the
    start speed `PE28` for `PE30`, then modulates [HB 6.3].
 5. Commissioning note: at least **7 minutes** from activation to the first
-   compressor start [HB 8.2]. That matches `PE03 = 420 s` [INFERRED].
+   compressor start [HB 8.2]. Seen: the compressor came on 6.5 to 8 minutes after the request and 5 to 7
+   minutes after the fan, so `PE04` alone is not what held it [T11]; the second
+   run gave 6.4 to 7.4 and 5 to 6 minutes [T18]. Which
+   timer does is open: `PE03` fits the numbers but is defined between two
+   compressor starts, and the recorded history shows no start in the 12 hours
+   before [INFERRED; `plans/todo.md`].
 
 The compressor does not start (step 4) while: a blocking alarm is active, a
 time program blocks it, room T < `PU13`, or (summer) water < `PU08` [HB 6.3].
@@ -354,13 +372,18 @@ time program blocks it, room T < `PU13`, or (summer) water < `PU08` [HB 6.3].
 1. Request ends (all sources clear) [HB 6.3].
 2. Compressor stops once its minimum on time `PE02` has passed; on an OFF or a
    blocking alarm it ramps down via `PE25` [HB 6.3].
-3. V3V + PM stay open for the run-on `Pb01` (handbook 255 s; reference unit
-   30 s), so water keeps flowing while the compressor ramps down [HB 6.4; T2].
+3. V3V + PM stay open for the run-on `Pb01` (§15), so water keeps flowing while the compressor ramps down [HB 6.4].
 4. Fan runs on for `PF03` at speed `PF26`, keeps its minimum run time `PF01`,
    and **in any case until V3V has closed** [HB 6.2].
 5. Damper closes after the request has ended, the compressor is off and V3V
    has closed [HB 6.5].
 6. After the valve closes, the anti-stagnation cycle starts counting [HB 6.4].
+
+Seen at 1-minute resolution [T19]: compressor in "Wait OFF" within 29 s of the
+request ending; compressor off, V3V + PM closed and damper closed in the next
+poll (within 61 s); the fan then in "Wait OFF" at 40 % (`PF26` as shipped) with
+the damper already closed, and off one poll later. The first anti-stagnation
+pulse came about 2 hours after the valve closed, not one `Pb08` wait [T20].
 7. With `PU09` second step active, the request counts as finished only after
    `PU10` has passed since the compressor stopped; water keeps flowing
    meanwhile [HB 6.3].
@@ -412,7 +435,7 @@ fan = on after PS01, band PF28..PF10 (DEU) or PF27..PF09 (INT)             # HB 
 
 compressor_wanted = (summer and INT and PU05 == 1) or DEU_DI or deu_auto
                     or (PH28 == 1 and Status_Dehum_byBMS)                  # HB 6.3
-compressor_blocked = blocking alarm or time program or room_T < PU13       # HB 6.3 (no room_T: unknown, INFERRED)
+compressor_blocked = blocking alarm or time program or room_T < PU13       # HB 6.3 (no room_T: not vetoed at the shipped PU13, T15)
                      or (summer and water_T < PU08 and not PU09_step_due)  # HB 6.3
                      or (summer and AL03 and not (DEU only and PU03 == 1)) # HB 7.4
                      or safety times PE01/PE03 or fan not yet on for PE04  # HB 6.3
@@ -420,7 +443,7 @@ compressor = compressor_wanted and not compressor_blocked
 # winter: HB 6.3 lists no winter case; compressor in winter only for DEU with PU02 != 0 (INFERRED)
 
 internal_valve = closed if compressor and INT and season == summer else open   # HB 6.4
-# K4 read 1 in standby on the reference unit; MB labels K4 1 = "Dehumidify" (open)  # T5, MB p.8
+# K4 read 1 in standby on the reference unit; MB labels K4 1 = "Dehumidify" (open)  # T5 (standby), T11 (DEU), MB p.8
 
 # ---------- protections, any time ----------
 water_T < PA43 for PA42           -> AL16: fan off; clears > PA43 + PA44   # HB 7.4
@@ -436,11 +459,11 @@ winter INT, valve on, water_T < PC08 for PA16 -> AL04                      # HB 
 |---------|-----------|--------------|------------|--------|
 | none | — | ON-standby (§4.2) | untreated | [HB 2.7] |
 | DEU | water ≥ `PU08` | Compressor; internal valve open | dry, ≈ room T | [HB 2.6.1, 2.7] |
-| DEU or INT | water < `PU08` (handbook 10 °C) | **Passive cold-water path**: compressor stays off; cold water in the register cools and dries the air. If the request is still open after `PU10` (120 min) and `PU09 = 1`, the compressor joins as a second step; that step ends when the request is satisfied, water keeps flowing | cooled and dried, no compressor | [HB 6.3] |
-| INT, `PU05 = 1` (factory) | water ≥ `PU08` | DEU is raised too; compressor on; internal valve **closed** | dry and cold | [HB 2.7, 6.1.1, 6.3, 6.4] |
+| DEU or INT | water < `PU08` | **Passive cold-water path**: compressor stays off; cold water in the register cools and dries the air. If the request is still open after `PU10` and `PU09 = 1`, the compressor joins as a second step; that step ends when the request is satisfied, water keeps flowing | cooled and dried, no compressor | [HB 6.3] |
+| INT, `PU05 = 1` | water ≥ `PU08` | DEU is raised too; compressor on; internal valve **closed** | dry and cold | [HB 2.7, 6.1.1, 6.3, 6.4] |
 | INT, `PU05 = 0`, no DEU | water ≥ `PU08` | INT does not start the compressor; valve/pump and fan run; cooling by the water only | cooled by water only | [INFERRED from HB 6.1.1, 6.3, 6.4]; untested [`plans/todo.md`] |
 | INT + DEU | water ≥ `PU08` | Compressor on and a cooling request → internal valve **closed** | dry and cold | [HB 6.4]; untested |
-| any | water > `PC07` (handbook 30 °C) for `PA16` (600 s) while the valve is open | **AL03**: INT blocked, DEU blocked unless `PU03 = 1`; valve "sniffing" `Pb02`/`Pb03`; clears below `PC07 − PA17` | — | [HB 7.4]; MB p.7 says the compressor stops above PC07 and restarts 2 K below |
+| any | water > `PC07` for `PA16` while the valve is open | **AL03**: INT blocked, DEU blocked unless `PU03 = 1`; valve "sniffing" `Pb02`/`Pb03`; clears below `PC07 − PA17` | — | [HB 7.4]; MB p.7 says the compressor stops above PC07 and restarts 2 K below |
 
 Notes:
 
@@ -457,16 +480,16 @@ Notes:
 
 | Request | Condition | What happens | Source |
 |---------|-----------|--------------|--------|
-| none | — | ON-standby; anti-stagnation pulses can blow cold air on brine | [HB 2.7, 3.8.7] |
+| none | — | ON-standby; anti-stagnation pulses can blow cold air on brine | [HB 2.7, 3.8.7]; the pulses are seen hourly in ON-standby [T13] |
 | INT (`PG02 = 1`) | water ≥ `PC08` | **Heating support**: compressor off, both valves open, V3V+PM open, fan runs; warms only with warm water | [HB 2.6.2, 2.7, 4.5, 6.4] |
 | INT | water < `PC08` for `PA16` | **AL04**: heating blocked, valve sniffing; clears above `PC08 + PA17`. MB: heating starts only above PC08 + 2 K | [HB 7.4; MB p.7] |
 | INT automatic | room T < `SEtH − PF12` | The unit heats by itself whenever a room temperature is available (§3.3) | [HB 6.1.2] |
-| DEU | `PU02 = 0` (factory) | No winter dehumidification | [HB 5.3 PU02; INFERRED that this also blocks DI/Modbus DEU] |
+| DEU | `PU02 = 0` | No winter dehumidification | [HB 5.3 PU02; INFERRED that this also blocks DI/Modbus DEU] |
 | DEU | `PU02 = 1` "with water" / `2` "without water" | Winter dehumidification enabled. What "with/without water" changes (V3V/PM open or not) is not described | [HB 5.3; INFERRED: unknown] |
 | any, brine circuit | — | Heating impossible; active winter DEU forbidden (coil freezing); switch the unit OFF in winter | [HB 3.8.7, 3.8.8] |
 
-* `PC08`: handbook and Modbus manual 20.0 °C, reference unit 10.0 °C [HB 5.3;
-  MB p.7; T2].
+* `PC08`: the reference unit ships with a lower value than the handbook and
+  the Modbus manual give (§15).
 * Heating has not been seen on the reference unit [`plans/todo.md`].
 
 ## 8. Display and probe configurations
@@ -486,44 +509,101 @@ Observations and consequences:
   [`MODBUS_REGISTERS.md` §14.7](MODBUS_REGISTERS.md#147-unwired-analog-inputs-read-a-sentinel-not-a-temperature).
 * Probe alarms AL28 (room T) / AL34 (room RH) are meant to fire when a
   configured source is missing [HB 7.3]. On the headless reference unit,
-  "OFF by display", none were set [T4]; whether they appear once ON is open.
-* `PU13` with no room temperature: whether the interlock vetoes a Modbus or DI
-  dehumidify request is **open** [INFERRED: unknown; `plans/todo.md`]. As
-  delivered `PU13 = 10.0 °C` (handbook 22.0) [T2].
+  "OFF by display", none were set [T4], and none appeared once the
+  unit was ON and dehumidifying [T15].
+* `PU13` with no room temperature: the interlock did not veto a Modbus dehumidify request on the
+  reference unit at its shipped `PU13` [T15]. Whether it vetoes at the
+  handbook default, or a DI request, is untested [`plans/todo.md`]. Values: §15.
 * The outdoor probe (`AI_Toutdoor`) only drives free cooling/heating, and
   only when `PG03 = 1` [HB 5.3 PG03]. Free cooling acts through a "Bypass
   Free-Cooling/Free-Heating" relay output, one of the allocatable outputs
-  [HB 5.3]; [INFERRED] that a standard HRDS+ has no such bypass wired. As
-  delivered `PG03 = 1` with no outdoor probe [T2].
+  [HB 5.3]; [INFERRED] that a standard HRDS+ has no such bypass wired. The reference unit ships with `PG03` on and no outdoor probe (§15).
 * Exhaust and discharge probes are display-only [INFERRED from HB 6, which
-  uses neither].
-* Old CNU display (`HA00 = 1/2`): the reference unit shipped with `HA00 = 2`
-  without any display [T2].
+  uses neither]. Without them the unit has no reading of the air it supplies:
+  on the reference unit 502 and 503 read the sentinel while dehumidifying, so
+  the reheat to about room temperature (§2.2) is not seen from the unit [T18].
+* Old CNU display (`HA00 = 1/2`): the reference unit shipped with the old-CNU value without any display (§15).
 
 ## 9. Fan
 
 ### 9.1 Bands and sources
 
-* Active band: DEU `PF28..PF10`, INT `PF27..PF09`; factory 50–85 % [HB 6.2;
-  MB p.7].
-* Sources: display manual request (fan screen, step `PF11`), 0–10 V
-  potentiometer, Modbus `PM20_SupplyFan_Manual`. The highest request wins; the
-  display and potentiometer requests are scaled linearly into the band
-  [HB 4.5, 6.2]. So request 0 → band minimum, not a stopped fan [INFERRED from
-  HB 6.2].
+* Active band: DEU `PF28..PF10`, INT `PF27..PF09`; defaults and shipped values in §15 [HB 6.2; MB p.7].
+* Sources: display manual request (fan screen, step `PF11`) and 0–10 V
+  potentiometer. The highest request wins [HB 4.5, 6.2].
+  * **0–10 V:** a position scaled linearly into the band, 0 V = minimum,
+    10 V = maximum [HB 4.5, 6.2]. Not tested.
+  * **Manual (display) request:** the handbook says it is scaled linearly
+    into the band too [HB 6.2]. On the headless reference unit it behaves as
+    an **absolute percentage clamped into the band**: it starts at 0, is
+    clamped up to `PF28` when the fan starts [T16, T22], follows a raised
+    `PF28` [T25] and keeps its value when `PF28` is lowered [T24, T26]. A
+    rescaled position would have followed a lowered minimum down. [INFERRED]
+    that "linear skaliert" for the display means "stepped by `PF11` between
+    minimum and maximum". **The sources disagree**; no display was tested.
+  * So with nothing else requesting, the fan does not stop on request 0: it
+    runs at the band minimum [T16, T18].
+* The Modbus map has one read-only register per request: integration
+  `FanIntegration_Request` (1112), air quality (1113), manual / display
+  (1114), time bands (1115), potentiometer (1116), each 0–100 % [MB p.14–15].
+  [INFERRED] that the output is the highest of them within the band, as
+  HB 6.2 says for manual and potentiometer. The time-band request follows the
+  setpoints `FSC`/`FSE`/`FSN` (1595–1597) only with time programs on (`PH03`)
+  [MB p.18; INFERRED from HB 5.2.4]; `PF23` (1660) is the speed forced by a
+  digital input [MB p.20].
+* **No register takes a fan-speed request from the BMS.** The "by BMS"
+  registers are on/off, DEU, INT and holiday only [MB p.5, p.14–15]. `PM20`
+  (1614) is listed R/W in the raw parameter table [MB p.18], but the
+  handbook defines it as "Einstellung der Zuluftventilator-Geschwindigkeit
+  via Display (read only)" [HB 5.3], and the Modbus fan chapter lists only
+  the bands and the read-only requests [MB p.7]. The unit sets `PM20` itself
+  [T22]. A value written to it inside the band is acknowledged and read back
+  as the unit's own value [T23], even at reads 0.5 s apart [T28]; one below
+  the band minimum is refused with exception 04 [T27]. [INFERRED] the unit
+  checks a write against the active band's limits and then keeps its own
+  request. Whether a display unit takes a Modbus write is not known.
+* What Modbus can change is the band: "Dieser Arbeitsbereich des Lüfters kann
+  in den Geräte-Einstellungen oder per Modbus individuell … konfiguriert
+  werden" [HB 4.5]. Seen on the reference unit during a DEU run:
+  * `PF28` 50 → 45: output and `PM20` stayed at 50 % [T24].
+  * `PF28` 45 → 55: output and `PM20` read 55 % in the same poll (≤ 60 s)
+    [T25].
+  * `PF28` 55 → 50: output and `PM20` stayed at 55 % [T26].
+
+  So a raised minimum pushes a running fan up; a lowered one leaves it where
+  it is. [INFERRED] from the clamp: lowering the maximum (`PF10`, `PF09`)
+  below the running speed pulls it down, and restoring the band afterwards
+  keeps the new speed until the request ends (as T26 does for the minimum).
+  Open: whether the change jumps or ramps in `PF11` steps (the polls were
+  60 s apart), whether `PF27` acts the same during INT, and whether the next
+  run starts at a changed `PF28`
+  ([`plans/fan-speed-tests.md`](../../plans/fan-speed-tests.md)).
+  `PF28`/`PF10`/`PF27`/`PF09` are EEPROM parameters (§3.6).
 * Display manual control works while no time programs are enabled (`PH03`)
   and a DEU request, or an INT request with `PF31 ≠ 0`, is active [HB 6.2]. `PF31 = 0`: INT fan follows the
   room temperature (`PF12`, `PF13`) [HB 5.3 PF31].
-* Whether `PM20` is scaled into the band (rescale), clipped to it (clamp) or
-  absolute is **open**; to command an absolute value, set the band to 0–100
-  [INFERRED; `plans/todo.md`]. One user could not get the fan below 30 %
-  [F#77].
+* One user could not get the fan below 30 % [F#77].
 * `PF07..PF08` ("VMC" band) bounds the post-run speed `PF26` [HB 5.3 PF26]. The
   HRDS+ has no ventilation-only mode with its fan [HB 2.7]; [INFERRED] that
   `PF07/PF08` matter only for run-on.
 * Read-backs: `outAO_SupplyFan` (actual output), `actRPMsupplyFan`,
   `SupplyFan_ManualRequest` (display's request), `SupplyFan_RemoteRequest`
-  (potentiometer) [MB p.7, p.8, p.15].
+  (potentiometer) [MB p.7, p.8, p.15]. On the reference unit `outAO_SupplyFan`
+  followed the fan (50 % while it ran) [T16]. Only `outAO_SupplyFan` is the
+  speed the fan gets: the fan screen, and so `PM20`/1114, is not changed by
+  the potentiometer request [HB 6.2]. Whether 1116 holds the raw 0–10 V
+  percentage or the value scaled into the band is open [INFERRED].
+* `actRPMsupplyFan` needs a tachometer signal on an input: input function 45
+  ("AI: Return/room temp. / DI: Tachometer signal supply fan") or 46 (return
+  fan) [HB 5.3, input functions]. No input of the reference unit is allocated
+  to either [T21], and 1117 read 0 with the fan running [T16, T18]: the 0 is
+  the unit's value, not a wrong read. The speed-sensor alarm (`PA23..PA25`)
+  can then not act either [INFERRED].
+* The unit writes the manual request itself: `PM20` and the display request
+  went from 0 to `PF28` (50 %) in the poll in which the fan started and back
+  to 0 when the request ended, with no write from the BMS [T16, T22], and
+  followed a raised `PF28` [T25]. A value written to `PM20` had no effect
+  [T23] and never showed in a read [T28].
 
 ### 9.2 Timing
 
@@ -537,7 +617,8 @@ Observations and consequences:
 ### 9.3 Recirculation is coupled to every request (`R` variant)
 
 * Every DEU and INT request opens the damper and runs the fan; only OFF /
-  ON-standby has the damper closed [HB 2.7, 6.5].
+  ON-standby has the damper closed [HB 2.7, 6.5]. Seen for DEU on the
+  reference unit [T11]; INT is untested.
 * "Ohne Umluft" is the hardware variant, not an operating mode [HB 2.1, 2.8,
   3.7.2].
 * Vendor: "whenever the compressor runs, recirculation is active" [V#44];
@@ -545,6 +626,12 @@ Observations and consequences:
   valve, damper and VMC, then fan after a delay, then compressor [V#76];
   setting the fan to 0 does not help, the damper opens anyway [V#78].
 * No register selects "dehumidify without recirculation" [MB].
+* No single register reports "recirculating": recirculation is the damper
+  output (1134) on with the fan running. `FanIntegration_Request` (1112)
+  stayed 0 throughout two recirculating dehumidify runs [T16, T18].
+* When the fan started, the MVHR's constant-flow supply dropped from 163 to
+  115 m³/h for about a minute and then recovered [T18]: the running
+  recirculation fan changes the pressure in the MVHR supply duct.
 * Field reports (unofficial, not tried here) [F#77–#79, #93]:
   * Disabling the fan output (AO4) or the damper output (DO1) stops the
     compressor from starting.
@@ -589,6 +676,15 @@ refrigerant circuit works on MVHR flow alone follows from the design
   compressor via AL11 [HB 6.3].
 * Status values Disabled / Alarm / Manual / OFF / Wait ON / Wait OFF / ON
   [HB 6.3]. Read back `CmpStatus` and `outAO_Cmp` [MB p.8, p.9].
+* Seen on the reference unit [T12]: output 15.7 %, then 32.8 %, then 44.0 %
+  (about the `PE28` step against `PE27`); the evaporator fell from 18 °C to
+  −3.1 °C in two polls; the output then stepped down about 6 % per minute
+  (the handbook's `PE08`/`PE09` defaults are 1 % every 10 s) and the evaporator
+  settled on `PU11` a few minutes later at about 25 % output. AL11 stayed
+  clear. The MVHR supplied about 100 m³/h on its lowest preset throughout.
+  In the second run, with the MVHR at 140 to 163 m³/h, the same start dipped
+  further, to −9.6 °C, and settled on `PU11` at 27 % within 6 minutes [T18]: the
+  dip is the start transient, not too little airflow.
 
 ## 11. Water circuit
 
@@ -604,30 +700,35 @@ refrigerant circuit works on MVHR flow alone follows from the design
   "deactivated". The Modbus manual annotates those `Packed_DO1` bits
   "0 = Integration, 1 = Dehumidify" [MB p.8]. Reading: `1` means the
   dehumidify/open position, which is also the standby position [INFERRED].
-  Not yet read while cooling [`plans/todo.md`].
+  It read 1 as well while dehumidifying with the compressor on [T11], as
+  expected for the open position. Not yet read while cooling [`plans/todo.md`].
 
 ### 11.2 External valve V3V and pump PM (relay K5)
 
 * Open (one output) on a summer DEU/INT request and a winter INT request
   [HB 6.4, 4.5]. Not opened in standby except the anti-stagnation pulses
-  [HB 2.7].
+  [HB 2.7]. Seen opening with a summer DEU request [T11] and as the periodic
+  pulses [T13].
 * Run-on `Pb01` after the request ends [HB 6.4].
 * A pump wired to `PM` starts with a request and the 1126 read-back follows
   [T10].
 * Closed immediately on a blocking alarm [HB 6.4].
 * Not configured (output disabled) means the unit cannot drive a pump
-  [MB p.15 "Disable"; INFERRED consequence]. As delivered `HD05 = 12` (water
-  valve) [T2].
+  [MB p.15 "Disable"; INFERRED consequence]. The reference unit ships with `HD05` allocating the water valve (§15).
 
 ### 11.3 Anti-stagnation and sniffing
 
-* General anti-stagnation: always enabled; after the valve closes, wait `Pb08`
-  (hours) then open for `Pb07` (seconds); also one cycle of `Pb07` when the
-  unit is switched on [HB 6.4].
-* Whether it also runs while the unit is OFF: HB 2.7 lists it under ON; HB 4.5
-  says the outputs pulse "independent of operation"; HB 3.8.7 recommends OFF
-  to avoid the cold bursts on brine — **sources unclear**; the OFF advice
-  suggests OFF stops it [INFERRED].
+* General anti-stagnation: always enabled; after the valve closes, wait `Pb08` (minutes, as the handbook's parameter table gives it) then open
+  for `Pb07` (seconds); also one cycle of `Pb07` when the unit is switched on
+  [HB 6.4]. Seen with the shipped `Pb07`/`Pb08`: valve and pump open for about a
+  minute, stay shut for the `Pb08` wait counted from the valve closing, and
+  repeat, while the unit is ON-standby; the switch-on pulse is a little longer
+  [T13]. After a request the first pulse came about 2 hours after the valve
+  closed, then hourly again [T20]; why is open [`plans/todo.md`].
+* While the unit is OFF there is no pulse: none in 8.5 hours of `off_by_bms`,
+  while the same unit pulsed hourly when ON [T14]. That agrees with HB 2.7
+  (lists it under ON) and HB 3.8.7 (recommends OFF to avoid cold bursts on
+  brine), not with the wording "independent of operation" in HB 4.5.
 * Sniffing on AL03 (summer) / AL04 (winter): wait `Pb03`, open `Pb02`, repeat
   until the alarm clears during an open phase [HB 6.4].
 
@@ -635,14 +736,21 @@ refrigerant circuit works on MVHR flow alone follows from the design
 
 | Threshold | Effect | Source |
 |-----------|--------|--------|
-| `PA43` (3.0 °C) for `PA42`, clear at `PA43 + PA44` | AL16, fan off | [HB 7.4] |
-| `PU08` (10.0 °C), summer | Below: no compressor (passive path) | [HB 6.3] |
-| `PC08` (HB 20.0, ref. unit 10.0 °C), winter | Below for `PA16`: AL04, heating blocked | [HB 7.4; T2] |
-| `PC07` (30.0 °C), summer | Above for `PA16`: AL03, INT (and DEU unless `PU03`) blocked | [HB 7.4] |
+| `PA43` for `PA42`, clear at `PA43 + PA44` | AL16, fan off | [HB 7.4] |
+| `PU08`, summer | Below: no compressor (passive path) | [HB 6.3] |
+| `PC08`, winter | Below for `PA16`: AL04, heating blocked | [HB 7.4] |
+| `PC07`, summer | Above for `PA16`: AL03, INT (and DEU unless `PU03`) blocked | [HB 7.4] |
 
-The water probe reads the water in the unit: with V3V closed it shows the
-standing water, not the circuit [INFERRED; the reference unit read 18.7 °C in
-standby, T3].
+The water probe reads the water at the unit. With V3V + PM closed that is the
+brine standing in the pipe, which warms up while nothing flows; once V3V + PM
+open it falls to the circuit's temperature within about two minutes (T17;
+18.7 °C standing in T3). A comparison against `PU08`, `PC07`, `PC08` or `PA43`
+right at a request start therefore sees the standing value first. Whether the
+unit decides on that first reading is open [`plans/todo.md`]. With no flow the
+probe also follows the air through the unit (it rose 16.6 → 18.1 °C with the
+evaporator probe when warmer MVHR air arrived), and it did not rise when the
+compressor started [T18]: it reads the water before the condenser, so it
+cannot show the condenser heat [INFERRED from T18].
 
 ## 12. Alarms and what they do to the flow
 
@@ -652,7 +760,7 @@ Codes, bit positions and reset registers:
 
 | Alarm | Trigger | Effect on the flow | Reset |
 |-------|---------|--------------------|-------|
-| AL02 | Room RH > `PA19`, or `DEU` input longer than `PA58`, for longer than `PA21` | `PA57 = 0` (factory): display only. `PA57 = 1`: unit stops | Power cycle; display-only also when the DEU demand is satisfied; blocking after `PA60` |
+| AL02 | Room RH > `PA19`, or `DEU` input longer than `PA58`, for longer than `PA21` | `PA57 = 0`: display only. `PA57 = 1`: unit stops | Power cycle; display-only also when the DEU demand is satisfied; blocking after `PA60` |
 | AL03 | Summer, valve active with a request, water > `PC07` for `PA16` | INT blocked, DEU blocked unless `PU03 = 1`, sniffing | Water < `PC07 − PA17` |
 | AL04 | Winter INT, valve active, water < `PC08` for `PA16` | Heating blocked, sniffing | Water > `PC08 + PA17` |
 | AL11 | Low-pressure switch or frost thermostat for `PA31` (bypassed `PA30` after a start); also if active when a start is requested | Compressor stops / does not start | Auto; manual after `PA32` events per hour |
@@ -667,7 +775,9 @@ Codes, bit positions and reset registers:
 * A blocking alarm closes the damper and the external valve at once [HB 6.4,
   6.5].
 * Alarms are visible while the unit is OFF [HB 7.3].
-* No alarm bits were set on the reference unit as delivered [T4].
+* No alarm bits were set on the reference unit as delivered [T4], nor during
+  the first dehumidify run, including AL11 at the −3.1 °C evaporator reading
+  [T12, T15], nor at −9.6 °C in the second [T18].
 
 ---
 
@@ -681,7 +791,7 @@ probes). "Dump" means
 | # | Date | What | Source |
 |---|------|------|--------|
 | T1 | 2026-10 | FC 43/14 identity (basic, regular, extended): `EVCO` / `EPB9ORSINDEU` / `V01.00.09.02`; all four status registers hold documented enum values | dump |
-| T2 | 2026-10 | As-delivered settings: see [§15](#15-as-delivered-settings-vs-handbook-defaults). Unit status `off_by_display` (with `PH01 = 1`, no display) | dump |
+| T2 | 2026-10 | As-delivered settings: see [§15](#15-parameters-source-default-and-shipped-value). Unit status `off_by_display` (with `PH01 = 1`, no display) | dump |
 | T3 | 2026-10 | Unwired analog inputs 499, 500, 502–506, 508–510, 512 read `0x8004`; 507 reads `0x7FFA`; water (501) 18.7 °C and evaporator (511) 16.8 °C read real values; inputs 513–519 read 0 (unidentified) | dump |
 | T4 | 2026-10 | No alarm bits set (768/769/770 = 0, `OR_Alarms` = 0) while OFF by display with no probes | dump |
 | T5 | 2026-10 | `R` unit: `PG01 = 0`; damper output 1134 = 0 (off); fan status OFF; compressor status OFF; 1112 = 0; K5 (1126) = 0; **K4 (1124) = 1** and `Packed_DO1` bits 12–13 = 1 in standby | dump |
@@ -690,11 +800,30 @@ probes). "Dump" means
 | T8 | 2026-10-21 | OFF written to `Status_OnOff_byBMS`: register read ON for several polls; register and `sm_UnitStatus` changed together at one later poll | PR #32 |
 | T9 | 2026-10-20 | Through the RS-485→TCP gateway a 120-register read got no reply at all; 10-register reads covered the whole map | PR #28 |
 | T10 | 2026-10-22 | A pump on the `PM` output ran when the unit started a request; the water valve/pump read-back (1126) followed. Run-on `Pb01` and the OFF edge not logged | owner |
+| T11 | 2026-10-22 | First Modbus dehumidify (DEU) request, written 07:03:53. `DehumRequest`, damper (1134) and V3V + PM (1126) on within 28 s; fan on 32 to 120 s after the damper; compressor on 6.5 to 8 min after the request and 5 to 7 min after the fan; fan output 50 %, `SupplyFan_Status` on, K4 (1124) = 1 | [run file](../../tests/devices/runs/hrds_30+_first_dehumidify_run_2026-10-22.json) |
+| T12 | 2026-10-22 | Compressor and evaporator in that run: output 15.7, 32.8, 44.0 %, evaporator 18.2, 5.6, −3.1 °C in three polls; then output stepping down about 6 % per minute and the evaporator back on 6.1 °C at 25 % a few minutes later; MVHR about 100 m³/h | [run file](../../tests/devices/runs/hrds_30+_first_dehumidify_run_2026-10-22.json) |
+| T13 | 2026-10-21/22 | Anti-stagnation: V3V + PM open about 1 min, shut 60 min (counted from closing), repeat: 22 periodic pulses from 09:33 to 06:56 while ON-standby; one longer pulse (92 s, 96 s) at each Modbus ON | HA history |
+| T14 | 2026-10-21 | Modbus OFF at 00:03 read `off_by_bms`; no V3V + PM pulse in the 8.5 h until the next Modbus ON at 08:31 | HA history |
+| T15 | 2026-10-22 | In the dehumidify run, with no room probe: the compressor started (`PU13` as shipped did not veto), no alarm bit set (AL11, AL28, AL34, AL03, AL04, AL16 clear, alarm flag off) | [run file](../../tests/devices/runs/hrds_30+_first_dehumidify_run_2026-10-22.json) |
+| T16 | 2026-10-22 | The fan was running (confirmed by the owner) while `actRPMsupplyFan` (1117) read 0 before and during; `outAO_SupplyFan` 50 %; `FanIntegration_Request` (1112) stayed 0 with fan and damper on; `PM20` (1614) and the display request (1114) went 0 to 50 % in the poll in which the fan started | [run file](../../tests/devices/runs/hrds_30+_first_dehumidify_run_2026-10-22.json) |
+| T17 | 2026-10-22 | Water probe: 21.9 °C standing at 06:50; 19.8 then 17.4 °C right after the 06:57 pulse, creeping back up to 18.3 °C by the request; 14.8 °C two polls after V3V + PM opened, 14.3 to 15.3 °C while flowing. The owner confirms the brine stands in the pipe and warms up | [run file](../../tests/devices/runs/hrds_30+_first_dehumidify_run_2026-10-22.json) |
+| T18 | 2026-10-23 | Second DEU run, MVHR at 140 to 163 m³/h: fan on 29 to 89 s after the request, compressor 6.4 to 7.4 min after it; evaporator 6.2, −9.6, −6.7, 1.2, 4.7, 6.5 °C, then 6.3 to 6.7 °C at 27 %, no alarm; 1117 = 0, 1112 = 0, K4 (1124) = 1, 502/503 unknown; water probe 16.6 → 18.1 °C with no flow as warmer MVHR air arrived, 17.9 → 16.4 °C after the compressor started; MVHR supply flow 163 → 115 m³/h in the minute the fan started, back to 141 and 157 m³/h | [run file](../../tests/devices/runs/hrds_30+_dehumidify_run_2026-10-23.json) |
+| T19 | 2026-10-22 | DEU stop, request cleared 07:36:57: `CmpStatus` Wait OFF at 07:37:26; at 07:37:58 compressor off, V3V + PM (1126) off, damper (1134) off, fan Wait OFF at 40 %; fan off at 07:38:53 | [run file](../../tests/devices/runs/hrds_30+_dehumidify_run_2026-10-23.json) |
+| T20 | 2026-10-22 | After that stop (valve closed by 07:37:58) the first anti-stagnation pulse came at 09:39:57, then 10:40:53, 11:41:54 (hourly), unit ON throughout | HA history |
+| T21 | 2026-10 | No input allocated to the fan tachometer (functions 45/46): `HA01` = 58, `HA02` = `HA03` = 0, `HA04` = 52, `HA05` = 47, `HA06` = 6, `HA07` = 8, `HA08..HA18` = 0, `HB01` = 27, `HB02` = 26, `HB03` = 2, `HB04` = 4, `HB05..HB07` = 0. Read again on the running unit on 2026-10-23 (fan on at 50 %): the same allocations, 1117 = 0 | dump; `diagnose_hrds.py` 2026-10-23 |
+| T22 | 2026-10-22/23 | `PM20` (1614) and the display request (1114) 0 → 50 % when the fan started (both runs) and 50 → 0 % at the stop (07:37:58), with no write from Home Assistant to 1614. Again on 2026-10-23: 0 at the end of a request (11:29:56), 50 at the next fan start (11:43:12) | [run file](../../tests/devices/runs/hrds_30+_dehumidify_run_2026-10-23.json), [band run file](../../tests/devices/runs/hrds_30+_fan_band_2026-10-23.json) |
+| T23 | 2026-10-23 | Fan speeds inside the band (`PF28..PF10` = 50–85 %: 60, 55 %) written to `PM20` (1614) during the DEU run from 11:43, before the band changes of T24–T26: the unit acknowledged the writes; none had any effect, the read-back stayed at 50 % (= `PF28`) | owner; Home Assistant log |
+| T27 | 2026-10-23 | `PM20` writes below the band minimum (`PF28` = 50 %) during DEU runs were refused with Modbus exception 04 (FC 06 → 0x86): 40 % eleven times 11:28:38–11:29:05 (run from 10:44), 45 % at 11:52:15 (run from 11:43) | Home Assistant log |
+| T28 | 2026-10-23 | During the run from 11:43, `diagnose_hrds.py --watch` reading 1614, 1114 and 639 every 0.5 s while 60, 55, 50 and 45 % were written to `PM20`: no change of 1614, 1114 or 639 was seen (50 needed no write, 45 was refused, T27) | owner, watch output |
+| T29 | 2026-10-23 | Hour counters count whole hours: `PM01` (1604) 0 → 1 and `PM04` (1610) 0 → 1 at 11:59 after about 1.6 h of fan and 1.1 h of compressor run time since the factory dump (Home Assistant history of 1119 / 1122). At ×0.1 h they would read about 16 and 11. Again at 20:21: `PM01` = 7 and `PM04` = 6 after about 7.1 h of fan and 6.1 h of compressor (nothing ran after 17:27). The odd neighbours 1603, 1605, 1609, 1611 read 0 in both dumps, so the counters are single 16-bit words. `PM00`/`PM03` read 20000, the handbook's "2000.0, Hours x10", so the display shows raw ÷ 10 in units of 10 h | dumps (factory, 2026-10-23 11:59 and 20:21); HA history |
+| T24 | 2026-10-23 | DEU run from 11:43:12 (compressor on 11:49:15), fan at 50 %. `PF28` 50 → 45 at 11:58:37: `outAO_SupplyFan` (639) and `PM20` stayed at 50 %. (`PF27` 50 → 45 → 50 at 11:58:22 / 11:58:53 does not apply to DEU) | [band run file](../../tests/devices/runs/hrds_30+_fan_band_2026-10-23.json) |
+| T25 | 2026-10-23 | Same run, `PF28` 45 → 55 at 12:57:03: 639 and `PM20` read 55 % in the same poll | [band run file](../../tests/devices/runs/hrds_30+_fan_band_2026-10-23.json) |
+| T26 | 2026-10-23 | Same run, later, `PF28` 55 → 50: 639 and `PM20` stayed at 55 % | owner; [band run file](../../tests/devices/runs/hrds_30+_fan_band_2026-10-23.json) |
 
-Not yet observed on hardware (everything else in this file): a running DEU or
-INT cycle with recorded fan/damper/compressor/valve read-backs, the passive
-cold-water path, winter operation, `HB04` season writes, `PM20` vs fan output,
-any display or probe configuration, the HRDS+ 50 and non-`R` units. The test
+Not yet observed on hardware (everything else in this file): the stop sequence
+of a DEU cycle at better than 1-minute resolution, an INT cycle, the passive cold-water path, winter operation,
+`HB04` season writes, a lowered band maximum (`PF10`) during a run, any display or probe
+configuration, the HRDS+ 50 and non-`R` units. The test
 plans are in [`plans/todo.md`](../../plans/todo.md). When a test is done, add a
 `T` row here and replace the `[INFERRED]` tag where it applies.
 
@@ -724,9 +853,9 @@ write recipes are in
 | Cool (summer) / heat (winter) | Automatic from T vs target [HB 5.2.3] | `INT` contact [HB 4.5] | `Status_Integ_byBMS`, needs `PH27 = 1` and `PG02 = 1` | §3.3, §6, §7 |
 | Target humidity | Humidity screen, OK, ↑/↓ [HB 5.2.3] | — | `PU01` | Clamped `PH29..PH30`; only effective with display or probe [MB p.6] |
 | Target temperature | Temperature screen [HB 5.2.3] | — | `SEtC` / `SEtH` | Clamped `PH07..PH08` / `PH09..PH10` (§3.4) |
-| Fan speed | Fan screen, hold ↑/↓ 2 s while the fan runs [HB 5.2.3] | `FAN` 0–10 V [HB 4.5] | `PM20_SupplyFan_Manual`; band `PF27/PF28`–`PF09/PF10` | Highest request wins; scaling of `PM20` open (§9.1) |
+| Fan speed | Fan screen, hold ↑/↓ 2 s while the fan runs [HB 5.2.3] | `FAN` 0–10 V [HB 4.5] | No request register; only the band `PF27/PF28`–`PF09/PF10` [HB 4.5; MB p.7]: a raised minimum raises a running fan, a lowered one does not lower it [T24–T26]. `PM20` mirrors the manual request; writing it has no effect, outside the band it is refused [T23, T27, T28] | Highest request wins; 0–10 V scaled into the band, the manual request clamped into it (§9.1) |
 | Reset an alarm | Alarm menu, hold OK 3 s [HB 5.2.4] | — | Reset registers (AL11/AL12/AL18) [MB p.10] | Only when the cause is gone [HB 5.2.4] |
-| Reset filter alarm AL22 | Alarm menu or counters menu (fan hours → 0) [HB 7.4] | — | Write 0 to `PM01` [MB p.9] | Fan hours count in h×10 [HB 5.2.4; MB p.9] |
+| Reset filter alarm AL22 | Alarm menu or counters menu (fan hours → 0) [HB 7.4] | — | Write 0 to `PM01` [MB p.9] | The registers count whole hours; the display shows them ÷ 10 as "Hours x10" [T29; HB 5.3] |
 | Time programs | Time program menu; disabled as delivered [HB 5.2.4] | — | `PH03` | Can hold the unit OFF and block the compressor (§3.1, §10) |
 | Clock | `CLOCK` line [HB 5.2.4] | — | — | Lost after a long power cut → AL26 [HB 5.2.4] |
 | Modbus address / baud / parity / stop bits | Installer menu → MODBUS (installer password) [MB p.11] | — | Listed R/W, but only configurable at the display or service software [MB p.5] | Power-cycle after a change [MB p.11] |
@@ -751,29 +880,52 @@ What each setting does is in the sections above; this table is the lookup.
 | `Pb01`, `Pb02`, `Pb03`, `Pb07`, `Pb08` | Valve run-on, sniffing, anti-stagnation | §11 |
 | `HC03`, `HC04`, `HD01`, `HD05` | Which output drives fan, damper, water valve | §9.3, §11.2 |
 
-## 15. As-delivered settings vs handbook defaults
+## 15. Parameters: source, default and shipped value
 
-The reference unit did not ship with the handbook's factory values [T2]. The
-distributor presumably pre-configures units [INFERRED]. Do not assume the
-handbook default on a real unit; read it.
+The behaviour sections cite parameters by code only. This is the lookup. *Defined
+in* names the handbook parameter table (`HB 5.3`) and the section that says what
+the parameter does. *Shipped* is what the reference unit held in the factory dump
+[T2]. Scaling is already applied (the dump holds raw registers).
 
-| Setting | Handbook default | Reference unit as delivered | Effect |
-|---------|------------------|-----------------------------|--------|
-| `HA00` | 6 (CNU2 T+H) [HB 5.3; MB p.5] | 2 (old CNU T+H) | Expects a display that is not there |
-| `PH01` / `PH02` | 1 / 0 [HB 5.3] | 1 / 0 | OFF by display |
-| `PH27` / `PH28` | 1 / 1 [MB p.5] | 1 / 1 | — |
-| `PG03` | 0 [HB 5.3] | 1 | Free cooling enabled without an outdoor probe |
-| `PU07` | 5 % [HB 5.3] | 3 % | Narrower DEU hysteresis |
-| `PU13` | 22.0 °C [HB 5.3, 7.2] | 10.0 °C | DEU allowed down to 10 °C room T |
-| `PC08` | 20.0 °C [HB 5.3; MB p.7] | 10.0 °C | Winter heating with cooler water |
-| `PS01` | 20 s [HB 5.3] | 90 s | Fan starts 90 s after the damper |
-| `PE04` | 120 s [HB 5.3] | 180 s | Longer fan → compressor delay |
-| `Pb01` | 255 s [HB 5.3] | 30 s | Shorter valve run-on |
-| `Pb08` | 99 h [HB 5.3] | 60 h | More frequent anti-stagnation |
-| `PF01` / `PF03` | 10 / 0 s [HB 5.3] | 60 / 30 s | Longer fan minimum run and a run-on |
-| `PH07` / `PH08` | 14.0 / 28.0 °C [HB 5.3] | 28.0 / 28.0 °C | `SEtC` pinned to 28.0 °C (`Actual_Setpoint` read 28.0) |
-| `PH09` / `PH10` | 14.0 / 14.0 °C [HB 5.3] | 14.0 / 14.0 °C | `SEtH` pinned to 14.0 °C |
-| `PH29` / `PH30` | — | 55 / 65 % | `PU01` limited to 55–65 % |
-| `PU05`, `PU08`, `PU09`, `PU10`, `PC07`, `PA43` | 1, 10.0, 1, 120, 30.0, 3.0 [HB 5.3] | same | — |
-| `PF27`/`PF28`, `PF09`/`PF10` | 50 / 85 % [HB 5.3] | same | — |
-| `PC11`, `PC12`, `PH03`, `PA57`, `PU02`, `PU03` | 0 [HB 5.3] | same | — |
+The reference unit did not ship with the handbook's values everywhere. The
+distributor presumably pre-configures units [INFERRED]. Do not assume the handbook
+default on a real unit; read it. Where behaviour could be checked (§13) it
+followed the handbook with the shipped value (`PS01`, `Pb07`/`Pb08`, `PF28`,
+`PU11`); the compressor start delay is not yet explained (§4.3).
+
+| Setting | Defined in | Handbook default | Shipped | Effect of the difference |
+|---------|------------|------------------|---------|--------------------------|
+| `HA00` | HB 5.3, MB p.5 | 6 (CNU2 T+H) | 2 (old CNU T+H) | Expects a display that is not there |
+| `PH01` / `PH02` | HB 5.3, MB p.5 | 1 / 0 | 1 / 0 | OFF by display; the BMS on/off write is ignored |
+| `PH27` / `PH28` | MB p.5 | 1 / 1 | 1 / 1 | — |
+| `PG03` | HB 5.3 | 0 | 1 | Free cooling enabled without an outdoor probe |
+| `PC05` | HB 5.3, 3.2 | 0 (manual) | 0 | — |
+| `HB04` | MB p.6, HB 4.5 | not checked | 4 (contact normally open, open = summer) | Season reads summer with the `E/I` terminal open |
+| `PC09` / `PC10` | HB 5.3 | 20.0 / 10.0 °C | 20.0 / 10.0 °C | — |
+| `PC11`, `PC12`, `PH03`, `PA57`, `PU02`, `PU03` | HB 5.3 | 0 | 0 | — |
+| `PH07` / `PH08` | HB 5.3 | 14.0 / 28.0 °C | 28.0 / 28.0 °C | `SEtC` pinned to 28.0 °C (`Actual_Setpoint` read 28.0) |
+| `PH09` / `PH10` | HB 5.3 | 14.0 / 14.0 °C | 14.0 / 14.0 °C | `SEtH` pinned to 14.0 °C |
+| `PH29` / `PH30` | HB 5.3 | 0 / 100 % | 55 / 65 % | `PU01` limited to 55–65 % |
+| `PU05` | HB 5.3, 6.1.1 | 1 (yes) | 1 | — |
+| `PU07` | HB 5.3, 6.1.1 | 5 % | 3 % | Narrower DEU hysteresis |
+| `PU08` / `PU09` / `PU10` | HB 5.3, 6.3 | 10.0 °C / 1 / 120 min | same | — |
+| `PU11` | HB 5.3, 6.3 | 6.0 °C | 6.0 °C | — |
+| `PU12` | HB 5.3, 6.3 | 1.0 °C | 1.5 °C | Wider evaporator dead band |
+| `PU13` | HB 5.3, 6.1.1 (7.2) | 22.0 °C | 10.0 °C | DEU allowed down to 10 °C room T |
+| `PC07` | HB 5.3, 7.4 | 30.0 °C | 30.0 °C | — |
+| `PC08` | HB 5.3, 7.4; MB p.7 | 20.0 °C | 10.0 °C | Winter heating with cooler water |
+| `PA16` | HB 5.3, 7.4 | 600 s | 900 s | AL03/AL04 take longer to raise |
+| `PA17` | HB 5.3, 7.4 | 2.0 °C | 2.0 °C | — |
+| `PA30` / `PA31` | HB 5.3, 7.4 | 120 / 30 s | same | — |
+| `PA42` / `PA43` / `PA44` | HB 5.3, 7.4 | 5 s / 3.0 °C / 2.0 °C | same | — |
+| `PS01` | HB 5.3, 6.2 | 20 s | 90 s | Fan starts 90 s after the damper opens |
+| `PE01` / `PE02` / `PE03` | HB 5.3, 6.3 | 300 / 20 / 420 s | same | — |
+| `PE04` | HB 5.3, 6.3 | 120 s | 180 s | Longer fan to compressor delay (not what held the first start, T11) |
+| `PE28` / `PE30` | HB 5.3, 6.3 | 52 rps / 60 s | same | — |
+| `PF01` / `PF03` | HB 5.3, 6.2 | 10 / 0 s | 60 / 30 s | Longer fan minimum run and a run-on |
+| `PF26` | HB 5.3, 6.2 | 40 % | 40 % | — |
+| `PF27` / `PF28`, `PF09` / `PF10` | HB 5.3, 6.2 | 50 / 50 %, 85 / 85 % | same | — |
+| `Pb01` | HB 5.3, 6.4 | 255 s | 30 s | Shorter valve run-on |
+| `Pb02` / `Pb03` | HB 5.3, 6.4 | 60 s / 3 min | 360 s / 3 min | Longer valve opening in each sniffing step |
+| `Pb07` / `Pb08` | HB 5.3, 6.4 | 60 s / 99 min | 60 s / 60 min | Pulse every 61 min instead of every 100 min (`Pb08` is minutes in the handbook's parameter table) |
+| `HD05` | HB 5.3 | not checked | water valve | Water valve allocated to its output |

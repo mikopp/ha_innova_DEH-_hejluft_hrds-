@@ -687,8 +687,7 @@ external probes to be present, otherwise the unit ignores them.
   with no request): watch **Supply fan status = Off**.
 * **Every Dry or Cool request on an `R` unit opens the recirculation damper
   and runs the fan** (damper first, fan after the pre-start time, then the
-  compressor). **Recirculation active**, **Supply fan output %** and **Supply
-  fan speed (RPM)** show it.
+  compressor). **Recirculation damper** and **Supply fan output %** show it.
 * Fan mode "off" (a write of 0 to PM20) therefore does **not** give
   dehumidifying on passive airflow on an `R` unit; the unit may floor the fan
   at its band minimum. Only a non-`R` unit (no fan, no damper) dehumidifies on

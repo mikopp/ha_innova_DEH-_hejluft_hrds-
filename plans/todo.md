@@ -17,10 +17,13 @@ evidence log, replace the `[INFERRED]` tags it settles, and fix the code/docs.
       Verify sign handling on outdoor/water temps below 0 °C.
 - [ ] **Humidity is integer %RH (no scale)** on both the room probe (505) and the
       setpoint (1586). Confirm no ×0.1.
-- [ ] **`recirculation_active` (reg 1112) is a 0/1 flag**, not a 0–100 %
-      value. It sits next to the 0–100 % fan-request registers; if hardware shows
-      a percentage, change it from a binary sensor to a `sensor` with
-      `FAKTOR: 0.01`. (See `const.py` `C_RECIRCULATION_ACTIVE`.)
+- [x] **`recirculation_active` (reg 1112) is a 0/1 flag**, not a 0–100 %
+      value. No: the Modbus manual's full map gives `FanIntegration_Request`
+      the range 0.00–100.00 like the fan requests 1113–1116 next to it
+      [MB p.14], so it is a fan request in % (`MODBUS_REGISTERS.md` §6). It
+      stayed 0 through two recirculating DEU runs (T16, T18). The entity PR
+      shows it as a % sensor. Still to see on hardware: a non-zero value during
+      an INT run ([`fan-speed-tests.md`](fan-speed-tests.md) test E).
 - [ ] **Air quality (506)** unit/scale and whether the probe is even fitted.
       The device class is now left unset: `AQI` accepts only a `None` unit in
       Home Assistant, so pairing it with "ppm" was invalid. If the probe turns
@@ -62,6 +65,9 @@ evidence log, replace the `[INFERRED]` tags it settles, and fix the code/docs.
       with no room probe, confirm whether a Modbus request still starts the
       compressor, and whether setting PU13 to 0 lifts the interlock. This is the
       most likely cause of "the write was accepted but nothing happened".
+      Update 2026-10-22: at the shipped `PU13` (10 °C) a Modbus dehumidify request
+      started the compressor with no room probe, so no veto there. Open: at the
+      handbook default (22 °C), and for a DI request.
 
 ## Request read-back lag (added 2026-10-21)
 
@@ -72,6 +78,89 @@ evidence log, replace the `[INFERRED]` tags it settles, and fix the code/docs.
       With debug logging for `custom_components.innova_hrds`, the line
       "HRDS+ confirmed <key>=<value> after N s" gives the real lag: size the
       schedule from it (and check whether OFF and ON lag alike).
+      Data point 2026-10-22: a dehumidify request (1140) showed in `DehumRequest`
+      (1121) within 28 s, so the lag differs between registers.
+
+## First dehumidify run, 2026-10-22 (open points)
+
+A Modbus dehumidify (DEU) request on the headless HRDS+ 30 R worked: damper, fan,
+compressor and water valve came on in order, the evaporator settled on its
+setpoint, no alarm. A second run followed on 2026-10-23. Data:
+`tests/devices/runs/hrds_30+_first_dehumidify_run_2026-10-22.json` and
+`tests/devices/runs/hrds_30+_dehumidify_run_2026-10-23.json`; evidence T11–T22
+in `doc/references/UNIT_BEHAVIOUR.md` §13. What they left open:
+
+- [x] **Fan RPM (1117) reads 0 with the fan running.** Answered 2026-10-23: the
+      speed needs an input allocated to the tachometer (input function 45/46),
+      and none is (T21); the 0 is the unit's value, not a wrong read
+      (`UNIT_BEHAVIOUR.md` §9.1). The fan's running is confirmed by the owner
+      and by the MVHR flow dip at its start (T18). `diagnose_hrds.py` now prints
+      the tachometer allocation in its snapshot; one read of the running unit
+      confirms the dump. Whether the fan's tachometer wire could be connected to
+      a free input is an installer question. Integration side: show the speed
+      only when an input is allocated (entity PR).
+- [ ] **What is 1112 (`FanIntegration_Request`)?** It stayed 0 through two
+      recirculating DEU runs (T16, T18), so it is neither "fan running" nor
+      "recirculating". The Modbus map makes it a 0–100 % fan request (see the
+      scaling item above). Hypothesis: the request of the INT fan control
+      (`PF31`, `PF12`/`PF13`), non-zero only during an INT request. Read it
+      during the first INT run ([`fan-speed-tests.md`](fan-speed-tests.md)
+      test E). Integration side: derive `recirculation_active` from the
+      damper (1134) and fan status (1119) and show 1112 under its own name
+      (entity PR).
+- [x] **Who wrote `PM20` (1614) and the display request (1114)?** The unit: both
+      went 0 → 50 % at the fan start of both runs and 50 → 0 at the stop, with no
+      write from Home Assistant (T22). So `commanded_percent` and
+      `number.manual_fan_speed` show the unit's value, a percentage written while
+      idle is overwritten at the next start, and the rescale/clamp sweep below
+      has to write `PM20` while a request runs. Open: does a `PM20` written
+      during a request hold until its end? **No** (T23, 2026-10-23): a value
+      inside the band written during a run was acknowledged and read back as
+      50 %. How fast the unit overwrites it: [`fan-speed-tests.md`](fan-speed-tests.md)
+      test C. Seen again on 2026-10-23: 0 at the end of a request (11:29:56),
+      50 at the next fan start (11:43:12), and `PM20` follows a raised `PF28`
+      (T25): it mirrors the unit's own manual request.
+- [ ] **Which timer held the compressor?** It came on 6.5–8 min after the
+      request and 5–7 min after the fan; `PE04` ships at 180 s, so something else
+      held it. `PE03` (420 s) fits numerically, but it is defined between two
+      compressor starts. Poll `CmpStatus` (1122, has a "Wait ON" state) and
+      `SupplyFan_Status` (1119) every 5 s through the next start to see the stages,
+      and repeat a start soon after a compressor stop to see whether `PE03` counts
+      from the last start.
+- [ ] **Record the stop sequence.** Seen at 1-minute resolution (T19): the
+      compressor, V3V + PM and damper were off within 61 s, the fan ran on at
+      `PF26` (40 %) for up to a minute more. Still to log every 5 s
+      (`diagnose_hrds.py --watch`): compressor stop against `PE02`, the
+      ramp-down (`PE25`), V3V + PM closing against `Pb01`, fan run-on against
+      `PF03`. Check the climate `hvac_action` and fan entity follow.
+- [ ] **First anti-stagnation pulse after a request: why 2 hours?** After the
+      2026-10-22 stop the valve stayed shut from 07:37:58 to 09:39:57, then
+      pulsed hourly again (T20); HB 6.4 says `Pb08` (60 min) after the valve
+      closes. Repeat after the next stop and see whether it is again 2 hours.
+- [ ] **Does the unit judge the first, standing brine reading?** At the request
+      start the probe read the warm standing brine (18.3 °C) and 14.8 °C two polls
+      after V3V + PM opened. If the brine ever flows below `PU08` but stands above
+      it, does the unit take the passive path or start the compressor, and do
+      `PC07`/AL03 judge the standing value? Watch `water_temperature` and
+      `compressor_status` at the start of a request in early summer.
+- [x] **Evaporator undershoot to −3.1 °C with the MVHR on its lowest preset
+      (about 100 m³/h).** Answered 2026-10-23: with the MVHR at 140–163 m³/h the
+      start dipped further, to −9.6 °C, and settled on `PU11` within 6 minutes,
+      AL11 clear (T18). It is the start transient, not too little airflow.
+- [ ] **Supply-air temperature.** The unit's supply probe reads unknown, so "DEU
+      gives dry air at about room temperature" (HB 2.6.1) is unverified. Log an
+      external sensor downstream of the HRDS through a run; that also shows what
+      the internal valve K4 does to the air. Nothing on the unit can stand in:
+      the water probe reads the water before the condenser (T18), and the
+      ComfoAir supply sensor sits before the HRDS. With about 16.5 °C brine
+      expect below room temperature (HB 3.8.5: more flow, cooler supply).
+- [ ] **Second dump while running.** Take a read-only dump with
+      `diagnose_hrds.py` during a DEU request and diff it against
+      `hrds_30+_headless_factory_state.json`: every register that changed should be
+      documented, or flagged.
+- [ ] **`PU13` at the handbook default.** At the shipped value the compressor
+      started without a room probe. Does it still start with `PU13` at the
+      handbook default? Only worth testing if `PU13` is ever raised.
 
 ## Headless operation, identity, sentinel (added 2026-10-19)
 
@@ -79,8 +168,8 @@ evidence log, replace the `[INFERRED]` tags it settles, and fix the code/docs.
       unit, EPB9ORSINDEU V01.00.09.02). PH01 = 0, HA00 = 0, PH02 = 1 and a power
       cycle still read `off_by_display`; the first Modbus ON (`switch.unit_on_off`)
       moved it to `on` at once. The setup check now reports
-      `unit_waiting_for_first_on` for this. Still open: does a Modbus OFF then read
-      `off_by_bms`, and does it stay so across a power cycle.
+      `unit_waiting_for_first_on` for this. A Modbus OFF then reads `off_by_bms`
+      (seen 2026-10-21). Still open: does it stay so across a power cycle.
 - [ ] **HA00 = 0 on a unit that read 2** (the manual says the factory value is
       6). Confirm it is accepted and whether AL28/AL34 appear afterwards.
 - [ ] **PH01 / HA00 are config parameters**: confirm that re-writing them only
@@ -89,10 +178,13 @@ evidence log, replace the `[INFERRED]` tags it settles, and fix the code/docs.
 - [ ] **Sentinel window** `0x7FF0..0x800F`: only `0x8004` and `0x7FFA` have been
       seen. Confirm what a *failed* (wired but broken) probe reads, and whether
       it also raises AL28/AL34.
-- [ ] **AL28/AL34 were not set** while the unit was OFF by display with no
+- [x] **AL28/AL34 were not set** while the unit was OFF by display with no
       probes (PackedAlarm_2/3 = 0). Confirm they appear once the unit is ON.
-- [ ] **PU13 with no room temperature**: does the interlock veto a Modbus
+      Done 2026-10-22: still clear with the unit ON and dehumidifying.
+- [x] **PU13 with no room temperature**: does the interlock veto a Modbus
       dehumidify when the room input is the sentinel? If yes, set PU13 to 0.
+      Done 2026-10-22: no veto at the shipped `PU13` (handbook default: see
+      *First dehumidify run*).
 - [ ] **Identity check**: the product-code prefix `EPB9` comes from one unit
       (`EPB9ORSINDEU`). Confirm other HRDS+ variants (30/50, non-R, non-DC)
       report an `EPB9…` code; loosen `EXPECTED_PRODUCT_PREFIX` if not. Also
@@ -113,6 +205,8 @@ evidence log, replace the `[INFERRED]` tags it settles, and fix the code/docs.
       handbook (§6.4) says the valve stays deactivated. Note its value in
       standby, while dehumidifying and while cooling (COOL). If it reliably
       tells cooling from dehumidifying, `hub.is_cooling` can use it.
+      Update 2026-10-22: it read 1 while dehumidifying too (same as standby); the
+      cooling reading is still missing.
 - [ ] **Winter heating evidence.** `hub.is_heating` needs the valve/pump output
       on, no AL04, compressor off and water at or above PC08. Confirm on a unit
       on a heating circuit that this is when the supply air actually warms, and
@@ -126,9 +220,22 @@ evidence log, replace the `[INFERRED]` tags it settles, and fix the code/docs.
 
 ## Fan mode — implemented, needs hardware verification
 
+> **2026-10-23: the integration's fan write does not work.** `PM20` (1614) is
+> the display's setpoint ("via Display (read only)", handbook §5.3); the unit
+> overwrites a Modbus write (T22, T23). No register takes a fan-speed request
+> from the BMS; the documented Modbus lever is the band (`PF28`/`PF27`,
+> `UNIT_BEHAVIOUR.md` §9.1). Seen on hardware: raising `PF28` above the
+> running speed raises it within a poll, lowering `PF28` does not lower it
+> (T24–T26). The remaining hardware tests are in
+> [`fan-speed-tests.md`](fan-speed-tests.md); the code change waits for them
+> (item *Fan write target* below).
+
 > The test simulator (`tests/sim/device.py`) models all three hypotheses below
-> as `fan_model` = `rescale` (default) / `clamp` / `direct`. Once the hardware
-> answer is known, make that one the default and drop the others.
+> as `fan_model` = `rescale` (default) / `clamp` / `direct`. **None of them
+> fits the hardware:** all three take `PM20` as a command. The unit keeps its
+> own manual request, clamps it into the band and mirrors it in `PM20`
+> (T22–T26). Replace the three with that model together with *Fan write
+> target*.
 
 The climate entity now exposes **fan_mode** (off / low / medium / high):
 
@@ -159,7 +266,34 @@ opened to 0/100.
       regardless of PM20 (`doc/references/UNIT_BEHAVIOUR.md` §9.3). A user
       reports the fan would not go below 30 %, and an unofficial I/O
       reassignment as the only way around it.
-- [ ] **Rescale or clamp? (R variant only) — the key fan question.** The technical
+- [ ] **Fan write target (decide after [`fan-speed-tests.md`](fan-speed-tests.md)).**
+      `fan.set_percentage`, `climate.set_fan_mode` and
+      `number.fan_manual_speed` write `PM20`, which does not hold (T23).
+      What does work (T24–T26): the band clamps the unit's own manual request,
+      so raising the minimum above the running speed raises it, and lowering
+      the minimum afterwards keeps the new speed until the request ends.
+      Lowering it should work the same way through the maximum (`PF10`/`PF09`),
+      untested ([`fan-speed-tests.md`](fan-speed-tests.md) test G).
+      Options:
+      * set speed X by writing the active band's minimum (to raise) or maximum
+        (to lower) to X and then restoring the band: two EEPROM writes per
+        change (ADR-0023), lost at the end of each request, since the next run
+        starts at `PF28`;
+      * keep the band at X for the whole run (one write, but X becomes the
+        floor for every later run);
+      * make the fan read-only and leave the band numbers to the user. Either supersedes
+      ADR-0008 (`/adr supersede`). Affected: `fan.py`, `climate.py`
+      (`_FAN_MODE_PCT`, "off" cannot stop the fan), `number.fan_manual_speed`
+      and `OPERATIONAL_KEYS` (`const.py`), the simulator's `fan_model`
+      (`tests/sim/device.py`: `PM20` must become unit-owned), the fan tests,
+      README *Commanded vs actual fan speed*.
+- [x] **Rescale or clamp? (R variant only) — the key fan question.**
+      **Answered (T23–T26).** The unit does not take `PM20` from Modbus at
+      all (T23). Its own manual request, which `PM20` mirrors, is an absolute
+      percentage **clamped** into the band, not rescaled: a lowered minimum
+      left the fan at 50 and later 55 %, a raised one pushed it up (T24–T26).
+      The 0–10 V input is still scaled linearly by the handbook (untested).
+      The question below is kept for the record. The technical
       handbook says manual fan control is *„linear zwischen den jeweiligen
       Minimal- und Maximalwerten (PF28/PF10 bzw. PF27/PF09) skaliert"*, i.e. the
       request is a **position within the band**, not an absolute percentage. If
@@ -219,7 +353,8 @@ option is recommended.
       3. **Start dehumidification:** 1105 ← 1 (on), 1140 ← 1 (dehumidify),
          1139 ← 0 (no active cooling). Turn on the PH02/PH28 enables first (the integration never sets them).
       4. **Pass 1:** write 1614 ← 0 with the factory band (PF28 = 50 %,
-         PF10 = 85 %).
+         PF10 = 85 %). Expected to change nothing: `PM20` does not hold a
+         write (T23).
       5. **Pass 2:** write 1853 (PF28) ← 0, then 1614 ← 0 again.
       6. **In each pass,** wait for the damper pre-start time (PS01, default
          20 s) plus the fan and compressor start delays. Then read:
@@ -374,10 +509,11 @@ handbook is silent or contradicts itself on these.
       bits `0 = Integration, 1 = Dehumidify`. Hypothesis: 1 = open (reheat)
       position. Read both while cooling (INT, compressor on): expect 0.
       (Same test as the condenser valve item under *Climate entity behaviour*.)
-- [ ] **Anti-stagnation while OFF.** Do V3V + PM still pulse every Pb08 hours
+- [x] **Anti-stagnation while OFF.** Do V3V + PM still pulse every Pb08 interval
       with the unit OFF (handbook §4.5 "independent of operation") or only
-      while ON (§2.7, and §3.8.7 recommends OFF on brine)? Watch 1126 over a
-      Pb08 interval (reference unit: 60 h) with the unit OFF.
+      while ON (§2.7, and §3.8.7 recommends OFF on brine)? Done 2026-10-21/22:
+      no pulse in 8.5 h of `off_by_bms`, hourly pulses while ON; `Pb08` is in
+      minutes, not hours (T13, T14).
 - [ ] **PU02 "with water" / "without water".** What changes between 1 and 2
       (does V3V/PM open)? And does PU02 = 0 also block a Modbus or DI
       dehumidify request in winter, or only the automatic one?

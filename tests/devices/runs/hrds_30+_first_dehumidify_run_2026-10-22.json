@@ -1,0 +1,100 @@
+{
+  "_about": "First Modbus dehumidify (DEU) run on the reference unit, read from Home Assistant history via ha-mcp. Poll interval ~60 s, so every time below is bracketed by two polls. Times are Europe/Vienna (UTC+2).",
+  "unit": {
+    "model": "HRDS+ 30 R DC",
+    "headless": true,
+    "room_probes": false,
+    "identity": "EVCO / EPB9ORSINDEU / V01.00.09.02",
+    "water_circuit": "brine",
+    "mvhr": "Zehnder ComfoAir Q350",
+    "integration_installed": "v0.9.3 (HACS repair 'restart required' still open, so the running code may be older)"
+  },
+  "settings_in_force": {
+    "PS01_damper_prestart_s": 90,
+    "PE01_cmp_min_off_s": 300,
+    "PE02_cmp_min_on_s": 20,
+    "PE03_cmp_min_between_starts_s": 420,
+    "PE04_fan_to_cmp_delay_s": 180,
+    "PE27_cmp_max_rps": 115,
+    "PE28_cmp_step1_rps": 52,
+    "PE30_cmp_min_time_step1_s": 60,
+    "PU11_evap_setpoint_C": 6.0,
+    "PU12_evap_deadband_C": 1.5,
+    "PU08_cold_water_only_below_C": 10.0,
+    "PU13_min_room_T_for_DEU_C": 10.0,
+    "PF28_PF10_fan_band_dehum_pct": [50, 85],
+    "PF01_fan_min_run_s": 60,
+    "PF03_fan_post_run_s": 30,
+    "Pb01_valve_run_on_s": 30,
+    "Pb07_anti_stagnation_open_s": 60,
+    "Pb08_anti_stagnation_wait_min": 60,
+    "season": "summer (HB04 = 4, ModeStatus summer_di)",
+    "_source": "settings from tests/devices/hrds_30+_headless_factory_state.json and the current entity states; installer device is off, so PE/Pb values were not re-read today"
+  },
+  "timeline_2026_10_22": [
+    {"t": "06:56:54-06:57:58", "event": "anti-stagnation pulse (V3V/PM 1126 on ~60 s) while ON-standby"},
+    {"t": "07:02:55", "event": "ComfoAir preset -> low (by the user's airflow automation), MVHR supply drops from ~160 to ~93-112 m3/h"},
+    {"t": "07:03:53", "event": "switch.dehumidify_modbus (1140) written ON"},
+    {"t": "<=07:04:21", "event": "read-back: DehumRequest 1121 = 1, damper 1134 = on, V3V/PM 1126 = on (full refresh at 07:04:21, i.e. request mirrored in <28 s)"},
+    {"t": "(07:04:53, 07:05:53]", "event": "SupplyFan_Status 1119 -> on, outAO_SupplyFan 639 -> 50 %, PM20 1614 0 -> 50 %, 1114 0 -> 50 %"},
+    {"t": "(07:10:51, 07:11:52]", "event": "CmpStatus 1122 -> on, outAO_Cmp 641 = 15.7 %"},
+    {"t": "07:12:54", "event": "compressor 32.8 %, evaporator 5.6 C"},
+    {"t": "07:13:55", "event": "compressor 44.0 % (~ PE28 52/115 rps = 45 %), evaporator -3.1 C (start transient)"},
+    {"t": "07:14:54", "event": "compressor 38.1 %, evaporator -2.9 C"},
+    {"t": "07:15:54", "event": "compressor 32.0 %, evaporator 1.1 C"},
+    {"t": "~07:18", "event": "compressor 25.0 %, evaporator 6.1 C (settled on PU11)"}
+  ],
+  "measured_delays_s": {
+    "write_to_readback_DEU_request": "<= 28",
+    "damper_open_to_fan_on": "32..120 (consistent with PS01 = 90)",
+    "request_to_fan_on": "60..120",
+    "fan_on_to_compressor_on": "298..419 (PE04 = 180 would give ~180; NOT the limiting timer)",
+    "request_to_compressor_on": "390..479 (consistent with PE03 = 420 s, and with HB 8.2 'at least 7 minutes')"
+  },
+  "values_during_run": {
+    "outAO_SupplyFan_639_pct": 50.0,
+    "actRPMsupplyFan_1117": 0,
+    "SupplyFan_Status_1119": "on",
+    "FanIntegration_Request_1112": 0,
+    "outDO_RecircDamper_1134": "on",
+    "outDO_WaterCond_K4_1124": "on (same as standby)",
+    "outDO_WaterValve_K5_1126": "on",
+    "PM20_1614_pct": 50.0,
+    "SupplyFan_ManualRequest_1114_pct": 50.0,
+    "water_501_C": {"standing_before_pulse": 21.9, "flowing": "14.3-15.3"},
+    "evaporator_511_C": {"standby": "~20", "min": -3.1, "settled": 6.1},
+    "alarms": "none (AL11 low pressure/frost stayed off; AL28/AL34 probe alarms not set while ON)",
+    "unit_status_1104": "on"
+  },
+  "mvhr_context": {
+    "comfoair_supply_m3h_during_run": "93-112",
+    "extract_air": "21.4-21.8 C, 60-63 %RH, 11.2-12.0 g/m3",
+    "outdoor": "13.2 C, 70 %RH",
+    "note": "ComfoAir supply temperature fell 19.9 -> 16.8 C from 07:06, but the ComfoAir was in 'cooling' (bypass) with 13 C outdoors, so it is not an HRDS effect; the ComfoAir supply sensor is upstream of the HRDS"
+  },
+  "anti_stagnation": {
+    "while_on_standby": "V3V/PM open for ~1 min, then shut for exactly 60 min (wait counted from the valve closing), repeat: 22 periodic pulses between 2026-10-21 09:33 and 2026-10-22 06:56",
+    "switch_on_pulse": "92 s (2026-10-20 23:58:48 -> 00:00:20) and 96 s (2026-10-21 08:31:41 -> 08:33:17), longer than the ~1 min periodic ones; poll resolution is 1 min",
+    "while_off_by_bms": "no pulse for 8.5 h (2026-10-21 00:00 .. 08:31)",
+    "on_switch_on": "pulse right at Modbus ON (2026-10-20 23:58, 2026-10-21 08:31), as HB 6.4 says",
+    "conclusion": "Pb08 is in MINUTES (handbook parameter table says Min), not hours; OFF stops the cycle"
+  },
+  "answered_questions": {
+    "modbus_off_reads_off_by_bms": "yes (2026-10-21 00:03 -> off_by_bms until the next ON)",
+    "PU13_vetoes_modbus_DEU_without_room_probe": "no, compressor started with no room T (PU13 = 10.0)",
+    "AL28_AL34_once_on": "not set",
+    "K4_1124_during_DEU": "1/on, same as standby; still to read during INT (expect 0)",
+    "DEU_valve_pump_on_brine": "1126 on with the request",
+    "evaporator_regulation": "settles on PU11 = 6.0 C within ~6 min of compressor start; first minutes undershoot to about -3 C",
+    "1112_is_not_recirculation_or_fan_running": "stays 0 while the fan runs and the damper is open",
+    "fan_rpm_1117": "fan confirmed running by the owner while 1117 read 0 (639 = 50 %, 1119 = on). Working assumption: a speed sensor exists and our read of 1117 is wrong; see plans/todo.md",
+    "water_probe_in_standby": "owner: the brine stands in the pipe when there is no flow and warms up; the probe reads that standing brine (21.9 C) until V3V/PM flows, then the circuit (~14.3 C) within ~2 min"
+  },
+  "open_questions": {
+    "PM20_1614_written_by_unit": "1614 went 0 -> 50 when the fan started without an HA write (to be confirmed in the logbook). Read 1614 again after the fan stops: back to 0?",
+    "pm20_scaling": "still open: sweep PM20 0/30/100 and read 639",
+    "stop_sequence": "not yet recorded: switch DEU off and log compressor (PE02), valve run-on (Pb01 30 s), fan run-on (PF03 30 s), damper close",
+    "power_cycle_keeps_requests": "untested",
+    "water_decision_on_standing_brine": "at request start the probe still reads the warm standing brine (18.3 C at 07:04). Does the unit decide PU08 (passive path) / PC07 on that first reading or after flow? Matters in early summer when the brine is below PU08 but the standing value is above it"
+  }
+}

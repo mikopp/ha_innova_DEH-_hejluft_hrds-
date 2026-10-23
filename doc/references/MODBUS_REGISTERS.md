@@ -57,8 +57,9 @@ Factory serial defaults:
   * **Fan speeds / analog-out percentages: value ×0.01 %** — *write two implied
     decimals*. e.g. `40 %` is the raw value `4000`; `85 %` is `8500`.
   * Humidity (`PU01`, `AI_HretRoom`, warning setpoint): integer **%RH**, no scale.
-  * Working hours (`PM00`/`PM01`…): ×0.1 h (raw `1500` → `150.0` → 1500 h, per
-    the "h ×10" note — read the PDF §Filterverschmutzung carefully).
+  * Working hours (`PM00`…`PM04`): raw = whole hours, one 16-bit word each
+    (UNIT_BEHAVIOUR.md T29). The display's "Hours x10" shows raw ÷ 10, so
+    the shipped limit raw `20000` ("2000.0") is 20000 h.
 
 ## 3. Function enables — **set these first**
 
@@ -117,18 +118,28 @@ for 40 %). Min/Max apply to the modulation band used in each mode.
 | `0x073C` | 1852 | `MinSpeedFan_Integ` (PF27) | R/W | 50.00 | 0–100 | Supply-fan min speed in integration (cooling) |
 | `0x066C` | 1644 | `MinSpeedSupplyFan_VMC` (PF07) | R/W | — | 0–100 | Supply-fan min speed in VMC (ventilation-only) mode |
 | `0x066E` | 1646 | `MaxSpeedFan_Integ` (PF09) | R/W | 85.00 | 0–100 | Supply-fan max speed in integration (cooling) |
-| `0x064E` | 1614 | `PM20_SupplyFan_Manual`    | R/W | — | 0–100 | Manual supply-fan setpoint |
-| `0x045A` | 1114 | `SupplyFan_ManualRequest`  | R/O | — | 0–100 | Current manual fan request |
-| `0x045C` | 1116 | `SupplyFan_RemoteRequest`  | R/O | — | 0–100 | Current potentiometer fan request |
-| `0x027F` | 639  | `outAO_SupplyFan`          | R/O | — | 0–100 | Actual supply-fan analog output % |
-| `0x045D` | 1117 | `actRPMsupplyFan`          | R/O | — | 0–65535 | Supply-fan actual RPM |
+| `0x064E` | 1614 | `PM20_SupplyFan_Manual`    | R/W | — | 0–100 | Supply-fan manual setpoint of the **display**. Listed R/W in the raw parameter table [MB p.18], defined "via Display (read only)" in the handbook (PM20, §5.3); the unit sets it itself, a written value does not hold, one outside the band answers exception 04 (UNIT_BEHAVIOUR.md §9.1, T22, T23, T27, T28). Not a fan-speed command |
+| `0x0458` | 1112 | `FanIntegration_Request`   | R/O | — | 0–100 | "Fans integration request": the fan request of the integration (INT) fan control (`PF31`) [MB p.14]. Not a 0/1 flag and not the INT request (1139), see §13. Read 0 while the fan ran during two dehumidify requests (UNIT_BEHAVIOUR.md T16, T18) |
+| `0x0459` | 1113 | `Supply_AirQualityRequest` | R/O | — | 0–100 | Supply-fan air-quality request [MB p.14] |
+| `0x045A` | 1114 | `SupplyFan_ManualRequest`  | R/O | — | 0–100 | Current manual (display) fan request; reads the same as `PM20` |
+| `0x045B` | 1115 | `Supply_TimeBandsRequest`  | R/O | — | 0–100 | Supply-fan time-band request [MB p.15] |
+| `0x045C` | 1116 | `SupplyFan_RemoteRequest`  | R/O | — | 0–100 | Current potentiometer (0–10 V) fan request |
+| `0x027F` | 639  | `outAO_SupplyFan`          | R/O | — | 0–100 | Actual supply-fan analog output %: the speed the fan is driven at |
+| `0x045D` | 1117 | `actRPMsupplyFan`          | R/O | — | 0–65535 | Supply-fan actual RPM. Needs an input allocated to the tachometer (input function 45 or 46, §16 `HA..`/`HB..`); 0 without one (UNIT_BEHAVIOUR.md §9.1) |
 
 ### 6.1 How the bands apply
 
-The min/max pairs are per-mode bands; display and 0–10 V requests are scaled
-linearly into the active band (handbook §6.2). Whether `PM20_SupplyFan_Manual`
-(1614) is scaled the same way is not confirmed on hardware. Details:
-[UNIT_BEHAVIOUR §9](UNIT_BEHAVIOUR.md#9-fan).
+The min/max pairs are per-mode bands; the handbook scales display and 0–10 V
+requests linearly into the active band (§6.2). On a real unit the manual
+(display) request mirrored in 1114/1614 is instead clamped into the band: a
+raised minimum raises it, a lowered one leaves it (UNIT_BEHAVIOUR.md T24–T26).
+No register takes a fan-speed
+request from the BMS; the band registers are the only fan-speed registers the
+Modbus manual's fan chapter lists as writable [MB p.7]. Other writable fan
+setpoints, each tied to a condition: `FSC`/`FSE`/`FSN` (1595–1597, time bands,
+need time programs `PH03`) [MB p.18], `PF23` (1660, forced by a digital input)
+[MB p.20], `PF26` (1637, run-on). Behaviour:
+[UNIT_BEHAVIOUR §9.1](UNIT_BEHAVIOUR.md#91-bands-and-sources).
 
 ## 7. Sensors (read-only, FC 04)
 
@@ -150,7 +161,6 @@ linearly into the active band (handbook §6.2). Whether `PM20_SupplyFan_Manual`
 |----------|----------|-------------------|--------|
 | `0x0450` | 1104 | `sm_UnitStatus`      | `0=OFF by display`, `1=OFF by DI`, `2=OFF by BMS`, `3=OFF by scheduler`, `4=OFF by RTC`, `5=ON` |
 | `0x0456` | 1110 | `ModeStatus`         | `0=Summer manual`, `1=Winter manual`, `2=Summer auto`, `3=Winter auto`, `4=Summer DI`, `5=Winter DI` |
-| `0x0458` | 1112 | `FanIntegration_Request` | `0=No`, `1=Yes` — "Fans integration request". Not the INT request (1139), see §13. Our reading: `1` while the fan runs to blend MVHR air with room air (unverified). |
 | `0x045F` | 1119 | `SupplyFan_Status`   | `0=Disable`, `1=OFF`, `2=Wait ON`, `3=ON`, `4=Wait OFF`, `5=Alarm` |
 | `0x0461` | 1121 | `DehumRequest`       | `0=No`, `1=Yes` — dehumidification currently requested |
 | `0x0462` | 1122 | `CmpStatus`          | `0=Disable`, `1=Alarm`, `2=Manual`, `3=Wait ON`, `4=ON`, `5=Wait OFF`, `6=OFF` — compressor (active cooling/dehum) |
@@ -232,7 +242,7 @@ Write `1` to reset the corresponding alarm: `0x030B`=AL01, `0x030C`=AL02,
 | `0x0728` | 1832 | `HC04` | Analog output allocation of the supply fan (raw code; `1` = 0-10 V supply fan). |
 | `0x072E` | 1838 | `HD01` | Relay DO1 allocation (raw code; `10` = recirculation damper NO, `9` = NC). |
 | `0x06A2` | 1698 | `PS01_PreStartTime_RecircDamper` | Damper pre-start time before the fan starts, in seconds (handbook default 20; a real unit read 90). |
-| `0x0642` | 1602 | `PM00_Limit_FansHours` | Fan running-hours alarm limit (h ×10) |
+| `0x0642` | 1602 | `PM00_Limit_FansHours` | Fan running-hours alarm limit (h; the display shows ÷ 10) |
 | `0x0644` | 1604 | `PM01_SupplyFan_Hours` | Fan running-hours counter (write 0 to reset filter alarm AL22) |
 
 ---
@@ -261,7 +271,8 @@ Write `1` to reset the corresponding alarm: `0x030B`=AL01, `0x030C`=AL02,
 
 **Set the air-flow (fan) speed**
 * Dehumidify-mode band: min `1853`, max `1647`. Cooling band: min `1852`,
-  max `1646`. Manual: `1614`. Remember the **×100** encoding (`40 %` → `4000`).
+  max `1646`. Remember the **×100** encoding (`40 %` → `4000`). `1614` (`PM20`)
+  is the display's setpoint and does not hold a written value (§6).
 * Actual output: `639` (`outAO_SupplyFan`, ×0.01 %), RPM: `1117`.
 
 **Set the humidity target** — write %RH to `1586` (`PU01`), clamped by `1892`/`1893`.
@@ -303,8 +314,7 @@ A written request reads back late (several polls on a real unit), see
 
 `Status_Integ_byBMS` (1139) and `FanIntegration_Request` (1112) both contain
 the word *integration* but are unrelated: 1139 is the **INT request**
-(cooling in summer, heating support in winter, written by the BMS); 1112 is a
-read-only status that the **supply fan** is running.
+(cooling in summer, heating support in winter, written by the BMS); 1112 is a read-only "fans integration request", a fan request in % of the INT fan control (§6). It read 0 while the supply fan ran for a dehumidify request (UNIT_BEHAVIOUR.md §13, T16).
 
 Airflow behaviour (passive MVHR flow, recirculation coupled to every request,
 the unofficial I/O workaround) used to be described here and is now in
@@ -632,7 +642,7 @@ truth for that: `custom_components/innova_hrds/installer_params.py`).
 | `0x0737` | 1847 | HD10 | DO4 expansion allocation | x1 | 0…30  | shown R/O, disabled by default |
 | `0x0738` | 1848 | HD11 | Open-collector expansion allocation | x1 | 0…30  | shown R/O, disabled by default |
 | `0x0739` | 1849 | Pb07 | Anti-stagnation valve active time | x1 | 1…999 s | R/W |
-| `0x073A` | 1850 | Pb08 | Anti-stagnation valve wait time | x1 | 1…99 h | R/W |
+| `0x073A` | 1850 | Pb08 | Anti-stagnation valve wait time | x1 | 1…99 min | R/W |
 | `0x073B` | 1851 | PE21 | Compressor min output (integration) | x0.01 | 0…100 % | R/W |
 | `0x073E` | 1854 | PF29 | Return fan min speed | x0.01 | 0…100 % | R/W, disabled by default |
 | `0x073F` | 1855 | PF30 | Return fan max speed | x0.01 | 0…100 % | R/W, disabled by default |
