@@ -460,6 +460,9 @@
       "recirculation_active": {
         "name": "Umluft aktiv"
       },
+      "supply_fan_running": {
+        "name": "Zuluftventilator läuft"
+      },
       "alarm_active": {
         "name": "Alarm aktiv"
       },
@@ -613,11 +616,6 @@
           "summer": "Sommer",
           "winter": "Winter"
         }
-      }
-    },
-    "fan": {
-      "hrds_supply_fan": {
-        "name": "Zuluftventilator"
       }
     },
     "number": {

@@ -49,9 +49,8 @@ read as a fact about the unit.
 - Hide the entities (as ADR-0011 does for setpoints): a reading that becomes
   real after an installer change would need a reload to appear; unknown is
   what an unwired probe already shows (ADR-0011).
-- Judge recirculation with the fan entity's stopped set (`_FAN_STOPPED`):
-  counts Wait ON (damper open, fan not yet turning) as recirculating. The
-  shared definition is the open ADR-0028.
+- Judge recirculation with the running set of ADR-0028: counts the run-on
+  Wait OFF, when the damper is already closed and no room air is drawn.
 
 ## Consequences
 
@@ -75,5 +74,5 @@ read as a fact about the unit.
 
 Evidence: `tests/devices/runs/hrds_30+_dehumidify_run_2026-10-23.json`.
 Related: ADR-0005 (unknown rather than stale), ADR-0011 (no probe, no
-reading), ADR-0017 (logic keys read at setup), ADR-0028 (proposed: one
-definition of "fan stopped").
+reading), ADR-0017 (logic keys read at setup), ADR-0028 (when the fan
+runs).

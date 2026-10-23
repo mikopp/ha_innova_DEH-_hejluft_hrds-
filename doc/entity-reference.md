@@ -57,9 +57,24 @@ device (see the [beta banner](../README.md#release-094--beta-not-10-yet)).
 
 #### Fan
 
-| Entity | Name | What it does |
-|---|---|---|
-| `fan.hrds_supply_fan` | Supply fan | `R` units only (a non-R unit has no fan of its own; its damper output reads *disabled*, and the fan entity, the fan speed numbers and the fan sensors are not created). The unit's supply/recirculation fan as a percentage, **read-only**: it reports the **actual** output (reg 639) and the fan status, and offers no speed or on/off control. The unit takes no fan-speed request over Modbus: PM20 (1614) is its own manual request, a written value does not hold and one outside the band is refused (T23, T27, T28; [UNIT_BEHAVIOUR §9.1](references/UNIT_BEHAVIOUR.md#91-bands-and-sources)). The fan starts at the band minimum (PF28); raising `number.fan_min_speed_dehumidify` above the current speed raises it, lowering it does not slow the fan (T24–T26; `_cooling` during INT and lowering via the maximum untested, [plan](../plans/fan-speed-tests.md)). Attributes: `output_percent` (the actual output, reg 639; Home Assistant shows `percentage` only on a fan that can set its speed), `manual_request_percent` (PM20), `actual_rpm`, `supply_fan_status`. Because the unit's own fan recirculates room air *in addition* to whatever the central MVHR pushes through the duct, it adds airflow on top of the MVHR. |
+There is no fan entity (`fan.hrds_supply_fan` up to 0.9.4): Modbus can
+neither switch the unit's fan nor set its speed (ADR-0034). The unit runs the
+fan with every dehumidify or integration request and stops it after a run-on
+([UNIT_BEHAVIOUR §9.2–9.3](references/UNIT_BEHAVIOUR.md#92-timing)). PM20
+(1614) is its own manual request: a written value does not hold and one
+outside the band is refused (T23, T27, T28;
+[§9.1](references/UNIT_BEHAVIOUR.md#91-bands-and-sources)). The fan starts at
+the band minimum (PF28); raising `number.fan_min_speed_dehumidify` above the
+current speed raises it, lowering it does not slow the fan (T24–T26;
+`_cooling` during INT and lowering via the maximum untested,
+[plan](../plans/fan-speed-tests.md)). What the fan does is shown by
+`binary_sensor.supply_fan_running`, `sensor.supply_fan_status`,
+`sensor.supply_fan_output`, `sensor.fan_manual_speed`,
+`sensor.supply_fan_rpm` and `sensor.supply_fan_airflow`. `R` units only: a
+non-R unit has no fan of its own, its damper output reads *disabled*, and the
+fan sensors and fan speed numbers are not created. The unit's own fan
+recirculates room air *in addition* to whatever the central MVHR pushes
+through the duct, so it adds airflow on top of the MVHR.
 
 #### Request switches
 
@@ -108,6 +123,7 @@ Alarm sensors map to a single bit of a packed alarm register (§9.1 in
 |---|---|---|---|
 | `binary_sensor.dehumidify_request` | Dehumidify requested | ³ | Dehumidification currently requested |
 | `binary_sensor.recirculation_active` | Recirculation active | ³ | (not a register) Damper (1134) open **and** supply fan status *On* (1119): room air is drawn across the coil. Off while the fan is still starting or runs on after the damper closed. R variant only |
+| `binary_sensor.supply_fan_running` | Supply fan running | ³ | (not a register) The fan turns: supply fan status (1119) *On* or *Stopping* (the run-on at PF26, T19). Off while *Starting* (the PS01 delay before the fan starts), off and in alarm; unknown when the status is unknown. The only on/off of the fan; Home Assistant cannot switch it. R variant only |
 | `binary_sensor.alarm_active` | Alarm active | ³ | At least one alarm is active |
 | `binary_sensor.alarm_compressor_lowpressure` | Alarm: compressor low-pressure / frost | ³ | AL11, reg 768 bit 10: Compressor stopped (low pressure / frost thermostat) |
 | `binary_sensor.alarm_compressor_highpressure` | Alarm: compressor high-pressure | ³ | AL12, reg 768 bit 11: Compressor stopped (high pressure switch) |

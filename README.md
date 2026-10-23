@@ -130,8 +130,9 @@ The integration talks to the unit's control board via Modbus TCP and exposes:
   per-mode fan speed bands.
 * **Select** — season (summer/winter), T/H probe source (HA00), winter
   dehumidification mode (PU02).
-* **Fan** — the supply/recirculation fan, read-only: on/off, actual output %
-  and the unit's manual request.
+* **Fan** — the supply/recirculation fan as readings: running, status,
+  actual output % and the unit's manual request. The unit switches it with
+  its requests; Home Assistant cannot.
 * **Water-circuit diagnostics** — valve/pump output, condenser valve, water
   alarms and a *Water circuit check* summary. Read-only: the unit runs its own
   water valve and pump.
@@ -721,8 +722,9 @@ copy of it kept for convenience. They are listed in the
 [entity reference](doc/entity-reference.md).
 
 The formula is proportional: `Q = (output% / 100) × Q_max`, using the live
-`supply_fan_output` register. The fan counts as stopped (0 m³/h) when the
-unit's own `supply_fan_status` says so, not at a percentage of ours. Default
+`supply_fan_output` register. The fan counts as running only when the unit's
+own `supply_fan_status` says *On* or *Stopping* (the run-on), and as stopped
+(0 m³/h) otherwise, not at a percentage of ours. Default
 Q_max per model:
 
 | Variant | Q_max |
@@ -744,13 +746,16 @@ with the underlying spec data in
 
 ### Fan speed
 
-**The fan speed is the unit's; Home Assistant shows it and cannot set it.**
-The unit has no register for a fan-speed request from Modbus. PM20 (1614), the
+**The fan is the unit's; Home Assistant shows it and can neither switch it nor
+set its speed.** The unit runs the fan with every dehumidify or integration
+request and stops it after a run-on; no register switches it by itself. It
+has no register for a fan-speed request from Modbus either. PM20 (1614), the
 "manual fan speed" of the register list, is the **display's** setpoint
 ("read only" in the handbook): the unit sets it itself, acknowledges a written
 value inside the band without keeping it, and refuses one outside the band.
-So the fan entity is read-only, the climate entity has no fan mode, and
-`sensor.hrds_manual_fan_speed` shows PM20 (up to 0.9.4 it was a number).
+So there is no fan entity (`fan.hrds_supply_fan` up to 0.9.4), the climate
+entity has no fan mode, and `sensor.hrds_manual_fan_speed` shows PM20 (up to
+0.9.4 it was a number).
 
 The fan runs at the highest of the unit's own requests, kept within the active
 mode's band (PF28–PF10 for dehumidify, PF27–PF09 for cooling): the 0–10 V
@@ -761,13 +766,16 @@ at the band **minimum**: 50 % as shipped. Details:
 
 What the integration shows:
 
-* `sensor.hrds_supply_fan_output` (%), `sensor.hrds_supply_fan_airflow`
-  (m³/h), and the state of `fan.hrds_supply_fan`: the speed the fan runs at.
+* `binary_sensor.hrds_supply_fan_running`: whether the fan turns, from its
+  status: on while *On* and during the run-on (*Stopping*), off while
+  *Starting*, off and in alarm.
+* `sensor.hrds_supply_fan_status`: the unit's fan status itself.
+* `sensor.hrds_supply_fan_output` (%) and `sensor.hrds_supply_fan_airflow`
+  (m³/h): the speed the fan runs at.
 * `sensor.hrds_supply_fan_rpm`: only when an input is allocated to the fan
   tachometer, else unknown.
-* `sensor.hrds_manual_fan_speed` and the fan entity's `manual_request_percent`
-  attribute: PM20, the unit's manual request. While the fan runs it reads the
-  same as the output.
+* `sensor.hrds_manual_fan_speed`: PM20, the unit's manual request. While the
+  fan runs it reads the same as the output.
 
 What works over Modbus is the band. The unit keeps its manual request within
 it, so on the reference unit, during a dehumidify run:

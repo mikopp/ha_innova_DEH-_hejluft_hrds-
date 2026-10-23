@@ -102,7 +102,9 @@ from the image's modbus manifest and installs that. A bare `pytest` skips
 * The fan runs at the unit's own manual request (PM20), clamped into the
   active band as seen on hardware (T22–T28): a raised minimum raises it, a
   lowered one leaves it, 0 when the request ends. A PM20 write is acknowledged
-  and not kept; one outside the band answers exception 04.
+  and not kept; one outside the band answers exception 04. `run_on` (s, 0 by
+  default) keeps a fan that was running in Wait OFF at PF26 after the request
+  (T19); `set_fan_fault()` puts it in Alarm.
 * `python -m tests.sim --port 5020 --control-port 8020` runs it as a process;
   the HTTP control API (`sim/control.py`) injects alarms, probe faults, a power
   cycle, offline, slow replies, rejected writes, a wrong identity.

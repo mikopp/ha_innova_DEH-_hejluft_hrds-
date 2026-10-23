@@ -28,7 +28,7 @@ paths:
   if `hub.is_heating` (heating INT, valve/pump on, no AL04, compressor off,
   water ≥ PC08); COOLING only if `hub.is_cooling` (cooling INT, compressor
   on, no AL03); else DRYING (compressor or 1121 on); else FAN (R unit, fan
-  on); else IDLE. The condenser valve (1124) MUST NOT be evidence (ADR-0015).
+  running, ADR-0028); else IDLE. The condenser valve (1124) MUST NOT be evidence (ADR-0015).
 - Setting a mode MUST check every write (`check_write_allowed`) before the
   first, then write the requests before `unit_on_off`. OFF clears both
   requests and switches the unit off (offered only where PH02 allows it);
@@ -69,7 +69,7 @@ refused Dry used to clear a running Cool before being refused.
 - `tests/ha/test_failures.py::test_off_switches_the_unit_off_when_a_request_cannot_be_cleared`
 - `tests/ha/test_display.py::test_auto_lets_the_unit_dehumidify_on_its_own`
 - `tests/ha/test_display.py::test_target_temperature_range_follows_the_season`
-- `tests/ha/test_fan.py::test_no_speed_control_and_nothing_written_to_pm20`
+- `tests/ha/test_fan.py::test_no_fan_control_and_nothing_written_to_pm20`
 
 ```sh
 ! grep -nE "FAN_MODE|fan_mode" custom_components/innova_hrds/climate.py

@@ -25,7 +25,9 @@ On top of it the model implements the behaviour documented in
 
 Outputs are recomputed after every write or injected change, so a poll that
 follows a write sees the final state; ``sequence_delay`` holds the fan and
-compressor in ``wait_on`` for that many seconds to mimic PS01.
+compressor in ``wait_on`` for that many seconds to mimic PS01; ``run_on``
+keeps a fan that was running in ``wait_off`` at ``PF26`` for that many seconds
+after the request ends (the run-on, HB 6.2, T19; 0 = stops at once).
 """
 
 from __future__ import annotations
@@ -104,9 +106,14 @@ class HrdsDevice:
             self.r_variant = self.input.get(R.DAMPER, 2) != 2
             self.pump_configured = self.input.get(R.WATER_VALVE_PUMP, 0) != 2
             self.sequence_delay = self.default_sequence_delay
+            self.run_on = 0.0
+            self._run_on_until: Optional[float] = None
             self.alarms: set[str] = set()
             self.unplugged: set[int] = set()
             self.pump_fault = False
+            # The fan's own alarm (overheating or speed sensing, HB 6.2):
+            # status Alarm, output 0 [INFERRED].
+            self.fan_fault = False
             self.ignore_writes: set[int] = set()
             # {register: n}: a write shows in reads only after n reads of it
             # (a unit that mirrors a request into its register late).
@@ -272,6 +279,11 @@ class HrdsDevice:
     def set_pump_fault(self, fault: bool = True) -> None:
         with self._lock:
             self.pump_fault = fault
+            self._recompute()
+
+    def set_fan_fault(self, fault: bool = True) -> None:
+        with self._lock:
+            self.fan_fault = fault
             self._recompute()
 
     def latch_display_off(self) -> None:
@@ -452,7 +464,24 @@ class HrdsDevice:
         # Fan: the unit's manual request (PM20) clamped into the active band
         # and driven as the output (T22, T24-T26). [INFERRED] a lowered maximum
         # pulls it down (plans/fan-speed-tests.md test G).
-        if not request:
+        # A fan that ran when the request ended runs on in wait_off at PF26
+        # (HB 6.2, T19).
+        if request:
+            self._run_on_until = None
+        elif i.get(R.FAN_STATUS) == 3 and self.run_on > 0:
+            self._run_on_until = time.monotonic() + self.run_on
+        running_on = (
+            not request
+            and self.run_on > 0
+            and self._run_on_until is not None
+            and time.monotonic() < self._run_on_until
+        )
+        if self.fan_fault:
+            i[R.FAN_STATUS] = 5
+        elif running_on:
+            i[R.FAN_STATUS] = 4
+            h[R.FAN_MANUAL] = 0
+        elif not request:
             i[R.FAN_STATUS] = 1
             h[R.FAN_MANUAL] = 0
         elif not started:
@@ -461,7 +490,9 @@ class HrdsDevice:
             i[R.FAN_STATUS] = 3
             low, high = self._fan_band(integ)
             h[R.FAN_MANUAL] = min(high, max(low, h.get(R.FAN_MANUAL, 0)))
-        out = h[R.FAN_MANUAL] if i[R.FAN_STATUS] == 3 else 0
+        out = {3: h[R.FAN_MANUAL], 4: h.get(R.PF26_FAN_POST_RUN, 0)}.get(
+            i[R.FAN_STATUS], 0
+        )
         i[R.FAN_MANUAL_REQUEST] = h.get(R.FAN_MANUAL, 0)
         i[R.FAN_OUTPUT] = out
         # The speed needs a tachometer input; without one 1117 reads 0 with the

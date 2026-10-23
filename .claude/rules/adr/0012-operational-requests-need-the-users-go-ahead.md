@@ -5,7 +5,7 @@ decision-makers: mikopp
 topics: [requests]
 paths:
   - "custom_components/innova_hrds/__init__.py"
-  - "custom_components/innova_hrds/{switch,climate,fan}.py"
+  - "custom_components/innova_hrds/{switch,climate}.py"
 ---
 
 # ADR-0012: Operational requests need the user's go-ahead

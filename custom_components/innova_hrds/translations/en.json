@@ -460,6 +460,9 @@
       "recirculation_active": {
         "name": "Recirculation active"
       },
+      "supply_fan_running": {
+        "name": "Supply fan running"
+      },
       "alarm_active": {
         "name": "Alarm active"
       },
@@ -613,11 +616,6 @@
           "summer": "Summer",
           "winter": "Winter"
         }
-      }
-    },
-    "fan": {
-      "hrds_supply_fan": {
-        "name": "Supply fan"
       }
     },
     "number": {

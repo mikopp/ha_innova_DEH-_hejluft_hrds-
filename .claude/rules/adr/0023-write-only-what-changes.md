@@ -1,11 +1,11 @@
 ---
 status: accepted
-date: 2026-10-21
+date: 2026-10-23
 decision-makers: mikopp
 topics: [modbus-writes]
 paths:
   - "custom_components/innova_hrds/__init__.py"
-  - "custom_components/innova_hrds/{climate,fan,switch,number,select}.py"
+  - "custom_components/innova_hrds/{climate,switch,number,select}.py"
 ---
 
 # ADR-0023: Write only what changes (EEPROM)

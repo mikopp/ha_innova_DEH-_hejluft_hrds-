@@ -6,7 +6,7 @@ topics: [modbus-writes, state]
 paths:
   - "custom_components/innova_hrds/__init__.py"
   - "custom_components/innova_hrds/entity_common.py"
-  - "custom_components/innova_hrds/{switch,number,select,fan,climate}.py"
+  - "custom_components/innova_hrds/{switch,number,select,climate}.py"
 ---
 
 # ADR-0006: A write takes or raises, and state is the unit's read-back

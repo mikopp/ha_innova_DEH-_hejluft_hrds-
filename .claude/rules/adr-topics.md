@@ -17,11 +17,11 @@ topics before the first edit: ADR-NNNN is `.claude/rules/adr/NNNN-*.md`; run
 - **modbus-reads** (polling, the block plan, decoding registers): ADR-0017, ADR-0018
 - **modbus-writes** (any write to the unit, the write paths, EEPROM wear): ADR-0006, ADR-0009, ADR-0010, ADR-0022, ADR-0023, ADR-0034
 - **requests** (switching the unit on/off, the DEU and INT requests, their guards): ADR-0012, ADR-0013, ADR-0014, ADR-0022, ADR-0024, ADR-0025
-- **state** (what an entity shows: read-back, unknown, unavailable, pending): ADR-0005, ADR-0006, ADR-0011, ADR-0024, ADR-0033, ADR-0034
+- **state** (what an entity shows: read-back, unknown, unavailable, pending): ADR-0005, ADR-0006, ADR-0011, ADR-0024, ADR-0028, ADR-0033, ADR-0034
 - **entities** (adding, grouping and renaming entities and devices): ADR-0002, ADR-0016, ADR-0017, ADR-0026, ADR-0030, ADR-0033
 - **config** (config and options flows, options, device identity, installer menu): ADR-0009, ADR-0010, ADR-0016, ADR-0017, ADR-0034
 - **climate** (the climate entity): ADR-0011, ADR-0025, ADR-0034
-- **fan** (the recirculation fan and the airflow estimate): ADR-0025, ADR-0033, ADR-0034
+- **fan** (the recirculation fan and the airflow estimate): ADR-0025, ADR-0028, ADR-0033, ADR-0034
 - **season** (summer and winter, heating): ADR-0013, ADR-0014
 - **water** (the water circuit and brine): ADR-0014, ADR-0015
 - **dependencies** (Home Assistant and pymodbus versions): ADR-0004

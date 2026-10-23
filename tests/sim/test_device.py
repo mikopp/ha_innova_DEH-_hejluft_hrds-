@@ -124,6 +124,23 @@ def test_fan_starts_at_the_band_minimum_and_follows_a_raised_one():
     assert dev.input[R.FAN_OUTPUT] == dev.holding[R.FAN_MANUAL] == 0
 
 
+def test_fan_runs_on_at_pf26_after_the_request():
+    """HB 6.2, T19: Wait OFF at PF26 after the request; 0 run-on stops at once."""
+    dev = HrdsDevice()
+    dev.holding[R.PF26_FAN_POST_RUN] = 4000
+    _dehumidify(dev)
+    dev.run_on = 3600
+    dev.write(R.DEU_REQUEST, 0)
+    assert dev.input[R.FAN_STATUS] == 4
+    assert dev.input[R.FAN_OUTPUT] == 4000
+    dev.run_on = 0
+    dev.read("input", R.FAN_STATUS, 1)
+    assert dev.input[R.FAN_STATUS] == 1
+    assert dev.input[R.FAN_OUTPUT] == 0
+    dev.set_fan_fault()
+    assert dev.input[R.FAN_STATUS] == 5
+
+
 def test_pm20_write_is_not_kept_and_outside_the_band_refused():
     """T23, T27, T28."""
     dev = HrdsDevice()

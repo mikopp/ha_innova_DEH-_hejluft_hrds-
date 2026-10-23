@@ -52,7 +52,7 @@ from .const import (
     C_HUMIDITY_PROBE_OK,
     C_INTEGRATION_AVAILABLE,
     C_INTEGRATION_REQUEST,
-    C_SUPPLY_FAN_STATUS,
+    C_SUPPLY_FAN_RUNNING,
     C_TEMP_PROBE_OK,
     C_UNIT_ON_OFF,
     C_UNIT_STATUS,
@@ -231,8 +231,8 @@ class HrdsClimate(HubBackedEntity, ClimateEntity):
             return HVACAction.COOLING
         if data.get(C_COMPRESSOR_STATUS) == "on" or data.get(C_DEHUM_REQUEST) == "on":
             return HVACAction.DRYING
-        # No request, but the unit runs its fan (an R unit).
-        if self._hub.has_fan and data.get(C_SUPPLY_FAN_STATUS) == "on":
+        # No request, but the unit runs its fan (an R unit), e.g. the run-on.
+        if self._hub.has_fan and data.get(C_SUPPLY_FAN_RUNNING) == "on":
             return HVACAction.FAN
         return HVACAction.IDLE
 

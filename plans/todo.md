@@ -132,7 +132,7 @@ in `doc/references/UNIT_BEHAVIOUR.md` §13. What they left open:
       `PF26` (40 %) for up to a minute more. Still to log every 5 s
       (`diagnose_hrds.py --watch`): compressor stop against `PE02`, the
       ramp-down (`PE25`), V3V + PM closing against `Pb01`, fan run-on against
-      `PF03`. Check the climate `hvac_action` and fan entity follow.
+      `PF03`. Check the climate `hvac_action` and `supply_fan_running` follow.
 - [ ] **First anti-stagnation pulse after a request: why 2 hours?** After the
       2026-10-22 stop the valve stayed shut from 07:37:58 to 09:39:57, then
       pulsed hourly again (T20); HB 6.4 says `Pb08` (60 min) after the valve
@@ -233,7 +233,8 @@ in `doc/references/UNIT_BEHAVIOUR.md` §13. What they left open:
 > The simulator (`tests/sim/device.py`) now models what the hardware showed:
 > the unit owns `PM20`, clamps it into the band and drives the fan at it; a
 > write is acknowledged and not kept, one outside the band is refused (T22–T28).
-> The fan entity and the climate entity no longer set the speed (ADR-0034).
+> There is no fan entity any more, and the climate entity has no fan mode
+> (ADR-0034).
 
 - [x] **Core assumption: compressor/dehumidify can run on passive MVHR flow
       alone (no unit fan running)** — this is architecturally confirmed: the
@@ -285,14 +286,13 @@ in `doc/references/UNIT_BEHAVIOUR.md` §13. What they left open:
 - [ ] Confirm `SupplyFan_Status` (1119) reports `1` (OFF) when fan mode = off
       and a mode is active, and that `recirculation_active` (1112) goes 0.
       Covered by the fan = 0 test below.
-- [ ] **Does the fan turn while 1119 reads `4` (wait_off, "Stopping")?** Record
-      1119, 639 and 1117 through a PF03 post-run after a request ends. Decides
-      the proposed
-      [ADR-0028](../doc/adr/proposed/0028-one-definition-of-fan-stopped.md) (today the
-      fan entity, the climate fan mode and the airflow disagree about it).
-- [ ] Verify the Low / Medium / High percentages (30 / 55 / 85 %) are
-      reasonable for the real unit; adjust in `climate.py` `_FAN_MODE_PCT` if
-      not. These are nominal choices, not values from the PDF.
+- [ ] **Does the fan stand still while 1119 reads `2` (wait_on, "Starting")
+      and turn while it reads `4` (wait_off, "Stopping")?** Record 1119 and 639
+      from a request's start to the end of the PF03 run-on, and look at the
+      fan. ADR-0028 counts On and Wait OFF as running (T19 saw 40 % in Wait
+      OFF); Wait ON as stopped is [INFERRED].
+- [x] ~~Verify the Low / Medium / High fan mode percentages~~: the climate
+      entity has no fan mode any more (ADR-0034).
 
 ## Fan = 0 during dehumidification, and keeping the damper closed (Modbus only)
 

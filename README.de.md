@@ -104,7 +104,9 @@ Sie spricht über Modbus TCP mit der Steuerplatine des Geräts und stellt bereit
 * **Sensoren, Binärsensoren, Schalter, Zahlen und Auswahlfelder**: Messwerte,
   Betriebszustand, Alarme, Anforderungen (Entfeuchten, Integration), Sollwerte
   und Lüfterbänder, Saison.
-* **Lüfter** (nur `R`-Variante): der Zuluft-/Umluftlüfter als Prozentwert.
+* **Lüfter** (nur `R`-Variante): der Zuluft-/Umluftlüfter als Messwerte
+  (läuft, Status, Ausgang in %). Ein- und ausschalten kann ihn nur das Gerät
+  mit seinen Anforderungen, nicht Home Assistant.
 * **Wasserkreis-Diagnose**: Ventil/Pumpe, Kondensatorventil, Wasseralarme und
   eine Zusammenfassung *Water circuit check* (nur lesend, das Gerät steuert
   seinen Wasserkreis selbst).

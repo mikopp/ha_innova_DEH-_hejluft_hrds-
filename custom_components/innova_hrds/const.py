@@ -21,7 +21,6 @@ from homeassistant.components.climate import (
     ClimateEntityDescription,
     ClimateEntityFeature,
 )
-from homeassistant.components.fan import FanEntityDescription
 from homeassistant.components.number import NumberEntityDescription, NumberMode
 from homeassistant.components.select import SelectEntityDescription
 from homeassistant.components.sensor import (
@@ -155,6 +154,10 @@ FAN_STATUS = {
     4: "wait_off",
     5: "alarm",
 }
+# The fan statuses in which the fan turns: ON and the run-on Wait OFF (at PF26,
+# T19). Wait ON is the PS01 delay before the start (UNIT_BEHAVIOUR.md 9.2).
+# The only definition of a running fan (ADR-0028).
+FAN_RUNNING_STATUSES = frozenset({"on", "wait_off"})
 COMPRESSOR_STATUS = {
     0: "disabled",
     1: "alarm",
@@ -241,6 +244,8 @@ C_FAN_INTEGRATION_REQUEST = "fan_integration_request"
 C_ALARM_ACTIVE = "alarm_active"
 # Computed binary sensor: damper open and fan running (no register says it).
 C_RECIRCULATION_ACTIVE = "recirculation_active"
+# Computed binary sensor: the fan turns, from its status (1119).
+C_SUPPLY_FAN_RUNNING = "supply_fan_running"
 # Read-only sensors derived from holding registers (RW=0)
 C_MACHINE_TYPE = "machine_type"
 C_INTEGRATION_AVAILABLE = "integration_available"
@@ -311,7 +316,7 @@ C_ALARM_ANTIFREEZE = "alarm_water_antifreeze"
 C_ALARM_FILTER = "alarm_dirty_filter"
 # Computed (non-register-backed) airflow sensors
 C_MAX_TOTAL_AIRFLOW = "max_total_airflow"
-# Composite fan entity (the R variant's recirculation fan).
+# The fan entity up to 0.9.4; only its registry entry is removed at setup.
 C_FAN_ENTITY = "hrds_supply_fan"
 C_SUPPLY_FAN_MAX_AIRFLOW = "supply_fan_max_airflow"
 C_SUPPLY_FAN_AIRFLOW = "supply_fan_airflow"
@@ -1335,7 +1340,7 @@ INSTALLER_DEVICE_SUFFIX = "-installer"
 # airflow and reads its damper output (1134) as disabled. Not created there.
 FAN_KEYS = frozenset(
     {
-        C_FAN_ENTITY,
+        C_SUPPLY_FAN_RUNNING,
         C_SUPPLY_FAN_OUTPUT,
         C_SUPPLY_FAN_RPM,
         C_SUPPLY_FAN_STATUS,
@@ -1416,6 +1421,11 @@ COMPUTED_BINARY_SENSORS: Dict[str, Dict[str, Any]] = {
     # On while the damper (1134) is open and the fan (1119) runs: the R
     # variant's recirculation. No register reports it (UNIT_BEHAVIOUR.md §9.3).
     C_RECIRCULATION_ACTIVE: {"NAME": "Recirculation active"},
+    # The unit switches the fan with its requests; Modbus cannot (ADR-0034).
+    C_SUPPLY_FAN_RUNNING: {
+        "NAME": "Supply fan running",
+        "DC": BinarySensorDeviceClass.RUNNING,
+    },
 }
 
 # Requests that make the unit do something. They are refused until the user
@@ -1478,11 +1488,6 @@ class MyButtonEntityDescription(ButtonEntityDescription):
 
 
 @dataclass
-class MyFanEntityDescription(FanEntityDescription):
-    """Describes the composite supply-fan entity."""
-
-
-@dataclass
 class MyClimateEntityDescription(ClimateEntityDescription):
     """Describes the composite climate entity."""
 
@@ -1502,7 +1507,6 @@ BINARY_TYPES: dict[str, MyBinaryEntityDescription] = {}
 SELECT_TYPES: dict[str, MySelectEntityDescription] = {}
 NUMBER_TYPES: dict[str, MyNumberEntityDescription] = {}
 CLIMATE_TYPES: dict[str, MyClimateEntityDescription] = {}
-FAN_TYPES: dict[str, MyFanEntityDescription] = {}
 BUTTON_TYPES: dict[str, MyButtonEntityDescription] = {}
 # Composite switches that are not backed by a register.
 OPERATION_TYPES: dict[str, MyBinaryEntityDescription] = {}
@@ -1669,13 +1673,6 @@ def init() -> None:
         name="Climate",
         translation_key="hrds_climate",
     )
-    # Also composite: backed by the manual-speed register plus status readings.
-    FAN_TYPES[C_FAN_ENTITY] = MyFanEntityDescription(
-        key=C_FAN_ENTITY,
-        name="Supply fan",
-        translation_key="hrds_supply_fan",
-    )
-
     BUTTON_TYPES[C_INSTALLER_REFRESH] = MyButtonEntityDescription(
         key=C_INSTALLER_REFRESH,
         name="Refresh installer parameters",

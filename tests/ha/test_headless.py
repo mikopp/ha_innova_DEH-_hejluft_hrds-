@@ -395,8 +395,8 @@ async def test_standby_mode_clears_requests_and_keeps_the_unit_on(setup, clock):
 @pytest.mark.parametrize("sim_options", [{"overlays": ("non_r",)}])
 async def test_non_r_unit_has_no_fan_entities(setup):
     s = setup
-    assert s.entity_id("fan", "hrds_supply_fan") is None
     for platform, key in (
+        ("binary_sensor", "supply_fan_running"),
         ("sensor", "fan_manual_speed"),
         ("sensor", "supply_fan_output"),
         ("sensor", "supply_fan_airflow"),
