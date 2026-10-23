@@ -1,0 +1,8 @@
+^custom_components/
+^tests/
+^scripts/
+^requirements_test\.txt$
+^pyproject\.toml$
+^\.github/ha-versions/
+^\.github/test-paths$
+^\.github/workflows/(tests|e2e)\.yaml$

@@ -48,6 +48,7 @@ in this order, empty ones left out: `### ⚠️ Breaking changes`,
 
 ### 🧪 Tests and CI
 
+- **A pull request that changes only documentation no longer runs the in-process and Home Assistant container tests.** The two required checks pass at once; `main`, the nightly run and releases still run everything (ADR-0035).
 - **The simulator runs the fan as the real unit does:** it owns PM20 (1614), clamps it into the band and drives the fan at it; a PM20 write is not kept, one outside the band answers exception 04. The three fan hypotheses (`fan_model`) are gone. It can also run the fan on at PF26 after a request (`run_on`) and raise a fan alarm (`set_fan_fault`). Decisions: ADR-0034, which supersedes ADR-0008, and ADR-0028 (when the fan runs).
 - **The bring-up diagnostic's watch (`--watch`) also reads PM20 and the fan band registers.**
 - **The bring-up diagnostic reports whether an input is allocated to the fan tachometer.** Run observations moved to `tests/devices/runs/`, so the seed tests no longer load them as register dumps.

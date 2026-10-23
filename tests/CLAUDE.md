@@ -130,5 +130,7 @@ from the image's modbus manifest and installs that. A bare `pytest` skips
 ## CI
 `tests.yaml` runs `sim`, `ha`, `test_wiring` and `test_release_script` (coverage gate 90 %);
 `e2e.yaml` runs `e2e` (nightly also against the HA `beta` image, allowed to
-fail); `release.yaml` runs both on the tagged commit before packaging. Triggers
-and branch protection: ADR-0020.
+fail); `release.yaml` runs both on the tagged commit before packaging. On a
+pull request both skip their test steps (and pass) unless a changed file
+matches `.github/test-paths`: add a path there when a test starts reading it
+(ADR-0035). Triggers and branch protection: ADR-0020.

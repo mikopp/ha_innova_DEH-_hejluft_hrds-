@@ -62,6 +62,7 @@ describes the format and how agents use it. In short:
 | [0032](../../.claude/rules/adr/0032-prs-record-changes-under-unreleased-and-never-set-a-version.md) | PRs record changes under Unreleased in release-notes shape and never set a version | `CHANGELOG.md`, `.claude/rules/changelog.md` |
 | [0033](../../.claude/rules/adr/0033-what-the-unit-cannot-report-is-derived-or-unknown.md) | What the unit cannot report is derived or unknown, never a stand-in register | `__init__.py`, `const.py` |
 | [0034](../../.claude/rules/adr/0034-the-fan-is-the-units-home-assistant-reads-it.md) | The fan is the unit's; Home Assistant shows it and sets only the band | `climate.py`, `config_flow.py`, `__init__.py`, `const.py`, `tests/sim/device.py` |
+| [0035](../../.claude/rules/adr/0035-pr-test-runs-skip-when-no-code-changed.md) | A pull request that changes no code skips the test runs, and the checks still pass | `.github/workflows/{tests,e2e}.yaml`, `.github/test-paths` |
 
 Not in force and not loaded; read only when recording an ADR (ADR-0029): [superseded (4)](superseded/README.md).
 <!-- adr-index:end -->
