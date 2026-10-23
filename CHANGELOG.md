@@ -21,7 +21,12 @@ in this order, empty ones left out: `### ⚠️ Breaking changes`,
 
 ### 📚 Documentation
 
-- **Unit behaviour cites parameters by code, with a lookup of handbook default and shipped value** (`UNIT_BEHAVIOUR.md` §15), plus evidence rows T11 to T17 from the first dehumidify run and new open points in `plans/todo.md`.
+- **Unit behaviour cites parameters by code, with a lookup of handbook default and shipped value** (`UNIT_BEHAVIOUR.md` §15), plus evidence rows T11 to T22 from the first two dehumidify runs and new open points in `plans/todo.md`.
+- **Why the supply fan speed reads 0:** the unit only measures it when an input is allocated to the fan tachometer, and the reference unit has none. Also documented: the stop sequence, that the unit sets the manual fan speed itself at each start and stop, and that register 1112 is not a recirculation flag.
+
+### 🧪 Tests and CI
+
+- **The bring-up diagnostic reports whether an input is allocated to the fan tachometer.** Run observations moved to `tests/devices/runs/`, so the seed tests no longer load them as register dumps.
 
 ---
 

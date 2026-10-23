@@ -121,7 +121,7 @@ for 40 %). Min/Max apply to the modulation band used in each mode.
 | `0x045A` | 1114 | `SupplyFan_ManualRequest`  | R/O | — | 0–100 | Current manual fan request |
 | `0x045C` | 1116 | `SupplyFan_RemoteRequest`  | R/O | — | 0–100 | Current potentiometer fan request |
 | `0x027F` | 639  | `outAO_SupplyFan`          | R/O | — | 0–100 | Actual supply-fan analog output % |
-| `0x045D` | 1117 | `actRPMsupplyFan`          | R/O | — | 0–65535 | Supply-fan actual RPM. Read 0 with the fan running (unresolved, `plans/todo.md`) |
+| `0x045D` | 1117 | `actRPMsupplyFan`          | R/O | — | 0–65535 | Supply-fan actual RPM. Needs an input allocated to the tachometer (input function 45 or 46, §16 `HA..`/`HB..`); 0 without one (UNIT_BEHAVIOUR.md §9.1) |
 
 ### 6.1 How the bands apply
 
@@ -150,7 +150,7 @@ linearly into the active band (handbook §6.2). Whether `PM20_SupplyFan_Manual`
 |----------|----------|-------------------|--------|
 | `0x0450` | 1104 | `sm_UnitStatus`      | `0=OFF by display`, `1=OFF by DI`, `2=OFF by BMS`, `3=OFF by scheduler`, `4=OFF by RTC`, `5=ON` |
 | `0x0456` | 1110 | `ModeStatus`         | `0=Summer manual`, `1=Winter manual`, `2=Summer auto`, `3=Winter auto`, `4=Summer DI`, `5=Winter DI` |
-| `0x0458` | 1112 | `FanIntegration_Request` | `0=No`, `1=Yes` — "Fans integration request". Not the INT request (1139), see §13. Stayed `0` while the fan ran and the damper was open for a dehumidify request (UNIT_BEHAVIOUR.md §13, T16), so it is not a "fan running" flag; it may be `1` only for an INT request (untested). |
+| `0x0458` | 1112 | `FanIntegration_Request` | `0=No`, `1=Yes` — "Fans integration request". Not the INT request (1139), see §13. Stayed `0` while the fan ran and the damper was open for two dehumidify requests (UNIT_BEHAVIOUR.md §13, T16, T18), so it is neither a "fan running" nor a "recirculating" flag; it may be `1` only for an INT request (untested). |
 | `0x045F` | 1119 | `SupplyFan_Status`   | `0=Disable`, `1=OFF`, `2=Wait ON`, `3=ON`, `4=Wait OFF`, `5=Alarm` |
 | `0x0461` | 1121 | `DehumRequest`       | `0=No`, `1=Yes` — dehumidification currently requested |
 | `0x0462` | 1122 | `CmpStatus`          | `0=Disable`, `1=Alarm`, `2=Manual`, `3=Wait ON`, `4=ON`, `5=Wait OFF`, `6=OFF` — compressor (active cooling/dehum) |

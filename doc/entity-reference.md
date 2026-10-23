@@ -94,7 +94,7 @@ device (see the [beta banner](../README.md#release-094--beta-not-10-yet)).
 | `sensor.actual_setpoint` | Active setpoint | °C | — | Reg 1111; active room setpoint in use |
 | `sensor.supply_fan_output` | Supply fan output | % | ³ Built-in | Reg 639 (×0.01 %); actual fan analog output |
 | `sensor.compressor_output` | Compressor output | % | ³ Built-in | Reg 641 (×0.01 %); compressor modulation level |
-| `sensor.supply_fan_rpm` | Supply fan speed | rpm | ³ Built-in | Reg 1117; reads 0 on the reference unit while the fan runs, under investigation |
+| `sensor.supply_fan_rpm` | Supply fan speed | rpm | ³ Built-in | Reg 1117; 0 unless an input is allocated to the fan tachometer, which none is on the reference unit |
 | `sensor.exhaust_temperature` | Exhaust air temperature | °C | External NTC | Reg 502; monitoring only |
 | `sensor.evaporator_temperature` | Evaporator temperature | °C | ³ Built-in | Reg 511; drives compressor modulation, works on a headless unit |
 | `sensor.recirculation_damper` | Recirculation damper | enum | ³ Built-in | Reg 1134; Off/On/Disabled, the state of the motorised recirculation damper (R-variant only). *On* confirms room air is being recirculated across the coil; *Disabled* means no damper is wired (non-`R`) |
@@ -112,7 +112,7 @@ Alarm sensors map to a single bit of a packed alarm register (§9.1 in
 | Entity | Name | Probe needed | What ON means |
 |---|---|---|---|
 | `binary_sensor.dehumidify_request` | Dehumidify requested | ³ | Dehumidification currently requested |
-| `binary_sensor.recirculation_active` | Recirculation active | ³ | Reg 1112; meaning unconfirmed (stayed 0 with the fan running), name under review |
+| `binary_sensor.recirculation_active` | Recirculation active | ³ | Reg 1112 (`FanIntegration_Request`); not a recirculation flag: stays 0 while the unit recirculates. Recirculation shows as damper output on with the fan running |
 | `binary_sensor.alarm_active` | Alarm active | ³ | At least one alarm is active |
 | `binary_sensor.alarm_compressor_lowpressure` | Alarm: compressor low-pressure / frost | ³ | AL11, reg 768 bit 10: Compressor stopped (low pressure / frost thermostat) |
 | `binary_sensor.alarm_compressor_highpressure` | Alarm: compressor high-pressure | ³ | AL12, reg 768 bit 11: Compressor stopped (high pressure switch) |

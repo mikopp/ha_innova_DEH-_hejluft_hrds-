@@ -21,8 +21,8 @@ evidence log, replace the `[INFERRED]` tags it settles, and fix the code/docs.
       value. It sits next to the 0–100 % fan-request registers; if hardware shows
       a percentage, change it from a binary sensor to a `sensor` with
       `FAKTOR: 0.01`. (See `const.py` `C_RECIRCULATION_ACTIVE`.)
-      Update 2026-10-22: it stayed 0 while the fan ran for a DEU request, so it is
-      not a "fan running" flag either; see *First dehumidify run*.
+      Update 2026-10-23: it stayed 0 through two recirculating DEU runs, so it
+      is neither "fan running" nor "recirculating"; see *First dehumidify run*.
 - [ ] **Air quality (506)** unit/scale and whether the probe is even fitted.
       The device class is now left unset: `AQI` accepts only a `None` unit in
       Home Assistant, so pairing it with "ppm" was invalid. If the probe turns
@@ -84,35 +84,33 @@ evidence log, replace the `[INFERRED]` tags it settles, and fix the code/docs.
 
 A Modbus dehumidify (DEU) request on the headless HRDS+ 30 R worked: damper, fan,
 compressor and water valve came on in order, the evaporator settled on its
-setpoint, no alarm. Data: `tests/devices/hrds_30+_first_dehumidify_run_2026-10-22.json`;
-evidence T11–T17 in `doc/references/UNIT_BEHAVIOUR.md` §13. What it left open:
+setpoint, no alarm. A second run followed on 2026-10-23. Data:
+`tests/devices/runs/hrds_30+_first_dehumidify_run_2026-10-22.json` and
+`tests/devices/runs/hrds_30+_dehumidify_run_2026-10-23.json`; evidence T11–T22
+in `doc/references/UNIT_BEHAVIOUR.md` §13. What they left open:
 
-- [ ] **Fan RPM (1117) reads 0 with the fan running.** The owner confirms the fan
-      turns and 639 reads 50 %. Working assumption: the unit does deliver a speed
-      and we read it wrongly. Check, in this order:
-      1. Read 1113–1118 raw with `tests/diagnose_hrds.py` while a DEU request
-         runs and compare with the standby dump (all 0 there).
-      2. Read 1117 and its neighbours with FC 03 as well as FC 04, in case the
-         speed sits at another address or in the holding space.
-      3. Find in the handbook (§6.2 lists a fan alarm "overheating or speed
-         sensing") and the Modbus manual (p.8, p.15) which input or parameter
-         delivers the speed signal, and whether it must be enabled (the HC/HD
-         allocations, the I/O map).
-      4. If the raw value is not 0, check scale and type (rps, pulses, ×10).
-      Until then the README marks `sensor.supply_fan_rpm` as under investigation.
-- [ ] **What is 1112 (`FanIntegration_Request`)?** It stayed 0 with the fan and
-      damper on for DEU, so it is not "fan running" (docs and README corrected).
-      Hypothesis: 1 only for an INT request. Read it during the first INT run. If
-      it stays 0, drop `binary_sensor.recirculation_active` or rename it; a rename
-      touches the en/de translations and needs a CHANGELOG line (the unique id
-      stays).
-- [ ] **Who wrote `PM20` (1614) and the display request (1114)?** Both went 0 to
-      50 % in the poll in which the fan started. Look in the HA logbook and the
-      integration's debug log for a write to 1614 around 07:04 on 2026-10-22, then
-      read 1614 after the fan has stopped: back to 0? If the unit sets it,
-      `commanded_percent` and `number.manual_fan_speed` do not show what we
-      commanded, and the rescale/clamp sweep below has to start from a stopped
-      unit.
+- [x] **Fan RPM (1117) reads 0 with the fan running.** Answered 2026-10-23: the
+      speed needs an input allocated to the tachometer (input function 45/46),
+      and none is (T21); the 0 is the unit's value, not a wrong read
+      (`UNIT_BEHAVIOUR.md` §9.1). The fan's running is confirmed by the owner
+      and by the MVHR flow dip at its start (T18). `diagnose_hrds.py` now prints
+      the tachometer allocation in its snapshot; one read of the running unit
+      confirms the dump. Whether the fan's tachometer wire could be connected to
+      a free input is an installer question. Integration side: show the speed
+      only when an input is allocated (entity PR).
+- [ ] **What is 1112 (`FanIntegration_Request`)?** It stayed 0 through two
+      recirculating DEU runs (T16, T18), so it is neither "fan running" nor
+      "recirculating". Hypothesis: 1 only for an INT request. Read it during the
+      first INT run. Integration side: derive `recirculation_active` from the
+      damper (1134) and fan status (1119) and show 1112 under its own name
+      (entity PR).
+- [x] **Who wrote `PM20` (1614) and the display request (1114)?** The unit: both
+      went 0 → 50 % at the fan start of both runs and 50 → 0 at the stop, with no
+      write from Home Assistant (T22). So `commanded_percent` and
+      `number.manual_fan_speed` show the unit's value, a percentage written while
+      idle is overwritten at the next start, and the rescale/clamp sweep below
+      has to write `PM20` while a request runs. Open: does a `PM20` written
+      during a request hold until its end?
 - [ ] **Which timer held the compressor?** It came on 6.5–8 min after the
       request and 5–7 min after the fan; `PE04` ships at 180 s, so something else
       held it. `PE03` (420 s) fits numerically, but it is defined between two
@@ -120,26 +118,33 @@ evidence T11–T17 in `doc/references/UNIT_BEHAVIOUR.md` §13. What it left open
       `SupplyFan_Status` (1119) every 5 s through the next start to see the stages,
       and repeat a start soon after a compressor stop to see whether `PE03` counts
       from the last start.
-- [ ] **Record the stop sequence.** Switch the request off and log every 5 s:
-      compressor stop against `PE02`, the ramp-down (`PE25`), V3V + PM closing
-      against `Pb01`, fan run-on against `PF03`/`PF26`, damper closing, then the
-      first anti-stagnation pulse a `Pb08` wait after the valve closed. Check the
-      climate `hvac_action` and fan entity follow.
+- [ ] **Record the stop sequence.** Seen at 1-minute resolution (T19): the
+      compressor, V3V + PM and damper were off within 61 s, the fan ran on at
+      `PF26` (40 %) for up to a minute more. Still to log every 5 s
+      (`diagnose_hrds.py --watch`): compressor stop against `PE02`, the
+      ramp-down (`PE25`), V3V + PM closing against `Pb01`, fan run-on against
+      `PF03`. Check the climate `hvac_action` and fan entity follow.
+- [ ] **First anti-stagnation pulse after a request: why 2 hours?** After the
+      2026-10-22 stop the valve stayed shut from 07:37:58 to 09:39:57, then
+      pulsed hourly again (T20); HB 6.4 says `Pb08` (60 min) after the valve
+      closes. Repeat after the next stop and see whether it is again 2 hours.
 - [ ] **Does the unit judge the first, standing brine reading?** At the request
       start the probe read the warm standing brine (18.3 °C) and 14.8 °C two polls
       after V3V + PM opened. If the brine ever flows below `PU08` but stands above
       it, does the unit take the passive path or start the compressor, and do
       `PC07`/AL03 judge the standing value? Watch `water_temperature` and
       `compressor_status` at the start of a request in early summer.
-- [ ] **Evaporator undershoot to −3.1 °C with the MVHR on its lowest preset
-      (about 100 m³/h).** AL11 stayed clear. Start transient (the `PE28` step) or
-      too little airflow? Repeat one start with the MVHR on a higher preset and
-      compare the minimum evaporator temperature and the settling time. Do not
-      touch `PU11`/`PU12` for this.
+- [x] **Evaporator undershoot to −3.1 °C with the MVHR on its lowest preset
+      (about 100 m³/h).** Answered 2026-10-23: with the MVHR at 140–163 m³/h the
+      start dipped further, to −9.6 °C, and settled on `PU11` within 6 minutes,
+      AL11 clear (T18). It is the start transient, not too little airflow.
 - [ ] **Supply-air temperature.** The unit's supply probe reads unknown, so "DEU
       gives dry air at about room temperature" (HB 2.6.1) is unverified. Log an
       external sensor downstream of the HRDS through a run; that also shows what
-      the internal valve K4 does to the air.
+      the internal valve K4 does to the air. Nothing on the unit can stand in:
+      the water probe reads the water before the condenser (T18), and the
+      ComfoAir supply sensor sits before the HRDS. With about 16.5 °C brine
+      expect below room temperature (HB 3.8.5: more flow, cooler supply).
 - [ ] **Second dump while running.** Take a read-only dump with
       `diagnose_hrds.py` during a DEU request and diff it against
       `hrds_30+_headless_factory_state.json`: every register that changed should be

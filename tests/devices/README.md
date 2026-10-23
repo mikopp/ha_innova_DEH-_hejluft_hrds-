@@ -37,3 +37,10 @@ instead. Two scenarios run today:
 
 `display_with_probes.json` (display plus external probes on AI2/AI3) covers the
 external-probe path.
+
+## Run observations (`runs/`)
+
+`runs/` holds what was seen while a real unit ran (timelines, delays, values
+read from Home Assistant history), the data behind the `T` rows of
+`doc/references/UNIT_BEHAVIOUR.md` §13. They are not register dumps, so they
+live outside this folder's top level, which the seed tests load.

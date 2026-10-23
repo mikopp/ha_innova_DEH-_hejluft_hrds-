@@ -1111,6 +1111,21 @@ def step_snapshot(dev: Dev) -> dict[str, dict[int, int]]:
     ):
         if addr in hold:
             say(INFO, f"reg {addr} {what} = {hold[addr]}")
+    # actRPMsupplyFan (1117) needs an input allocated to the fan tachometer:
+    # code 45 (supply fan) or 46 (return fan) on a DI, HB 6 input table; the
+    # same codes on an analog input mean room / outdoor temperature.
+    alloc = {
+        **{1803 + n: f"HA{n:02}" for n in range(1, 19)},
+        **{1821 + n: f"HB{n:02}" for n in range(1, 8)},
+    }
+    tacho = [f"{alloc[a]}={hold[a]}" for a in alloc if hold.get(a) in (45, 46)]
+    if any(a in hold for a in alloc):
+        say(
+            INFO,
+            "fan tachometer input: "
+            + (", ".join(tacho) if tacho else "none allocated (1117 cannot count)")
+            + f"; actRPMsupplyFan 1117 = {inp.get(1117)}",
+        )
     print(
         "  Unmapped analog-output allocations (HC03 AO3, HC04 AO4 = supply fan) and\n"
         "  the other HD0x relay allocations sit in the holding dump above; compare\n"

@@ -353,7 +353,8 @@ Sources: HB 2.7 (OFF, ON-standby, DEU, INT), HB 6.2–6.5 (sequences), HB 7.3
    start speed `PE28` for `PE30`, then modulates [HB 6.3].
 5. Commissioning note: at least **7 minutes** from activation to the first
    compressor start [HB 8.2]. Seen: the compressor came on 6.5 to 8 minutes after the request and 5 to 7
-   minutes after the fan, so `PE04` alone is not what held it [T11]. Which
+   minutes after the fan, so `PE04` alone is not what held it [T11]; the second
+   run gave 6.4 to 7.4 and 5 to 6 minutes [T18]. Which
    timer does is open: `PE03` fits the numbers but is defined between two
    compressor starts, and the recorded history shows no start in the 12 hours
    before [INFERRED; `plans/todo.md`].
@@ -366,13 +367,18 @@ time program blocks it, room T < `PU13`, or (summer) water < `PU08` [HB 6.3].
 1. Request ends (all sources clear) [HB 6.3].
 2. Compressor stops once its minimum on time `PE02` has passed; on an OFF or a
    blocking alarm it ramps down via `PE25` [HB 6.3].
-3. V3V + PM stay open for the run-on `Pb01` (§15), so water keeps flowing while the compressor ramps down [HB 6.4]. The stop
-   sequence has not been recorded yet [`plans/todo.md`].
+3. V3V + PM stay open for the run-on `Pb01` (§15), so water keeps flowing while the compressor ramps down [HB 6.4].
 4. Fan runs on for `PF03` at speed `PF26`, keeps its minimum run time `PF01`,
    and **in any case until V3V has closed** [HB 6.2].
 5. Damper closes after the request has ended, the compressor is off and V3V
    has closed [HB 6.5].
 6. After the valve closes, the anti-stagnation cycle starts counting [HB 6.4].
+
+Seen at 1-minute resolution [T19]: compressor in "Wait OFF" within 29 s of the
+request ending; compressor off, V3V + PM closed and damper closed in the next
+poll (within 61 s); the fan then in "Wait OFF" at 40 % (`PF26` as shipped) with
+the damper already closed, and off one poll later. The first anti-stagnation
+pulse came about 2 hours after the valve closed, not one `Pb08` wait [T20].
 7. With `PU09` second step active, the request counts as finished only after
    `PU10` has passed since the compressor stopped; water keeps flowing
    meanwhile [HB 6.3].
@@ -508,7 +514,9 @@ Observations and consequences:
   Free-Cooling/Free-Heating" relay output, one of the allocatable outputs
   [HB 5.3]; [INFERRED] that a standard HRDS+ has no such bypass wired. The reference unit ships with `PG03` on and no outdoor probe (§15).
 * Exhaust and discharge probes are display-only [INFERRED from HB 6, which
-  uses neither].
+  uses neither]. Without them the unit has no reading of the air it supplies:
+  on the reference unit 502 and 503 read the sentinel while dehumidifying, so
+  the reheat to about room temperature (§2.2) is not seen from the unit [T18].
 * Old CNU display (`HA00 = 1/2`): the reference unit shipped with the old-CNU value without any display (§15).
 
 ## 9. Fan
@@ -534,11 +542,18 @@ Observations and consequences:
 * Read-backs: `outAO_SupplyFan` (actual output), `actRPMsupplyFan`,
   `SupplyFan_ManualRequest` (display's request), `SupplyFan_RemoteRequest`
   (potentiometer) [MB p.7, p.8, p.15]. On the reference unit `outAO_SupplyFan`
-  followed the fan (50 % while it ran), but `actRPMsupplyFan` read 0 with the
-  fan running [T16]. The register is documented as a speed, so the read is
-  what is suspect, not the fan [`plans/todo.md`]. The manual request
-  registers (`PM20` and the display request) went from 0 to 50 % in the poll
-  in which the fan started [T16]; who wrote them is open [`plans/todo.md`].
+  followed the fan (50 % while it ran) [T16].
+* `actRPMsupplyFan` needs a tachometer signal on an input: input function 45
+  ("AI: Return/room temp. / DI: Tachometer signal supply fan") or 46 (return
+  fan) [HB 5.3, input functions]. No input of the reference unit is allocated
+  to either [T21], and 1117 read 0 with the fan running [T16, T18]: the 0 is
+  the unit's value, not a wrong read. The speed-sensor alarm (`PA23..PA25`)
+  can then not act either [INFERRED].
+* The unit writes the manual request itself: `PM20` and the display request
+  went from 0 to `PF28` (50 %) in the poll in which the fan started and back
+  to 0 when the request ended, with no write from the BMS [T16, T22]. A value
+  written to `PM20` therefore does not survive the next request [INFERRED from
+  T22; `plans/todo.md`].
 
 ### 9.2 Timing
 
@@ -561,6 +576,12 @@ Observations and consequences:
   valve, damper and VMC, then fan after a delay, then compressor [V#76];
   setting the fan to 0 does not help, the damper opens anyway [V#78].
 * No register selects "dehumidify without recirculation" [MB].
+* No single register reports "recirculating": recirculation is the damper
+  output (1134) on with the fan running. `FanIntegration_Request` (1112)
+  stayed 0 throughout two recirculating dehumidify runs [T16, T18].
+* When the fan started, the MVHR's constant-flow supply dropped from 163 to
+  115 m³/h for about a minute and then recovered [T18]: the running
+  recirculation fan changes the pressure in the MVHR supply duct.
 * Field reports (unofficial, not tried here) [F#77–#79, #93]:
   * Disabling the fan output (AO4) or the damper output (DO1) stops the
     compressor from starting.
@@ -611,6 +632,9 @@ refrigerant circuit works on MVHR flow alone follows from the design
   (the handbook's `PE08`/`PE09` defaults are 1 % every 10 s) and the evaporator
   settled on `PU11` a few minutes later at about 25 % output. AL11 stayed
   clear. The MVHR supplied about 100 m³/h on its lowest preset throughout.
+  In the second run, with the MVHR at 140 to 163 m³/h, the same start dipped
+  further, to −9.6 °C, and settled on `PU11` at 27 % within 6 minutes [T18]: the
+  dip is the start transient, not too little airflow.
 
 ## 11. Water circuit
 
@@ -649,7 +673,8 @@ refrigerant circuit works on MVHR flow alone follows from the design
   [HB 6.4]. Seen with the shipped `Pb07`/`Pb08`: valve and pump open for about a
   minute, stay shut for the `Pb08` wait counted from the valve closing, and
   repeat, while the unit is ON-standby; the switch-on pulse is a little longer
-  [T13].
+  [T13]. After a request the first pulse came about 2 hours after the valve
+  closed, then hourly again [T20]; why is open [`plans/todo.md`].
 * While the unit is OFF there is no pulse: none in 8.5 hours of `off_by_bms`,
   while the same unit pulsed hourly when ON [T14]. That agrees with HB 2.7
   (lists it under ON) and HB 3.8.7 (recommends OFF to avoid cold bursts on
@@ -671,7 +696,11 @@ brine standing in the pipe, which warms up while nothing flows; once V3V + PM
 open it falls to the circuit's temperature within about two minutes (T17;
 18.7 °C standing in T3). A comparison against `PU08`, `PC07`, `PC08` or `PA43`
 right at a request start therefore sees the standing value first. Whether the
-unit decides on that first reading is open [`plans/todo.md`].
+unit decides on that first reading is open [`plans/todo.md`]. With no flow the
+probe also follows the air through the unit (it rose 16.6 → 18.1 °C with the
+evaporator probe when warmer MVHR air arrived), and it did not rise when the
+compressor started [T18]: it reads the water before the condenser, so it
+cannot show the condenser heat [INFERRED from T18].
 
 ## 12. Alarms and what they do to the flow
 
@@ -698,7 +727,7 @@ Codes, bit positions and reset registers:
 * Alarms are visible while the unit is OFF [HB 7.3].
 * No alarm bits were set on the reference unit as delivered [T4], nor during
   the first dehumidify run, including AL11 at the −3.1 °C evaporator reading
-  [T12, T15].
+  [T12, T15], nor at −9.6 °C in the second [T18].
 
 ---
 
@@ -721,16 +750,21 @@ probes). "Dump" means
 | T8 | 2026-10-21 | OFF written to `Status_OnOff_byBMS`: register read ON for several polls; register and `sm_UnitStatus` changed together at one later poll | PR #32 |
 | T9 | 2026-10-20 | Through the RS-485→TCP gateway a 120-register read got no reply at all; 10-register reads covered the whole map | PR #28 |
 | T10 | 2026-10-22 | A pump on the `PM` output ran when the unit started a request; the water valve/pump read-back (1126) followed. Run-on `Pb01` and the OFF edge not logged | owner |
-| T11 | 2026-10-22 | First Modbus dehumidify (DEU) request, written 07:03:53. `DehumRequest`, damper (1134) and V3V + PM (1126) on within 28 s; fan on 32 to 120 s after the damper; compressor on 6.5 to 8 min after the request and 5 to 7 min after the fan; fan output 50 %, `SupplyFan_Status` on, K4 (1124) = 1 | [run file](../../tests/devices/hrds_30+_first_dehumidify_run_2026-10-22.json) |
-| T12 | 2026-10-22 | Compressor and evaporator in that run: output 15.7, 32.8, 44.0 %, evaporator 18.2, 5.6, −3.1 °C in three polls; then output stepping down about 6 % per minute and the evaporator back on 6.1 °C at 25 % a few minutes later; MVHR about 100 m³/h | [run file](../../tests/devices/hrds_30+_first_dehumidify_run_2026-10-22.json) |
+| T11 | 2026-10-22 | First Modbus dehumidify (DEU) request, written 07:03:53. `DehumRequest`, damper (1134) and V3V + PM (1126) on within 28 s; fan on 32 to 120 s after the damper; compressor on 6.5 to 8 min after the request and 5 to 7 min after the fan; fan output 50 %, `SupplyFan_Status` on, K4 (1124) = 1 | [run file](../../tests/devices/runs/hrds_30+_first_dehumidify_run_2026-10-22.json) |
+| T12 | 2026-10-22 | Compressor and evaporator in that run: output 15.7, 32.8, 44.0 %, evaporator 18.2, 5.6, −3.1 °C in three polls; then output stepping down about 6 % per minute and the evaporator back on 6.1 °C at 25 % a few minutes later; MVHR about 100 m³/h | [run file](../../tests/devices/runs/hrds_30+_first_dehumidify_run_2026-10-22.json) |
 | T13 | 2026-10-21/22 | Anti-stagnation: V3V + PM open about 1 min, shut 60 min (counted from closing), repeat: 22 periodic pulses from 09:33 to 06:56 while ON-standby; one longer pulse (92 s, 96 s) at each Modbus ON | HA history |
 | T14 | 2026-10-21 | Modbus OFF at 00:03 read `off_by_bms`; no V3V + PM pulse in the 8.5 h until the next Modbus ON at 08:31 | HA history |
-| T15 | 2026-10-22 | In the dehumidify run, with no room probe: the compressor started (`PU13` as shipped did not veto), no alarm bit set (AL11, AL28, AL34, AL03, AL04, AL16 clear, alarm flag off) | [run file](../../tests/devices/hrds_30+_first_dehumidify_run_2026-10-22.json) |
-| T16 | 2026-10-22 | The fan was running (confirmed by the owner) while `actRPMsupplyFan` (1117) read 0 before and during; `outAO_SupplyFan` 50 %; `FanIntegration_Request` (1112) stayed 0 with fan and damper on; `PM20` (1614) and the display request (1114) went 0 to 50 % in the poll in which the fan started | [run file](../../tests/devices/hrds_30+_first_dehumidify_run_2026-10-22.json) |
-| T17 | 2026-10-22 | Water probe: 21.9 °C standing at 06:50; 19.8 then 17.4 °C right after the 06:57 pulse, creeping back up to 18.3 °C by the request; 14.8 °C two polls after V3V + PM opened, 14.3 to 15.3 °C while flowing. The owner confirms the brine stands in the pipe and warms up | [run file](../../tests/devices/hrds_30+_first_dehumidify_run_2026-10-22.json) |
+| T15 | 2026-10-22 | In the dehumidify run, with no room probe: the compressor started (`PU13` as shipped did not veto), no alarm bit set (AL11, AL28, AL34, AL03, AL04, AL16 clear, alarm flag off) | [run file](../../tests/devices/runs/hrds_30+_first_dehumidify_run_2026-10-22.json) |
+| T16 | 2026-10-22 | The fan was running (confirmed by the owner) while `actRPMsupplyFan` (1117) read 0 before and during; `outAO_SupplyFan` 50 %; `FanIntegration_Request` (1112) stayed 0 with fan and damper on; `PM20` (1614) and the display request (1114) went 0 to 50 % in the poll in which the fan started | [run file](../../tests/devices/runs/hrds_30+_first_dehumidify_run_2026-10-22.json) |
+| T17 | 2026-10-22 | Water probe: 21.9 °C standing at 06:50; 19.8 then 17.4 °C right after the 06:57 pulse, creeping back up to 18.3 °C by the request; 14.8 °C two polls after V3V + PM opened, 14.3 to 15.3 °C while flowing. The owner confirms the brine stands in the pipe and warms up | [run file](../../tests/devices/runs/hrds_30+_first_dehumidify_run_2026-10-22.json) |
+| T18 | 2026-10-23 | Second DEU run, MVHR at 140 to 163 m³/h: fan on 29 to 89 s after the request, compressor 6.4 to 7.4 min after it; evaporator 6.2, −9.6, −6.7, 1.2, 4.7, 6.5 °C, then 6.3 to 6.7 °C at 27 %, no alarm; 1117 = 0, 1112 = 0, K4 (1124) = 1, 502/503 unknown; water probe 16.6 → 18.1 °C with no flow as warmer MVHR air arrived, 17.9 → 16.4 °C after the compressor started; MVHR supply flow 163 → 115 m³/h in the minute the fan started, back to 141 and 157 m³/h | [run file](../../tests/devices/runs/hrds_30+_dehumidify_run_2026-10-23.json) |
+| T19 | 2026-10-22 | DEU stop, request cleared 07:36:57: `CmpStatus` Wait OFF at 07:37:26; at 07:37:58 compressor off, V3V + PM (1126) off, damper (1134) off, fan Wait OFF at 40 %; fan off at 07:38:53 | [run file](../../tests/devices/runs/hrds_30+_dehumidify_run_2026-10-23.json) |
+| T20 | 2026-10-22 | After that stop (valve closed by 07:37:58) the first anti-stagnation pulse came at 09:39:57, then 10:40:53, 11:41:54 (hourly), unit ON throughout | HA history |
+| T21 | 2026-10 | No input allocated to the fan tachometer (functions 45/46): `HA01` = 58, `HA02` = `HA03` = 0, `HA04` = 52, `HA05` = 47, `HA06` = 6, `HA07` = 8, `HA08..HA18` = 0, `HB01` = 27, `HB02` = 26, `HB03` = 2, `HB04` = 4, `HB05..HB07` = 0 | dump |
+| T22 | 2026-10-22/23 | `PM20` (1614) and the display request (1114) 0 → 50 % when the fan started (both runs) and 50 → 0 % at the stop (07:37:58), with no write from Home Assistant to 1614 | [run file](../../tests/devices/runs/hrds_30+_dehumidify_run_2026-10-23.json) |
 
 Not yet observed on hardware (everything else in this file): the stop sequence
-of a DEU cycle, an INT cycle, the passive cold-water path, winter operation,
+of a DEU cycle at better than 1-minute resolution, an INT cycle, the passive cold-water path, winter operation,
 `HB04` season writes, `PM20` vs fan output, any display or probe
 configuration, the HRDS+ 50 and non-`R` units. The test
 plans are in [`plans/todo.md`](../../plans/todo.md). When a test is done, add a
