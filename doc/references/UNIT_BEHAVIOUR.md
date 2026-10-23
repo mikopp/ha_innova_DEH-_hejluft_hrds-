@@ -276,12 +276,15 @@ Each request is the **OR** of its sources; any one raises it [HB 6.1]:
 
 ### 3.5 Fan speed
 
-See [§9](#9-fan). In short: the display request and 0–10 V feed the fan; the
-**highest** wins; each is scaled into the active mode's min–max band
-[HB 4.5, 6.2]. Modbus has no fan-speed request: `PM20` is the display's
-setpoint, which the unit rewrites [HB 5.3; T22, T23]. Over Modbus the band
-itself is the lever [HB 4.5; MB p.7]; that it moves a running fan is
-[INFERRED] ([`plans/fan-speed-tests.md`](../../plans/fan-speed-tests.md)).
+See [§9](#9-fan). In short: the display (manual) request and 0–10 V feed the
+fan; the **highest** wins [HB 4.5, 6.2]. 0–10 V is scaled linearly into the
+active mode's min–max band [HB 4.5, 6.2]. The manual request behaves as an
+absolute percentage that the band clamps [T22, T24–T26], against the
+handbook's "linear skaliert" [HB 6.2]. Modbus has no fan-speed request:
+`PM20` mirrors the manual request, and a value written to it has no effect
+[HB 5.3; T23]. Over Modbus only the band acts: raising the minimum above the
+running speed raises it, lowering the minimum does not lower it
+[T24–T26].
 
 ### 3.6 Persistence across a power cycle
 
@@ -527,10 +530,19 @@ Observations and consequences:
 
 * Active band: DEU `PF28..PF10`, INT `PF27..PF09`; defaults and shipped values in §15 [HB 6.2; MB p.7].
 * Sources: display manual request (fan screen, step `PF11`) and 0–10 V
-  potentiometer. The highest request wins; both are scaled linearly into the
-  band [HB 4.5, 6.2]. So request 0 → band minimum, not a stopped fan [INFERRED
-  from HB 6.2]; on the headless reference unit the fan ran at exactly `PF28`
-  (50 %) [T16, T18].
+  potentiometer. The highest request wins [HB 4.5, 6.2].
+  * **0–10 V:** a position scaled linearly into the band, 0 V = minimum,
+    10 V = maximum [HB 4.5, 6.2]. Not tested.
+  * **Manual (display) request:** the handbook says it is scaled linearly
+    into the band too [HB 6.2]. On the headless reference unit it behaves as
+    an **absolute percentage clamped into the band**: it starts at 0, is
+    clamped up to `PF28` when the fan starts [T16, T22], follows a raised
+    `PF28` [T25] and keeps its value when `PF28` is lowered [T24, T26]. A
+    rescaled position would have followed a lowered minimum down. [INFERRED]
+    that "linear skaliert" for the display means "stepped by `PF11` between
+    minimum and maximum". **The sources disagree**; no display was tested.
+  * So with nothing else requesting, the fan does not stop on request 0: it
+    runs at the band minimum [T16, T18].
 * The Modbus map has one read-only register per request: integration
   `FanIntegration_Request` (1112), air quality (1113), manual / display
   (1114), time bands (1115), potentiometer (1116), each 0–100 % [MB p.14–15].
@@ -549,11 +561,21 @@ Observations and consequences:
   back as 50 % [T23].
 * What Modbus can change is the band: "Dieser Arbeitsbereich des Lüfters kann
   in den Geräte-Einstellungen oder per Modbus individuell … konfiguriert
-  werden" [HB 4.5]. With every request at 0 the output is the band minimum,
-  so writing `PF28` (DEU) or `PF27` (INT) should set the speed [INFERRED].
-  Whether a running fan follows at once, ramps in `PF11` steps or waits for
-  the next start is untested ([`plans/fan-speed-tests.md`](../../plans/fan-speed-tests.md)).
-  `PF28`/`PF27` are EEPROM parameters (§3.6).
+  werden" [HB 4.5]. Seen on the reference unit during a DEU run:
+  * `PF28` 50 → 45: output and `PM20` stayed at 50 % [T24].
+  * `PF28` 45 → 55: output and `PM20` read 55 % in the same poll (≤ 60 s)
+    [T25].
+  * `PF28` 55 → 50: output and `PM20` stayed at 55 % [T26].
+
+  So a raised minimum pushes a running fan up; a lowered one leaves it where
+  it is. [INFERRED] from the clamp: lowering the maximum (`PF10`, `PF09`)
+  below the running speed pulls it down, and restoring the band afterwards
+  keeps the new speed until the request ends (as T26 does for the minimum).
+  Open: whether the change jumps or ramps in `PF11` steps (the polls were
+  60 s apart), whether `PF27` acts the same during INT, and whether the next
+  run starts at a changed `PF28`
+  ([`plans/fan-speed-tests.md`](../../plans/fan-speed-tests.md)).
+  `PF28`/`PF10`/`PF27`/`PF09` are EEPROM parameters (§3.6).
 * Display manual control works while no time programs are enabled (`PH03`)
   and a DEU request, or an INT request with `PF31 ≠ 0`, is active [HB 6.2]. `PF31 = 0`: INT fan follows the
   room temperature (`PF12`, `PF13`) [HB 5.3 PF31].
@@ -576,9 +598,10 @@ Observations and consequences:
   can then not act either [INFERRED].
 * The unit writes the manual request itself: `PM20` and the display request
   went from 0 to `PF28` (50 %) in the poll in which the fan started and back
-  to 0 when the request ended, with no write from the BMS [T16, T22]. A value
-  written during a run did not hold either [T23]; how fast it is overwritten
-  is open ([`plans/fan-speed-tests.md`](../../plans/fan-speed-tests.md)).
+  to 0 when the request ended, with no write from the BMS [T16, T22], and
+  followed a raised `PF28` [T25]. A value written to `PM20` had no effect
+  [T23]; how fast it is overwritten is open
+  ([`plans/fan-speed-tests.md`](../../plans/fan-speed-tests.md)).
 
 ### 9.2 Timing
 
@@ -786,12 +809,15 @@ probes). "Dump" means
 | T19 | 2026-10-22 | DEU stop, request cleared 07:36:57: `CmpStatus` Wait OFF at 07:37:26; at 07:37:58 compressor off, V3V + PM (1126) off, damper (1134) off, fan Wait OFF at 40 %; fan off at 07:38:53 | [run file](../../tests/devices/runs/hrds_30+_dehumidify_run_2026-10-23.json) |
 | T20 | 2026-10-22 | After that stop (valve closed by 07:37:58) the first anti-stagnation pulse came at 09:39:57, then 10:40:53, 11:41:54 (hourly), unit ON throughout | HA history |
 | T21 | 2026-10 | No input allocated to the fan tachometer (functions 45/46): `HA01` = 58, `HA02` = `HA03` = 0, `HA04` = 52, `HA05` = 47, `HA06` = 6, `HA07` = 8, `HA08..HA18` = 0, `HB01` = 27, `HB02` = 26, `HB03` = 2, `HB04` = 4, `HB05..HB07` = 0. Read again on the running unit on 2026-10-23 (fan on at 50 %): the same allocations, 1117 = 0 | dump; `diagnose_hrds.py` 2026-10-23 |
-| T22 | 2026-10-22/23 | `PM20` (1614) and the display request (1114) 0 → 50 % when the fan started (both runs) and 50 → 0 % at the stop (07:37:58), with no write from Home Assistant to 1614 | [run file](../../tests/devices/runs/hrds_30+_dehumidify_run_2026-10-23.json) |
-| T23 | 2026-10-23 | A fan speed inside the band (`PF28..PF10` = 50–85 %) written to `PM20` (1614) during a DEU run: the unit acknowledged the write; the read-back stayed at 50 % (= `PF28`) | owner |
+| T22 | 2026-10-22/23 | `PM20` (1614) and the display request (1114) 0 → 50 % when the fan started (both runs) and 50 → 0 % at the stop (07:37:58), with no write from Home Assistant to 1614. Again on 2026-10-23: 0 at the end of a request (11:29:56), 50 at the next fan start (11:43:12) | [run file](../../tests/devices/runs/hrds_30+_dehumidify_run_2026-10-23.json), [band run file](../../tests/devices/runs/hrds_30+_fan_band_2026-10-23.json) |
+| T23 | 2026-10-23 | Fan speeds inside the band (`PF28..PF10` = 50–85 %) written to `PM20` (1614) during a DEU run, before the run of T24–T26: the unit acknowledged the writes; none had any effect, the read-back stayed at 50 % (= `PF28`) | owner |
+| T24 | 2026-10-23 | DEU run from 11:43:12 (compressor on 11:49:15), fan at 50 %. `PF28` 50 → 45 at 11:58:37: `outAO_SupplyFan` (639) and `PM20` stayed at 50 %. (`PF27` 50 → 45 → 50 at 11:58:22 / 11:58:53 does not apply to DEU) | [band run file](../../tests/devices/runs/hrds_30+_fan_band_2026-10-23.json) |
+| T25 | 2026-10-23 | Same run, `PF28` 45 → 55 at 12:57:03: 639 and `PM20` read 55 % in the same poll | [band run file](../../tests/devices/runs/hrds_30+_fan_band_2026-10-23.json) |
+| T26 | 2026-10-23 | Same run, later, `PF28` 55 → 50: 639 and `PM20` stayed at 55 % | owner; [band run file](../../tests/devices/runs/hrds_30+_fan_band_2026-10-23.json) |
 
 Not yet observed on hardware (everything else in this file): the stop sequence
 of a DEU cycle at better than 1-minute resolution, an INT cycle, the passive cold-water path, winter operation,
-`HB04` season writes, a band (`PF28`) change during a run, any display or probe
+`HB04` season writes, a lowered band maximum (`PF10`) during a run, any display or probe
 configuration, the HRDS+ 50 and non-`R` units. The test
 plans are in [`plans/todo.md`](../../plans/todo.md). When a test is done, add a
 `T` row here and replace the `[INFERRED]` tag where it applies.
@@ -822,7 +848,7 @@ write recipes are in
 | Cool (summer) / heat (winter) | Automatic from T vs target [HB 5.2.3] | `INT` contact [HB 4.5] | `Status_Integ_byBMS`, needs `PH27 = 1` and `PG02 = 1` | §3.3, §6, §7 |
 | Target humidity | Humidity screen, OK, ↑/↓ [HB 5.2.3] | — | `PU01` | Clamped `PH29..PH30`; only effective with display or probe [MB p.6] |
 | Target temperature | Temperature screen [HB 5.2.3] | — | `SEtC` / `SEtH` | Clamped `PH07..PH08` / `PH09..PH10` (§3.4) |
-| Fan speed | Fan screen, hold ↑/↓ 2 s while the fan runs [HB 5.2.3] | `FAN` 0–10 V [HB 4.5] | No request register; only the band `PF27/PF28`–`PF09/PF10` [HB 4.5; MB p.7]. `PM20` is the display's setpoint and does not hold [T23] | Highest request wins, scaled into the band (§9.1) |
+| Fan speed | Fan screen, hold ↑/↓ 2 s while the fan runs [HB 5.2.3] | `FAN` 0–10 V [HB 4.5] | No request register; only the band `PF27/PF28`–`PF09/PF10` [HB 4.5; MB p.7]: a raised minimum raises a running fan, a lowered one does not lower it [T24–T26]. `PM20` mirrors the manual request; writing it has no effect [T23] | Highest request wins; 0–10 V scaled into the band, the manual request clamped into it (§9.1) |
 | Reset an alarm | Alarm menu, hold OK 3 s [HB 5.2.4] | — | Reset registers (AL11/AL12/AL18) [MB p.10] | Only when the cause is gone [HB 5.2.4] |
 | Reset filter alarm AL22 | Alarm menu or counters menu (fan hours → 0) [HB 7.4] | — | Write 0 to `PM01` [MB p.9] | Fan hours count in h×10 [HB 5.2.4; MB p.9] |
 | Time programs | Time program menu; disabled as delivered [HB 5.2.4] | — | `PH03` | Can hold the unit OFF and block the compressor (§3.1, §10) |

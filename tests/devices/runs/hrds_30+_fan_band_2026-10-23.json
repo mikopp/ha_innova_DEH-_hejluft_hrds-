@@ -1,0 +1,64 @@
+{
+ "_about": "Fan band changes during a Modbus dehumidify (DEU) run on the reference unit, 2026-10-23. Read from Home Assistant history (activity log and history graphs of Manual fan speed, Supply fan output and the fan band numbers, screenshots by the owner) and the owner's account. The band writes were made by the owner through the integration's number entities. Poll interval ~60 s. Times Europe/Vienna (UTC+2).",
+ "unit": "HRDS+ 30 R DC, headless, brine circuit, behind a ComfoAir Q350 (see hrds_30+_first_dehumidify_run_2026-10-22.json)",
+ "band_before": {
+  "PF28_1853_pct": 50,
+  "PF10_1647_pct": 85,
+  "PF27_1852_pct": 50,
+  "PF09_1646_pct": 85
+ },
+ "timeline_2026_10_23": [
+  {
+   "t": "10:44:17",
+   "event": "Run 1: fan starts; PM20 1614 and outAO_SupplyFan 639 0 -> 50 %"
+  },
+  {
+   "t": "10:44..11:29",
+   "event": "Owner writes fan speeds inside 50-85 % to PM20 (number.fan_manual_speed): no effect, read-back stays 50 % (T23)"
+  },
+  {
+   "t": "11:29:56",
+   "event": "Request ended: PM20 and 639 -> 0 %"
+  },
+  {
+   "t": "11:43:12",
+   "event": "Run 2: fan starts; PM20 and 639 0 -> 50 %"
+  },
+  {
+   "t": "11:49:15",
+   "event": "CmpStatus on"
+  },
+  {
+   "t": "11:58:22",
+   "event": "PF27 1852 50 -> 45 % (INT band; no effect expected in DEU)"
+  },
+  {
+   "t": "11:58:37",
+   "event": "PF28 1853 50 -> 45 %: PM20 and 639 stay 50 % (T24)"
+  },
+  {
+   "t": "11:58:53",
+   "event": "PF27 45 -> 50 %"
+  },
+  {
+   "t": "12:57:03",
+   "event": "PF28 45 -> 55 %: PM20 and 639 read 55 % in the same poll (T25)"
+  },
+  {
+   "t": "after 12:57",
+   "event": "PF28 55 -> 50 %: PM20 and 639 stay 55 % (T26)"
+  }
+ ],
+ "findings": {
+  "pm20_write": "Writing PM20 has no effect: the unit keeps its own manual request and mirrors it in 1614 and 1114.",
+  "band_clamps_manual_request": "The manual request behaves as an absolute percentage clamped into [PF28, PF10]: clamped up from 0 to PF28 at fan start, pushed up by a raised PF28, left alone by a lowered PF28. Not the handbook's linear rescale (HB 6.2), under which a lowered minimum would have lowered the fan.",
+  "pm20_tracks_output": "PM20, 1114 and 639 showed the same value at every poll of both runs.",
+  "modbus_lever": "Raising the active band's minimum raises a running fan within one poll; lowering it does not slow the fan."
+ },
+ "open": {
+  "lower_via_max": "Does lowering PF10 below the running speed pull it down, and does it stay there after PF10 is restored? (fan-speed-tests.md test G)",
+  "jump_or_ramp": "Does the output jump to a raised minimum or ramp in PF11 steps? Needs reads every few seconds (test A)",
+  "next_run": "Does the next fan start use a changed PF28? (test F)",
+  "int_band": "Does PF27 act the same during an INT request? (test E)"
+ }
+}

@@ -117,7 +117,9 @@ in `doc/references/UNIT_BEHAVIOUR.md` §13. What they left open:
       during a request hold until its end? **No** (T23, 2026-10-23): a value
       inside the band written during a run was acknowledged and read back as
       50 %. How fast the unit overwrites it: [`fan-speed-tests.md`](fan-speed-tests.md)
-      test C.
+      test C. Seen again on 2026-10-23: 0 at the end of a request (11:29:56),
+      50 at the next fan start (11:43:12), and `PM20` follows a raised `PF28`
+      (T25): it mirrors the unit's own manual request.
 - [ ] **Which timer held the compressor?** It came on 6.5–8 min after the
       request and 5–7 min after the fan; `PE04` ships at 180 s, so something else
       held it. `PE03` (420 s) fits numerically, but it is defined between two
@@ -222,13 +224,18 @@ in `doc/references/UNIT_BEHAVIOUR.md` §13. What they left open:
 > the display's setpoint ("via Display (read only)", handbook §5.3); the unit
 > overwrites a Modbus write (T22, T23). No register takes a fan-speed request
 > from the BMS; the documented Modbus lever is the band (`PF28`/`PF27`,
-> `UNIT_BEHAVIOUR.md` §9.1). The hardware tests are in
+> `UNIT_BEHAVIOUR.md` §9.1). Seen on hardware: raising `PF28` above the
+> running speed raises it within a poll, lowering `PF28` does not lower it
+> (T24–T26). The remaining hardware tests are in
 > [`fan-speed-tests.md`](fan-speed-tests.md); the code change waits for them
 > (item *Fan write target* below).
 
 > The test simulator (`tests/sim/device.py`) models all three hypotheses below
-> as `fan_model` = `rescale` (default) / `clamp` / `direct`. Once the hardware
-> answer is known, make that one the default and drop the others.
+> as `fan_model` = `rescale` (default) / `clamp` / `direct`. **None of them
+> fits the hardware:** all three take `PM20` as a command. The unit keeps its
+> own manual request, clamps it into the band and mirrors it in `PM20`
+> (T22–T26). Replace the three with that model together with *Fan write
+> target*.
 
 The climate entity now exposes **fan_mode** (off / low / medium / high):
 
@@ -262,18 +269,31 @@ opened to 0/100.
 - [ ] **Fan write target (decide after [`fan-speed-tests.md`](fan-speed-tests.md)).**
       `fan.set_percentage`, `climate.set_fan_mode` and
       `number.fan_manual_speed` write `PM20`, which does not hold (T23).
-      Options: write the active band's minimum (`PF28` in DEU, `PF27` in INT,
-      capped by `PF10`/`PF09`, write only on change, ADR-0023), or make the
-      fan read-only and leave the band numbers to the user. Either supersedes
+      What does work (T24–T26): the band clamps the unit's own manual request,
+      so raising the minimum above the running speed raises it, and lowering
+      the minimum afterwards keeps the new speed until the request ends.
+      Lowering it should work the same way through the maximum (`PF10`/`PF09`),
+      untested ([`fan-speed-tests.md`](fan-speed-tests.md) test G).
+      Options:
+      * set speed X by writing the active band's minimum (to raise) or maximum
+        (to lower) to X and then restoring the band: two EEPROM writes per
+        change (ADR-0023), lost at the end of each request, since the next run
+        starts at `PF28`;
+      * keep the band at X for the whole run (one write, but X becomes the
+        floor for every later run);
+      * make the fan read-only and leave the band numbers to the user. Either supersedes
       ADR-0008 (`/adr supersede`). Affected: `fan.py`, `climate.py`
       (`_FAN_MODE_PCT`, "off" cannot stop the fan), `number.fan_manual_speed`
       and `OPERATIONAL_KEYS` (`const.py`), the simulator's `fan_model`
       (`tests/sim/device.py`: `PM20` must become unit-owned), the fan tests,
       README *Commanded vs actual fan speed*.
 - [x] **Rescale or clamp? (R variant only) — the key fan question.**
-      **Answered (T23): neither.** The unit does not take `PM20` from Modbus
-      at all; the output stays at the band minimum. The question below is
-      kept for the record. The technical
+      **Answered (T23–T26).** The unit does not take `PM20` from Modbus at
+      all (T23). Its own manual request, which `PM20` mirrors, is an absolute
+      percentage **clamped** into the band, not rescaled: a lowered minimum
+      left the fan at 50 and later 55 %, a raised one pushed it up (T24–T26).
+      The 0–10 V input is still scaled linearly by the handbook (untested).
+      The question below is kept for the record. The technical
       handbook says manual fan control is *„linear zwischen den jeweiligen
       Minimal- und Maximalwerten (PF28/PF10 bzw. PF27/PF09) skaliert"*, i.e. the
       request is a **position within the band**, not an absolute percentage. If
