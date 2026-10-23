@@ -38,13 +38,15 @@ in this order, empty ones left out: `### ⚠️ Breaking changes`,
 ### 📚 Documentation
 
 - **Why the fan speed cannot be set over Modbus, and what works instead:** PM20 (1614) is the display's setpoint and no register takes a fan-speed request from the BMS (T23). The band clamps the unit's own manual request: a raised PF28 raised a running fan, a lowered one did not (`UNIT_BEHAVIOUR.md` §9.1, T24–T26). Test plan: `plans/fan-speed-tests.md`.
-
+- **A fan speed written to PM20 is never taken:** inside the band the unit acknowledges it and keeps its own value, below the band it refuses it (T27, T28). The evidence row T23 now gives the right run and values.
+- **The running-hour counters (PM00–PM04) count whole hours,** not tenths as the docs said; the handbook's "Hours x10" is the display's unit (T29). The installer entities already showed hours.
 - **Unit behaviour cites parameters by code, with a lookup of handbook default and shipped value** (`UNIT_BEHAVIOUR.md` §15), plus evidence rows T11 to T22 from the first two dehumidify runs and new open points in `plans/todo.md`.
 - **Why the supply fan speed reads 0:** the unit only measures it when an input is allocated to the fan tachometer, and the reference unit has none. Also documented: the stop sequence, that the unit sets the manual fan speed itself at each start and stop, and that register 1112 is not a recirculation flag.
 
 ### 🧪 Tests and CI
 
 - **The simulator runs the fan as the real unit does:** it owns PM20 (1614), clamps it into the band and drives the fan at it; a PM20 write is not kept, one outside the band answers exception 04. The three fan hypotheses (`fan_model`) are gone. Decision: ADR-0034, which supersedes ADR-0008.
+- **The bring-up diagnostic's watch (`--watch`) also reads PM20 and the fan band registers.**
 - **The bring-up diagnostic reports whether an input is allocated to the fan tachometer.** Run observations moved to `tests/devices/runs/`, so the seed tests no longer load them as register dumps.
 
 ---

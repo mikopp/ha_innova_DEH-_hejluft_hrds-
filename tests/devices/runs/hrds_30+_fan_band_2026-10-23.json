@@ -1,5 +1,5 @@
 {
- "_about": "Fan band changes during a Modbus dehumidify (DEU) run on the reference unit, 2026-10-23. Read from Home Assistant history (activity log and history graphs of Manual fan speed, Supply fan output and the fan band numbers, screenshots by the owner) and the owner's account. The band writes were made by the owner through the integration's number entities. Poll interval ~60 s. Times Europe/Vienna (UTC+2).",
+ "_about": "Fan band changes during a Modbus dehumidify (DEU) run on the reference unit, 2026-10-23. Read from Home Assistant history (activity log and history graphs of Manual fan speed, Supply fan output and the fan band numbers, screenshots by the owner) the owner's account, the Home Assistant log (write errors) and a diagnose_hrds.py --watch run. The band writes were made by the owner through the integration's number entities. Poll interval ~60 s. Times Europe/Vienna (UTC+2).",
  "unit": "HRDS+ 30 R DC, headless, brine circuit, behind a ComfoAir Q350 (see hrds_30+_first_dehumidify_run_2026-10-22.json)",
  "band_before": {
   "PF28_1853_pct": 50,
@@ -13,8 +13,8 @@
    "event": "Run 1: fan starts; PM20 1614 and outAO_SupplyFan 639 0 -> 50 %"
   },
   {
-   "t": "10:44..11:29",
-   "event": "Owner writes fan speeds inside 50-85 % to PM20 (number.fan_manual_speed): no effect, read-back stays 50 % (T23)"
+   "t": "11:28:38..11:29:05",
+   "event": "PM20 (number.fan_manual_speed) 40 %, below PF28 = 50 %, written eleven times: refused with Modbus exception 04 (T27)"
   },
   {
    "t": "11:29:56",
@@ -27,6 +27,14 @@
   {
    "t": "11:49:15",
    "event": "CmpStatus on"
+  },
+  {
+   "t": "11:49..11:52",
+   "event": "PM20 60 and 55 % written (inside the band): acknowledged, no effect; diagnose_hrds.py --watch at 0.5 s saw no change of 1614, 1114 or 639 (T23, T28). 50 % needed no write"
+  },
+  {
+   "t": "11:52:15",
+   "event": "PM20 45 % written: refused with exception 04 (T27)"
   },
   {
    "t": "11:58:22",
@@ -50,7 +58,7 @@
   }
  ],
  "findings": {
-  "pm20_write": "Writing PM20 has no effect: the unit keeps its own manual request and mirrors it in 1614 and 1114.",
+  "pm20_write": "Writing PM20 has no effect: inside the band the unit acknowledges and keeps its own value (never seen at 0.5 s reads), below the band minimum it answers exception 04. It mirrors its own manual request in 1614 and 1114.",
   "band_clamps_manual_request": "The manual request behaves as an absolute percentage clamped into [PF28, PF10]: clamped up from 0 to PF28 at fan start, pushed up by a raised PF28, left alone by a lowered PF28. Not the handbook's linear rescale (HB 6.2), under which a lowered minimum would have lowered the fan.",
   "pm20_tracks_output": "PM20, 1114 and 639 showed the same value at every poll of both runs.",
   "modbus_lever": "Raising the active band's minimum raises a running fan within one poll; lowering it does not slow the fan."
