@@ -44,7 +44,7 @@ nennt Innova als Hersteller der Entfeuchtungsgeräte HRDS und HRDS+.
 > *Wird Ihr Gerät mit der Innova-Platine unter einem anderen Namen verkauft,
 > eröffnen Sie ein Issue und verlinken Sie die Produktseite.*
 
-## Release 0.9.4: Beta, noch nicht 1.0
+## Release 0.9.5: Beta, noch nicht 1.0
 
 Die Integration ist veröffentlicht und nutzbar, aber eine **Beta**.
 
@@ -68,7 +68,7 @@ Die Integration ist veröffentlicht und nutzbar, aber eine **Beta**.
 Berichte von anderen Geräten sind sehr willkommen, siehe
 [Reporting issues](README.md#reporting-issues) (EN). Der Weg zu 1.0:
 [Road to 1.0](README.md#road-to-10) (EN). Details: der
-[englische Abschnitt](README.md#release-094--beta-not-10-yet).
+[englische Abschnitt](README.md#release-095--beta-not-10-yet).
 
 ## Schnellstart
 
