@@ -48,7 +48,7 @@ names Innova as the manufacturer of the HRDS and HRDS+ dehumidification units.
 > *If your unit uses the Innova board and is sold under another name, open an
 > issue and link its product page.*
 
-## Release 0.9.3 — beta, not 1.0 yet
+## Release 0.9.4 — beta, not 1.0 yet
 
 The integration is released and usable, but it is a **beta**.
 

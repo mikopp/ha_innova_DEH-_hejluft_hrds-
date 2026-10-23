@@ -11,7 +11,7 @@ in this order, empty ones left out: `### ⚠️ Breaking changes`,
 
 ---
 
-## Unreleased
+## 0.9.4 (2026-10-23): New repository name, German README, entity reference by device
 
 ### ✨ Highlights
 
