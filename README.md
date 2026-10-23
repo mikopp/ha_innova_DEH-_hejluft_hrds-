@@ -753,9 +753,8 @@ has no register for a fan-speed request from Modbus either. PM20 (1614), the
 "manual fan speed" of the register list, is the **display's** setpoint
 ("read only" in the handbook): the unit sets it itself, acknowledges a written
 value inside the band without keeping it, and refuses one outside the band.
-So there is no fan entity (`fan.hrds_supply_fan` up to 0.9.4), the climate
-entity has no fan mode, and `sensor.hrds_manual_fan_speed` shows PM20 (up to
-0.9.4 it was a number).
+So the fan is shown by readings only, with no fan entity, the climate entity
+has no fan mode, and `sensor.hrds_manual_fan_speed` shows PM20.
 
 The fan runs at the highest of the unit's own requests, kept within the active
 mode's band (PF28–PF10 for dehumidify, PF27–PF09 for cooling): the 0–10 V

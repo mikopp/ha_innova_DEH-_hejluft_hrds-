@@ -1,12 +1,14 @@
 ---
 status: accepted
-date: 2026-10-21
+date: 2026-10-23
 decision-makers: mikopp
 topics: [docs]
 paths:
   - "doc/references/*.md"
+  - "doc/entity-reference.md"
   - "plans/*.md"
   - "README.md"
+  - "README.de.md"
 ---
 
 # ADR-0027: One home per topic; every unit fact carries its evidence
@@ -28,6 +30,11 @@ paths:
   (`UNIT_BEHAVIOUR.md` §15).
 - Decisions MUST be ADRs (ADR-0001, index `doc/adr/README.md`), not README
   or CLAUDE.md prose.
+- The entity reference, `UNIT_BEHAVIOUR.md`, `MODBUS_REGISTERS.md` and the
+  READMEs MUST describe the current state only: no earlier versions ("up to
+  0.9.4", "no longer", "used to", "was a number"), no explanation of why
+  something that once existed is gone. That history belongs only in the
+  CHANGELOG and the release notes (and in a retired ADR).
 
 ## Context
 
@@ -47,6 +54,7 @@ so a wrong statement becomes a wrong model.
 
 ```sh
 grep -q "Only the unit" doc/references/UNIT_BEHAVIOUR.md
+! grep -inE "\b(up to|until|since) 0\.[0-9]|\bno longer\b|\bused to\b|\bformerly\b|\bwas a number\b" doc/entity-reference.md doc/references/UNIT_BEHAVIOUR.md doc/references/MODBUS_REGISTERS.md README.md README.de.md
 ```
 
 ## More information

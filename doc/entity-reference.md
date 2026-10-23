@@ -57,8 +57,8 @@ device (see the [beta banner](../README.md#release-094--beta-not-10-yet)).
 
 #### Fan
 
-There is no fan entity (`fan.hrds_supply_fan` up to 0.9.4): Modbus can
-neither switch the unit's fan nor set its speed (ADR-0034). The unit runs the
+The fan is shown by readings only, with no fan entity: Modbus can neither
+switch the unit's fan nor set its speed (ADR-0034). The unit runs the
 fan with every dehumidify or integration request and stops it after a run-on
 ([UNIT_BEHAVIOUR §9.2–9.3](references/UNIT_BEHAVIOUR.md#92-timing)). PM20
 (1614) is its own manual request: a written value does not hold and one
@@ -102,7 +102,7 @@ through the duct, so it adds airflow on top of the MVHR.
 | `sensor.air_quality` | Air quality | ppm | External IAQ sensor | Reg 506; monitoring only |
 | `sensor.actual_setpoint` | Active setpoint | °C | — | Reg 1111; active room setpoint in use |
 | `sensor.supply_fan_output` | Supply fan output | % | ³ Built-in | Reg 639 (×0.01 %); actual fan analog output |
-| `sensor.fan_manual_speed` | Manual fan speed | % | ³ Built-in | Reg 1614, PM20: the unit's own manual fan request, read-only (it was a number up to 0.9.4). The unit sets it to the band minimum (PF28) when the fan starts, up to a raised minimum during a run (T25) and to 0 when a request ends (T22); the fan is driven at it. Reads the same as `sensor.fan_manual_request` (1114) |
+| `sensor.fan_manual_speed` | Manual fan speed | % | ³ Built-in | Reg 1614, PM20: the unit's own manual fan request, read-only. The unit sets it to the band minimum (PF28) when the fan starts, up to a raised minimum during a run (T25) and to 0 when a request ends (T22); the fan is driven at it. Reads the same as `sensor.fan_manual_request` (1114) |
 | `sensor.compressor_output` | Compressor output | % | ³ Built-in | Reg 641 (×0.01 %); compressor modulation level |
 | `sensor.supply_fan_rpm` | Supply fan speed | rpm | ³ Built-in | Reg 1117. **Unknown** when no input is allocated to the fan tachometer (input function 45/46 on HA01, HA04–HA18, HB01, HB02, HB05–HB07, read at setup): the unit then has no speed to report and the register reads 0 with the fan running |
 | `sensor.exhaust_temperature` | Exhaust air temperature | °C | External NTC | Reg 502; monitoring only |
@@ -254,8 +254,7 @@ Entity ids carry the device name, for example `sensor.hrds_setup_setup_check`.
 **Why it exists.** The handbook's installer menu (§5.3) has about 240
 parameters with a Modbus address. They are not needed for setup or normal use.
 **Why it is separate and opt-in:** a few of them cut the connection or are
-destructive, and reading them all made the poll too heavy for the real unit
-(0.9.0 did not load), so the device is **off by default** and its registers are
+destructive, and reading them all makes the poll too heavy for the real unit, so the device is **off by default** and its registers are
 never part of the regular poll (ADR-0017). Turn on *Installer device* in the
 integration options (Settings → Devices & services → HRDS+ → Configure); turning
 it off again removes the device and its entities. Entity ids carry the parameter
