@@ -57,8 +57,9 @@ Factory serial defaults:
   * **Fan speeds / analog-out percentages: value ×0.01 %** — *write two implied
     decimals*. e.g. `40 %` is the raw value `4000`; `85 %` is `8500`.
   * Humidity (`PU01`, `AI_HretRoom`, warning setpoint): integer **%RH**, no scale.
-  * Working hours (`PM00`/`PM01`…): ×0.1 h (raw `1500` → `150.0` → 1500 h, per
-    the "h ×10" note — read the PDF §Filterverschmutzung carefully).
+  * Working hours (`PM00`…`PM04`): raw = whole hours, one 16-bit word each
+    (UNIT_BEHAVIOUR.md T29). The display's "Hours x10" shows raw ÷ 10, so
+    the shipped limit raw `20000` ("2000.0") is 20000 h.
 
 ## 3. Function enables — **set these first**
 
@@ -117,7 +118,7 @@ for 40 %). Min/Max apply to the modulation band used in each mode.
 | `0x073C` | 1852 | `MinSpeedFan_Integ` (PF27) | R/W | 50.00 | 0–100 | Supply-fan min speed in integration (cooling) |
 | `0x066C` | 1644 | `MinSpeedSupplyFan_VMC` (PF07) | R/W | — | 0–100 | Supply-fan min speed in VMC (ventilation-only) mode |
 | `0x066E` | 1646 | `MaxSpeedFan_Integ` (PF09) | R/W | 85.00 | 0–100 | Supply-fan max speed in integration (cooling) |
-| `0x064E` | 1614 | `PM20_SupplyFan_Manual`    | R/W | — | 0–100 | Supply-fan manual setpoint of the **display**. Listed R/W in the raw parameter table [MB p.18], defined "via Display (read only)" in the handbook (PM20, §5.3); the unit sets it itself, a written value does not hold (UNIT_BEHAVIOUR.md §9.1, T22, T23). Not a fan-speed command |
+| `0x064E` | 1614 | `PM20_SupplyFan_Manual`    | R/W | — | 0–100 | Supply-fan manual setpoint of the **display**. Listed R/W in the raw parameter table [MB p.18], defined "via Display (read only)" in the handbook (PM20, §5.3); the unit sets it itself, a written value does not hold, one outside the band answers exception 04 (UNIT_BEHAVIOUR.md §9.1, T22, T23, T27, T28). Not a fan-speed command |
 | `0x0458` | 1112 | `FanIntegration_Request`   | R/O | — | 0–100 | "Fans integration request": the fan request of the integration (INT) fan control (`PF31`) [MB p.14]. Not a 0/1 flag and not the INT request (1139), see §13. Read 0 while the fan ran during two dehumidify requests (UNIT_BEHAVIOUR.md T16, T18) |
 | `0x0459` | 1113 | `Supply_AirQualityRequest` | R/O | — | 0–100 | Supply-fan air-quality request [MB p.14] |
 | `0x045A` | 1114 | `SupplyFan_ManualRequest`  | R/O | — | 0–100 | Current manual (display) fan request; reads the same as `PM20` |
@@ -241,7 +242,7 @@ Write `1` to reset the corresponding alarm: `0x030B`=AL01, `0x030C`=AL02,
 | `0x0728` | 1832 | `HC04` | Analog output allocation of the supply fan (raw code; `1` = 0-10 V supply fan). |
 | `0x072E` | 1838 | `HD01` | Relay DO1 allocation (raw code; `10` = recirculation damper NO, `9` = NC). |
 | `0x06A2` | 1698 | `PS01_PreStartTime_RecircDamper` | Damper pre-start time before the fan starts, in seconds (handbook default 20; a real unit read 90). |
-| `0x0642` | 1602 | `PM00_Limit_FansHours` | Fan running-hours alarm limit (h ×10) |
+| `0x0642` | 1602 | `PM00_Limit_FansHours` | Fan running-hours alarm limit (h; the display shows ÷ 10) |
 | `0x0644` | 1604 | `PM01_SupplyFan_Hours` | Fan running-hours counter (write 0 to reset filter alarm AL22) |
 
 ---
