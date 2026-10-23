@@ -5,6 +5,17 @@ headless. Each test checks one assumption from
 [`doc/references/UNIT_BEHAVIOUR.md` §9.1](../doc/references/UNIT_BEHAVIOUR.md#91-bands-and-sources).
 Tags (`[HB 6.2]`, `[MB p.7]`, `T23`) are explained in §0 of that file.
 
+## Status (2026-10-23)
+
+* Test A is partly done: raising `PF28` mid-run raises the fan within one
+  poll (T25), and lowering `PF28` does not lower it (T24, T26). The unit
+  **clamps** its own manual request into the band, and does not rescale it
+  ([run file](../tests/devices/runs/hrds_30+_fan_band_2026-10-23.json)).
+* Still open:
+  * A: jump or ramp, at 5 s resolution;
+  * B, C, D (optional), E, F;
+  * new test G: lowering through the maximum.
+
 ## Why
 
 * A fan speed written to `PM20` (1614) inside the band was acknowledged, but
@@ -23,15 +34,16 @@ Tags (`[HB 6.2]`, `[MB p.7]`, `T23`) are explained in §0 of that file.
 
 | # | Assumption | Source | Test |
 |---|------------|--------|------|
-| A1 | With every fan request at 0 (headless), the output is the band minimum | [HB 6.2; T16] | A |
-| A2 | A new `PF28` written while the fan runs moves the output | [INFERRED from HB 4.5] | A |
-| A3 | The output jumps to a new minimum, or ramps in `PF11` steps | [INFERRED] | A |
-| A4 | `PM20`/1114 follow the band minimum (they show the scaled manual request) | [INFERRED from T22] | A |
+| A1 | With every fan request at 0 (headless), the output is the band minimum | [HB 6.2; T16] | A, **seen** (T16, T22) |
+| A2 | A new `PF28` written while the fan runs moves the output | [INFERRED from HB 4.5] | A, **seen when raised** (T25); a lowered `PF28` does not move it (T24, T26) |
+| A3 | The output jumps to a new minimum, or ramps in `PF11` steps | [INFERRED] | A, open |
+| A4 | `PM20`/1114 follow the band minimum (they show the scaled manual request) | [INFERRED from T22] | A, **seen** (T25): they mirror the clamped manual request |
 | A5 | `PF28 = PF10` is accepted and gives that speed | [INFERRED] | B |
 | A6 | A write to `PM20` is overwritten within one controller cycle, and 639 never moves | [T23; INFERRED] | C |
 | A7 | 0–10 V on FAN+ raises 639 and 1116, but not 1114/1614 | [HB 6.2] | D |
 | A8 | 1112 is a 0–100 % request that is non-zero only during INT | [MB p.14; INFERRED] | E |
 | A9 | A `PF28` written while idle applies from the next fan start | [INFERRED] | F |
+| A10 | Lowering `PF10` below the running speed pulls it down; restoring `PF10` keeps the lower speed | [INFERRED from T24–T26] | G |
 
 ## Tools and rules
 
@@ -78,6 +90,12 @@ Tags (`[HB 6.2]`, `[MB p.7]`, `T23`) are explained in §0 of that file.
 
 ### A. Band minimum during a run (A1–A4)
 
+**Partly done (T24–T26):** 65 → 50 was not run as written. Instead, during a
+run with the fan at 50, `PF28` went 50 → 45 (no change), then 45 → 55 (55 in
+the same poll), then 55 → 50 (stayed at 55). What remains is the 5 s log of a
+raise, to tell a jump from a ramp. The expected values below assume the fan
+is at 50 before step 3; after step 4 it stays at 65, as T26 shows.
+
 1. Start DEU (`switch.dehumidify` on). Wait until 1119 = ON and 639 is
    steady (≈ 2 min after the damper opens).
 2. Start the 5 s read loop: 639, 1114, 1614, 1116, 1119.
@@ -85,7 +103,7 @@ Tags (`[HB 6.2]`, `[MB p.7]`, `T23`) are explained in §0 of that file.
 4. Set it back to 50. Log for 2 minutes.
 
 Expected: 639 reads 65 within one or two controller cycles, and 1114/1614 read
-65 too. Then all three read 50 again.
+65 too. After step 4 all three stay at 65 until the request ends (T26).
 
 What the results mean:
 
@@ -93,8 +111,7 @@ What the results mean:
 |------------------|---------|
 | Reads 65 at once | The band is a live lever |
 | Steps up by `PF11` (7 %) every few seconds | Ramp. Note the interval |
-| Stays 50 until the next request | The band is read only at fan start. Then run test F |
-| Stays 50 for good | A1/A2 are wrong. Stop and report |
+| Stays 50 | Contradicts T25. Stop and report |
 
 ### B. Top of the band (A5)
 
@@ -104,7 +121,8 @@ During the same run:
    1 minute.
 2. Set it back to 50.
 
-Expected: 639 reads 85. Do not write a minimum above 85.
+Expected: 639 reads 85 and stays there after step 2 (T26). Use test G to bring
+it down. Do not write a minimum above 85.
 
 ### C. PM20 overwrite timing (A6)
 
@@ -148,12 +166,24 @@ Expected: 1112 reads a percentage inside `PF27..PF09`, not only 0 or 1.
 2. Start DEU and read 639 at fan start.
 3. Restore 50.
 
-Expected: 639 reads 60 from the start. Run this only if test A showed no live
-change.
+Expected: 639 reads 60 from the start, since the request starts at 0 and is
+clamped up to the minimum (T22).
+
+### G. Lower through the maximum (A10)
+
+1. During a run with the fan above 50 (for example at 55 after a test-A
+   raise), start the 5 s read loop on 639, 1114, 1614.
+2. Set `number.fan_max_speed_dehumidify` (PF10) to 52. Log for 1 minute.
+   Expected: 639, 1114 and 1614 read 52.
+3. Set PF10 back to 85. Log for 1 minute. Expected: they stay at 52.
+4. Never set PF10 below PF28.
+
+This decides whether the integration can set any speed within the band with
+two band writes, or only raise it (`plans/todo.md`, *Fan write target*).
 
 ## Recording the results
 
-* For each test, add a `T` row to `UNIT_BEHAVIOUR.md` §13, starting at T24.
+* For each test, add a `T` row to `UNIT_BEHAVIOUR.md` §13, starting at T27.
   Replace the `[INFERRED]` tags it settles in §3.5, §9.1 and §14.
 * Put a run file in `tests/devices/runs/`, named
   `hrds_30+_fan_speed_tests_<date>.json`. Use the same layout as the two run

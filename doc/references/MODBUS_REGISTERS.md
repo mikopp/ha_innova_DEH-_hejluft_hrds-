@@ -128,8 +128,11 @@ for 40 %). Min/Max apply to the modulation band used in each mode.
 
 ### 6.1 How the bands apply
 
-The min/max pairs are per-mode bands; display and 0–10 V requests are scaled
-linearly into the active band (handbook §6.2). No register takes a fan-speed
+The min/max pairs are per-mode bands; the handbook scales display and 0–10 V
+requests linearly into the active band (§6.2). On a real unit the manual
+(display) request mirrored in 1114/1614 is instead clamped into the band: a
+raised minimum raises it, a lowered one leaves it (UNIT_BEHAVIOUR.md T24–T26).
+No register takes a fan-speed
 request from the BMS; the band registers are the only fan-speed registers the
 Modbus manual's fan chapter lists as writable [MB p.7]. Other writable fan
 setpoints, each tied to a condition: `FSC`/`FSE`/`FSN` (1595–1597, time bands,
