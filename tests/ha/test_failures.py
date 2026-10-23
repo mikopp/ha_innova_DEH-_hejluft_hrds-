@@ -22,7 +22,7 @@ async def test_offline_goes_unavailable_and_recovers(setup, clock):
         ("sensor", "unit_status"),
         ("sensor", "water_temperature"),
         ("climate", CLIMATE),
-        ("fan", "hrds_supply_fan"),
+        ("binary_sensor", "supply_fan_running"),
         ("sensor", "supply_fan_airflow"),
     ):
         assert s.state(platform, key).state == STATE_UNAVAILABLE, key

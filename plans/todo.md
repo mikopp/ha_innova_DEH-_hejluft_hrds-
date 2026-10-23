@@ -132,7 +132,7 @@ in `doc/references/UNIT_BEHAVIOUR.md` §13. What they left open:
       `PF26` (40 %) for up to a minute more. Still to log every 5 s
       (`diagnose_hrds.py --watch`): compressor stop against `PE02`, the
       ramp-down (`PE25`), V3V + PM closing against `Pb01`, fan run-on against
-      `PF03`. Check the climate `hvac_action` and fan entity follow.
+      `PF03`. Check the climate `hvac_action` and `supply_fan_running` follow.
 - [ ] **First anti-stagnation pulse after a request: why 2 hours?** After the
       2026-10-22 stop the valve stayed shut from 07:37:58 to 09:39:57, then
       pulsed hourly again (T20); HB 6.4 says `Pb08` (60 min) after the valve
@@ -230,32 +230,11 @@ in `doc/references/UNIT_BEHAVIOUR.md` §13. What they left open:
 > [`fan-speed-tests.md`](fan-speed-tests.md); the code change waits for them
 > (item *Fan write target* below).
 
-> The test simulator (`tests/sim/device.py`) models all three hypotheses below
-> as `fan_model` = `rescale` (default) / `clamp` / `direct`. **None of them
-> fits the hardware:** all three take `PM20` as a command. The unit keeps its
-> own manual request, clamps it into the band and mirrors it in `PM20`
-> (T22–T26). Replace the three with that model together with *Fan write
-> target*.
-
-The climate entity now exposes **fan_mode** (off / low / medium / high):
-
-| Mode   | Manual fan speed written to reg 1614 |
-|--------|--------------------------------------|
-| off    | 0 %  |
-| low    | 30 % |
-| medium | 55 % |
-| high   | 85 % |
-
-Read-back maps the **actual** output (`outAO_SupplyFan`, 639) to the nearest
-preset via midpoint thresholds (42.5 / 70.0 %). `fan.hrds_supply_fan` reads the
-same register, so the two entities always agree about what the fan is doing.
-The **commanded** setpoint is `number.fan_manual_speed` (1614) and the fan
-entity's `commanded_percent` attribute.
-
-The gap between commanded and actual is the interesting measurement — see the
-rescale-vs-clamp item below. Note the presets are written to 1614 as-is, so if
-the band scales them, "low" will not read back as `low` until PF28/PF10 are
-opened to 0/100.
+> The simulator (`tests/sim/device.py`) now models what the hardware showed:
+> the unit owns `PM20`, clamps it into the band and drives the fan at it; a
+> write is acknowledged and not kept, one outside the band is refused (T22–T28).
+> There is no fan entity any more, and the climate entity has no fan mode
+> (ADR-0034).
 
 - [x] **Core assumption: compressor/dehumidify can run on passive MVHR flow
       alone (no unit fan running)** — this is architecturally confirmed: the
@@ -266,27 +245,14 @@ opened to 0/100.
       regardless of PM20 (`doc/references/UNIT_BEHAVIOUR.md` §9.3). A user
       reports the fan would not go below 30 %, and an unofficial I/O
       reassignment as the only way around it.
-- [ ] **Fan write target (decide after [`fan-speed-tests.md`](fan-speed-tests.md)).**
-      `fan.set_percentage`, `climate.set_fan_mode` and
-      `number.fan_manual_speed` write `PM20`, which does not hold (T23).
-      What does work (T24–T26): the band clamps the unit's own manual request,
-      so raising the minimum above the running speed raises it, and lowering
-      the minimum afterwards keeps the new speed until the request ends.
-      Lowering it should work the same way through the maximum (`PF10`/`PF09`),
-      untested ([`fan-speed-tests.md`](fan-speed-tests.md) test G).
-      Options:
-      * set speed X by writing the active band's minimum (to raise) or maximum
-        (to lower) to X and then restoring the band: two EEPROM writes per
-        change (ADR-0023), lost at the end of each request, since the next run
-        starts at `PF28`;
-      * keep the band at X for the whole run (one write, but X becomes the
-        floor for every later run);
-      * make the fan read-only and leave the band numbers to the user. Either supersedes
-      ADR-0008 (`/adr supersede`). Affected: `fan.py`, `climate.py`
-      (`_FAN_MODE_PCT`, "off" cannot stop the fan), `number.fan_manual_speed`
-      and `OPERATIONAL_KEYS` (`const.py`), the simulator's `fan_model`
-      (`tests/sim/device.py`: `PM20` must become unit-owned), the fan tests,
-      README *Commanded vs actual fan speed*.
+- [x] **Fan write target.** Decided by the owner on 2026-10-23 (ADR-0034,
+      supersedes ADR-0008): the fan is read-only, the climate entity has no fan
+      mode, and `fan_manual_speed` (PM20) is a read-only sensor. A write to
+      `PM20` never acts without a display (T23, T27, T28), and whether it acts
+      with one is unknown. The band numbers stay the user's lever. A speed
+      control built on the band (raise via the minimum, lower via the maximum,
+      [`fan-speed-tests.md`](fan-speed-tests.md) test G) can be proposed once
+      G is run; it costs EEPROM writes per change (ADR-0023).
 - [x] **Rescale or clamp? (R variant only) — the key fan question.**
       **Answered (T23–T26).** The unit does not take `PM20` from Modbus at
       all (T23). Its own manual request, which `PM20` mirrors, is an absolute
@@ -320,14 +286,13 @@ opened to 0/100.
 - [ ] Confirm `SupplyFan_Status` (1119) reports `1` (OFF) when fan mode = off
       and a mode is active, and that `recirculation_active` (1112) goes 0.
       Covered by the fan = 0 test below.
-- [ ] **Does the fan turn while 1119 reads `4` (wait_off, "Stopping")?** Record
-      1119, 639 and 1117 through a PF03 post-run after a request ends. Decides
-      the proposed
-      [ADR-0028](../doc/adr/proposed/0028-one-definition-of-fan-stopped.md) (today the
-      fan entity, the climate fan mode and the airflow disagree about it).
-- [ ] Verify the Low / Medium / High percentages (30 / 55 / 85 %) are
-      reasonable for the real unit; adjust in `climate.py` `_FAN_MODE_PCT` if
-      not. These are nominal choices, not values from the PDF.
+- [ ] **Does the fan stand still while 1119 reads `2` (wait_on, "Starting")
+      and turn while it reads `4` (wait_off, "Stopping")?** Record 1119 and 639
+      from a request's start to the end of the PF03 run-on, and look at the
+      fan. ADR-0028 counts On and Wait OFF as running (T19 saw 40 % in Wait
+      OFF); Wait ON as stopped is [INFERRED].
+- [x] ~~Verify the Low / Medium / High fan mode percentages~~: the climate
+      entity has no fan mode any more (ADR-0034).
 
 ## Fan = 0 during dehumidification, and keeping the damper closed (Modbus only)
 

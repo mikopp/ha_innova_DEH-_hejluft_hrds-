@@ -113,6 +113,9 @@
       "fan_manual_request": {
         "name": "Manual fan request (display)"
       },
+      "fan_manual_speed": {
+        "name": "Manual fan speed"
+      },
       "fan_integration_request": {
         "name": "Fan integration request"
       },
@@ -457,6 +460,9 @@
       "recirculation_active": {
         "name": "Recirculation active"
       },
+      "supply_fan_running": {
+        "name": "Supply fan running"
+      },
       "alarm_active": {
         "name": "Alarm active"
       },
@@ -612,11 +618,6 @@
         }
       }
     },
-    "fan": {
-      "hrds_supply_fan": {
-        "name": "Supply fan"
-      }
-    },
     "number": {
       "humidity_setpoint": {
         "name": "Humidity setpoint"
@@ -641,9 +642,6 @@
       },
       "fan_max_speed_cooling": {
         "name": "Fan max speed (cooling)"
-      },
-      "fan_manual_speed": {
-        "name": "Manual fan speed"
       },
       "dehumidify_differential": {
         "name": "Dehumidify differential"

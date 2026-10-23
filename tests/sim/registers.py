@@ -43,6 +43,7 @@ HUMIDITY_SETPOINT = 1586
 FAN_HOURS = 1604  # PM01, write 0 resets AL22
 FAN_MANUAL = 1614  # PM20, x0.01 %
 PC07_MAX_WATER = 1633  # x0.1 degC
+PF26_FAN_POST_RUN = 1637  # x0.01 %, the fan's run-on speed
 PU02_WINTER_DEHUM = 1689  # 0 = no dehumidifying in winter (factory)
 PU07_DEHUM_DIFF = 1694  # %RH; auto DEU on above PU01 + PU07, off below PU01
 PF07_FAN_MIN_VMC = 1644  # x0.01 %

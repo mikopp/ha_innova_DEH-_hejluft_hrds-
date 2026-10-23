@@ -113,6 +113,9 @@
       "fan_manual_request": {
         "name": "Manuelle Lüfteranforderung (Display)"
       },
+      "fan_manual_speed": {
+        "name": "Manuelle Ventilatordrehzahl"
+      },
       "fan_integration_request": {
         "name": "Lüfter-Integrationsanforderung"
       },
@@ -457,6 +460,9 @@
       "recirculation_active": {
         "name": "Umluft aktiv"
       },
+      "supply_fan_running": {
+        "name": "Zuluftventilator läuft"
+      },
       "alarm_active": {
         "name": "Alarm aktiv"
       },
@@ -612,11 +618,6 @@
         }
       }
     },
-    "fan": {
-      "hrds_supply_fan": {
-        "name": "Zuluftventilator"
-      }
-    },
     "number": {
       "humidity_setpoint": {
         "name": "Feuchte-Sollwert"
@@ -641,9 +642,6 @@
       },
       "fan_max_speed_cooling": {
         "name": "Ventilator max. Drehzahl (Kühlung)"
-      },
-      "fan_manual_speed": {
-        "name": "Manuelle Ventilatordrehzahl"
       },
       "dehumidify_differential": {
         "name": "Entfeuchtungs-Differenz"

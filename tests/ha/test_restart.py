@@ -94,18 +94,18 @@ async def test_restart_leaves_a_running_unit_alone(hass, setup, clock):
     assert climate.attributes["hvac_action"] == "drying"
 
 
-async def test_restart_keeps_season_and_fan_setpoint(hass, setup, clock):
+async def test_restart_keeps_season_and_fan_band(hass, setup, clock):
     s = setup
     await allow_operation(s)
     await s.service("select", "select_option", "season", option="winter")
-    await s.service("fan", "set_percentage", "hrds_supply_fan", percentage=40)
+    await s.service("number", "set_value", "fan_min_speed_dehumidify", value=55)
     await clock.settle()
-    season, fan = s.device.holding[R.HB04_SEASON], s.device.holding[R.FAN_MANUAL]
+    season, fan = s.device.holding[R.HB04_SEASON], s.device.holding[R.PF28_FAN_MIN_DEU]
 
     await restart(hass, s)
 
     assert s.device.holding[R.HB04_SEASON] == season == R.SEASON_WINTER
-    assert s.device.holding[R.FAN_MANUAL] == fan == 4000
+    assert s.device.holding[R.PF28_FAN_MIN_DEU] == fan == 5500
     assert s.state("select", "season").state == "winter"
 
 

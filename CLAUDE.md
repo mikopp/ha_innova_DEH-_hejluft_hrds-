@@ -31,7 +31,7 @@ Do not restate ADR content in this file.
   operation gate (ADR-0012, ADR-0013, ADR-0014).
 * Verify the device before anything can write (ADR-0009).
 * Entities show the unit's read-back, and unknown or unavailable rather than
-  stale (ADR-0005, ADR-0006). No option may shadow a register (ADR-0008).
+  stale (ADR-0005, ADR-0006). No option may shadow a register (ADR-0034).
 * The entity reference `doc/entity-reference.md` is the only list of entities
   and mirrors the devices (main / setup / installer). Change it in the same
   commit as any entity, group or device change; `wiring_check.py` fails on a
@@ -45,7 +45,7 @@ Do not restate ADR content in this file.
 | `const.py` | `ENTITIES_DICT` (every register), `init()` classification into typed dicts, key groups (`SETUP_KEYS`, `CONFIG_KEYS`, `DIAGNOSTIC_KEYS`, `FAN_KEYS`, `OPERATIONAL_KEYS`, `PENDING_KEYS`, `MODBUS_ENABLE_FOR`), option names and defaults |
 | `__init__.py` | Setup/unload, registry migrations, and `HrdsModbusHub`: poll (`_do_read_cycle`, `_read_blocks`), decode (`_decode_all`), headless sync, derived state (`active_season`, `int_effect`, `auto_capable`, `is_heating`, `is_cooling`, setup and water issues, `_compute_derived`), guards (`check_write_allowed`), writes (`write_entity_value`, `_write_registers`), pending requests, brine guard |
 | `entity_common.py` | `HubBackedEntity` (availability, hub callback), `setup_platform_from_types`, device infos |
-| `climate.py`, `fan.py` | Composite entities (not one register each) |
+| `climate.py` | Composite entity (not one register) |
 | `sensor.py` … `button.py` | Generic platforms built from the typed dicts |
 | `identity.py` | FC 43 + register fingerprint check |
 | `config_flow.py` | Config and options flows (host, port, unit id, model, options) |

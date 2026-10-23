@@ -49,7 +49,7 @@ registers or values computed from them.
 
 | Entity | Name | What it shows / does |
 |---|---|---|
-| `climate.hrds_climate` | Climate | HVAC mode (Off, Standby or Auto⁴, Dry, Cool in summer, Heat in winter if enabled), action, fan mode (`R` units only). The mode says what can make the unit act. **Off** is the unit off: it clears the dehumidify and integration requests and switches the unit off. **Standby** (HA's *fan only*) is a unit that is on with nothing requested and no display or room probe, so nothing can start it by itself; action *Idle*, or *Fan* while a manual fan speed runs the fan. **Auto** turns the unit on with no request, so it regulates on its own setpoints; with a display or room probe that is what "on, nothing requested" means, so Standby is not offered then. *Turn on* clears both requests and switches the unit on (Standby, or Auto where offered); *turn off* is Off. **Cool**/**Heat** are offered only on a unit with the integration function (PG02), and an INT request that cannot act (brine in winter, no integration function) does not show as Cool/Heat; a winter INT from elsewhere shows as Heat whatever *Allow winter heating* says. The action reports what the unit does: *Cooling* needs a summer INT the unit acts on with the compressor running and no AL03; *Heating* needs the evidence described in [Operating modes in winter](../README.md#operating-modes-in-winter). Target T¹ / RH² only when a display or room probe is configured. `current_temperature`¹ and `current_humidity`² are suppressed when the corresponding probe is absent. Target-humidity bounds follow the unit's own PH29/PH30 clamps; the target temperature is SEtC in summer (15–35 °C) and SEtH in winter, limited to the unit's PH09–PH10 clamp (factory 14 °C both). |
+| `climate.hrds_climate` | Climate | HVAC mode (Off, Standby or Auto⁴, Dry, Cool in summer, Heat in winter if enabled) and action; no fan mode, since the unit takes no fan-speed request over Modbus (see the fan below). The mode says what can make the unit act. **Off** is the unit off: it clears the dehumidify and integration requests and switches the unit off. **Standby** (HA's *fan only*) is a unit that is on with nothing requested and no display or room probe, so nothing can start it by itself; action *Idle*, or *Fan* if the unit runs its fan with nothing requested. **Auto** turns the unit on with no request, so it regulates on its own setpoints; with a display or room probe that is what "on, nothing requested" means, so Standby is not offered then. *Turn on* clears both requests and switches the unit on (Standby, or Auto where offered); *turn off* is Off. **Cool**/**Heat** are offered only on a unit with the integration function (PG02), and an INT request that cannot act (brine in winter, no integration function) does not show as Cool/Heat; a winter INT from elsewhere shows as Heat whatever *Allow winter heating* says. The action reports what the unit does: *Cooling* needs a summer INT the unit acts on with the compressor running and no AL03; *Heating* needs the evidence described in [Operating modes in winter](../README.md#operating-modes-in-winter). Target T¹ / RH² only when a display or room probe is configured. `current_temperature`¹ and `current_humidity`² are suppressed when the corresponding probe is absent. Target-humidity bounds follow the unit's own PH29/PH30 clamps; the target temperature is SEtC in summer (15–35 °C) and SEtH in winter, limited to the unit's PH09–PH10 clamp (factory 14 °C both). |
 
 ⁴ Only offered when a display or a room probe lets the unit raise requests by
 itself (handbook §6.1), and while that reading is healthy. Not tested on a real
@@ -57,9 +57,24 @@ device (see the [beta banner](../README.md#release-094--beta-not-10-yet)).
 
 #### Fan
 
-| Entity | Name | What it does |
-|---|---|---|
-| `fan.hrds_supply_fan` | Supply fan | `R` units only (a non-R unit has no fan of its own; its damper output reads *disabled*, and the fan entity, the climate fan modes, the fan speed numbers and the fan sensors are not created). The unit's supply/recirculation fan as a percentage. Reports the **actual** output (reg 639) — what the fan is doing — while `fan.set_percentage` writes the setpoint PM20 (1614). **On the reference unit that write has no effect:** PM20 is the unit's own manual request and it overwrites the write ([UNIT_BEHAVIOUR §9.1](references/UNIT_BEHAVIOUR.md#91-bands-and-sources), T23). The fan starts at the band minimum (PF28); raising `number.fan_min_speed_dehumidify` above the current speed raises it, lowering it does not slow the fan (T24–T26; `_cooling` during INT and lowering via the maximum untested, [plan](../plans/fan-speed-tests.md)). The commanded value (`commanded_percent`, which shows PM20, the display's request), RPM and fan status are state attributes. Because the unit's own fan recirculates room air *in addition* to whatever the central MVHR pushes through the duct, it adds airflow on top of the MVHR. |
+The fan is shown by readings only, with no fan entity: Modbus can neither
+switch the unit's fan nor set its speed (ADR-0034). The unit runs the
+fan with every dehumidify or integration request and stops it after a run-on
+([UNIT_BEHAVIOUR §9.2–9.3](references/UNIT_BEHAVIOUR.md#92-timing)). PM20
+(1614) is its own manual request: a written value does not hold and one
+outside the band is refused (T23, T27, T28;
+[§9.1](references/UNIT_BEHAVIOUR.md#91-bands-and-sources)). The fan starts at
+the band minimum (PF28); raising `number.fan_min_speed_dehumidify` above the
+current speed raises it, lowering it does not slow the fan (T24–T26;
+`_cooling` during INT and lowering via the maximum untested,
+[plan](../plans/fan-speed-tests.md)). What the fan does is shown by
+`binary_sensor.supply_fan_running`, `sensor.supply_fan_status`,
+`sensor.supply_fan_output`, `sensor.fan_manual_speed`,
+`sensor.supply_fan_rpm` and `sensor.supply_fan_airflow`. `R` units only: a
+non-R unit has no fan of its own, its damper output reads *disabled*, and the
+fan sensors and fan speed numbers are not created. The unit's own fan
+recirculates room air *in addition* to whatever the central MVHR pushes
+through the duct, so it adds airflow on top of the MVHR.
 
 #### Request switches
 
@@ -75,12 +90,6 @@ device (see the [beta banner](../README.md#release-094--beta-not-10-yet)).
 |---|---|---|---|---|
 | `select.season` | Season | 1825 | Summer, Winter | HB04 — the season switch without a display (the Modbus manual's method: it flips how the open DI4 contact is read). Read-back is `sensor.operating_mode`. Switching to winter is refused while an integration request is on (it would turn into heating) and, on brine, while dehumidify is on. **If a contact is wired to DI4, closing it inverts the meaning.** |
 
-#### Fan setpoint
-
-| Entity | Name | Register | Range | Notes |
-|---|---|---|---|---|
-| `number.fan_manual_speed` | Manual fan speed | 1614 | 0–100 % | PM20, the **display's** manual setpoint. The fan entity and climate fan mode write here too, but the unit does not keep a written value (T23): it sets PM20 itself, to the band minimum (PF28) when the fan starts, up to a raised minimum during a run (T25) and to 0 when a request ends ([UNIT_BEHAVIOUR §9.1](references/UNIT_BEHAVIOUR.md#91-bands-and-sources)). It shows the unit's manual request; the speed the fan gets is `sensor.supply_fan_output` (639). See [Commanded vs actual fan speed](../README.md#commanded-vs-actual-fan-speed). |
-
 #### Sensors
 
 | Entity | Name | Unit | Probe needed | Notes |
@@ -93,6 +102,7 @@ device (see the [beta banner](../README.md#release-094--beta-not-10-yet)).
 | `sensor.air_quality` | Air quality | ppm | External IAQ sensor | Reg 506; monitoring only |
 | `sensor.actual_setpoint` | Active setpoint | °C | — | Reg 1111; active room setpoint in use |
 | `sensor.supply_fan_output` | Supply fan output | % | ³ Built-in | Reg 639 (×0.01 %); actual fan analog output |
+| `sensor.fan_manual_speed` | Manual fan speed | % | ³ Built-in | Reg 1614, PM20: the unit's own manual fan request, read-only. The unit sets it to the band minimum (PF28) when the fan starts, up to a raised minimum during a run (T25) and to 0 when a request ends (T22); the fan is driven at it. Reads the same as `sensor.fan_manual_request` (1114) |
 | `sensor.compressor_output` | Compressor output | % | ³ Built-in | Reg 641 (×0.01 %); compressor modulation level |
 | `sensor.supply_fan_rpm` | Supply fan speed | rpm | ³ Built-in | Reg 1117. **Unknown** when no input is allocated to the fan tachometer (input function 45/46 on HA01, HA04–HA18, HB01, HB02, HB05–HB07, read at setup): the unit then has no speed to report and the register reads 0 with the fan running |
 | `sensor.exhaust_temperature` | Exhaust air temperature | °C | External NTC | Reg 502; monitoring only |
@@ -113,6 +123,7 @@ Alarm sensors map to a single bit of a packed alarm register (§9.1 in
 |---|---|---|---|
 | `binary_sensor.dehumidify_request` | Dehumidify requested | ³ | Dehumidification currently requested |
 | `binary_sensor.recirculation_active` | Recirculation active | ³ | (not a register) Damper (1134) open **and** supply fan status *On* (1119): room air is drawn across the coil. Off while the fan is still starting or runs on after the damper closed. R variant only |
+| `binary_sensor.supply_fan_running` | Supply fan running | ³ | (not a register) The fan turns: supply fan status (1119) *On* or *Stopping* (the run-on at PF26, T19). Off while *Starting* (the PS01 delay before the fan starts), off and in alarm; unknown when the status is unknown. The only on/off of the fan; Home Assistant cannot switch it. R variant only |
 | `binary_sensor.alarm_active` | Alarm active | ³ | At least one alarm is active |
 | `binary_sensor.alarm_compressor_lowpressure` | Alarm: compressor low-pressure / frost | ³ | AL11, reg 768 bit 10: Compressor stopped (low pressure / frost thermostat) |
 | `binary_sensor.alarm_compressor_highpressure` | Alarm: compressor high-pressure | ³ | AL12, reg 768 bit 11: Compressor stopped (high pressure switch) |
@@ -137,7 +148,7 @@ probe lets the unit act on them (ADR-0011).
 | `number.humidity_setpoint` | Humidity setpoint | 1586 | 0–100 %RH | PU01; target humidity for automatic dehumidify. **Not created without a display or humidity probe** |
 | `number.summer_setpoint` | Summer setpoint | 1584 | 15–35 °C | SEtC; target room temp for automatic summer integration, clamped by PH07/PH08. **Not created without a display or room temperature probe** |
 | `number.winter_setpoint` | Winter setpoint | 1585 | 5–35 °C | SEtH; target room temp for automatic winter heating: the unit heats by itself below SEtH − PF12 (see [The unit heats on its own](../README.md#the-unit-heats-on-its-own)). Clamped by the unit to PH09–PH10 (factory 14 °C both). **Not created without a display or room temperature probe** |
-| `number.fan_min_speed_dehumidify` | Fan min speed (dehumidify) | 1853 | 0–100 % | PF28; lower fan bound in dehumidify mode |
+| `number.fan_min_speed_dehumidify` | Fan min speed (dehumidify) | 1853 | 0–100 % | PF28; lower fan bound in dehumidify mode, and the fan's start speed. The only way to change the speed over Modbus: raising it above the running speed raises the fan; lowering it does not slow a running fan (T24–T26). EEPROM parameter: set it when needed, not per cycle (ADR-0023) |
 | `number.fan_max_speed_dehumidify` | Fan max speed (dehumidify) | 1647 | 0–100 % | PF10; upper fan bound in dehumidify mode |
 | `number.fan_min_speed_cooling` | Fan min speed (cooling) | 1852 | 0–100 % | PF27; lower fan bound in active cooling |
 | `number.fan_min_speed_vmc` | Fan min speed (VMC) | 1644 | 0–100 % | PF07; lower fan bound in VMC (ventilation-only) mode |
@@ -243,8 +254,7 @@ Entity ids carry the device name, for example `sensor.hrds_setup_setup_check`.
 **Why it exists.** The handbook's installer menu (§5.3) has about 240
 parameters with a Modbus address. They are not needed for setup or normal use.
 **Why it is separate and opt-in:** a few of them cut the connection or are
-destructive, and reading them all made the poll too heavy for the real unit
-(0.9.0 did not load), so the device is **off by default** and its registers are
+destructive, and reading them all makes the poll too heavy for the real unit, so the device is **off by default** and its registers are
 never part of the regular poll (ADR-0017). Turn on *Installer device* in the
 integration options (Settings → Devices & services → HRDS+ → Configure); turning
 it off again removes the device and its entities. Entity ids carry the parameter
